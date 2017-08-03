@@ -220,24 +220,26 @@ func root(cmd *cobra.Command, args []string) {
 			uncordon(nodeID)
 		}
 		release(lock)
-	} else {
-		node, err := client.CoreV1().Nodes().Get(nodeID)
-		if err != nil {
-			log.Fatal(err)
-		}
-		nodeMeta.Unschedulable = node.Spec.Unschedulable
 	}
 
 	source := rand.NewSource(time.Now().UnixNano())
 	tick := delaytick.New(source, time.Minute*time.Duration(period))
 	for _ = range tick {
-		if rebootRequired() && !rebootBlocked() && acquire(lock, &nodeMeta) {
-			if !nodeMeta.Unschedulable {
-				drain(nodeID)
-				waitForDrain(client, nodeID)
+		if rebootRequired() && !rebootBlocked() {
+			node, err := client.CoreV1().Nodes().Get(nodeID)
+			if err != nil {
+				log.Fatal(err)
 			}
-			reboot()
-			break
+			nodeMeta.Unschedulable = node.Spec.Unschedulable
+
+			if acquire(lock, &nodeMeta) {
+				if !nodeMeta.Unschedulable {
+					drain(nodeID)
+					waitForDrain(client, nodeID)
+				}
+				reboot()
+				break
+			}
 		}
 	}
 
