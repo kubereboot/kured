@@ -23,6 +23,7 @@ spec:
 #            - --period=60
 #            - --prometheus-url=http://prometheus.monitoring.svc.cluster.local
 #            - --reboot-sentinel=/var/run/reboot-required
+#            - --slack-hook-url=https://hooks.slack.com/...
           env:
             # Pass in the name of the node on which this pod is scheduled
             # for use with drain/uncordon operations and lock acquisition

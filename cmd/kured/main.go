@@ -16,6 +16,7 @@ import (
 	"github.com/weaveworks/kured/pkg/alerts"
 	"github.com/weaveworks/kured/pkg/daemonsetlock"
 	"github.com/weaveworks/kured/pkg/delaytick"
+	"github.com/weaveworks/kured/pkg/notifications/slack"
 )
 
 var (
@@ -27,6 +28,8 @@ var (
 	prometheusURL  string
 	alertFilter    *regexp.Regexp
 	rebootSentinel string
+	slackHookURL   string
+	slackUsername  string
 )
 
 func main() {
@@ -49,6 +52,11 @@ func main() {
 		"alert names to ignore when checking for active alerts")
 	rootCmd.PersistentFlags().StringVar(&rebootSentinel, "reboot-sentinel", "/var/run/reboot-required",
 		"path to file whose existence signals need to reboot")
+
+	rootCmd.PersistentFlags().StringVar(&slackHookURL, "slack-hook-url", "",
+		"slack hook URL for reboot notfications")
+	rootCmd.PersistentFlags().StringVar(&slackUsername, "slack-username", "kured",
+		"slack username for reboot notfications")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
@@ -169,8 +177,15 @@ func waitForDrain(client *kubernetes.Clientset, nodeID string) {
 	}
 }
 
-func reboot() {
+func reboot(nodeID string) {
 	log.Infof("Commanding reboot")
+
+	if slackHookURL != "" {
+		if err := slack.NotifyReboot(slackHookURL, slackUsername, nodeID); err != nil {
+			log.Warnf("Error notifying slack: %v", err)
+		}
+	}
+
 	// Relies on /var/run/dbus/system_bus_socket bind mount to talk to systemd
 	rebootCmd := exec.Command("/bin/systemctl", "reboot")
 	if err := rebootCmd.Run(); err != nil {
@@ -237,7 +252,7 @@ func root(cmd *cobra.Command, args []string) {
 					drain(nodeID)
 					waitForDrain(client, nodeID)
 				}
-				reboot()
+				reboot(nodeID)
 				break
 			}
 		}
