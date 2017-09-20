@@ -10,33 +10,34 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-// Return true if there are any active (e.g. pending or firing) alerts
-func PrometheusCountActive(prometheusURL string, filter *regexp.Regexp) (int, error) {
+// Returns a list of names of active (e.g. pending or firing) alerts, filtered
+// by the supplied regexp.
+func PrometheusActiveAlerts(prometheusURL string, filter *regexp.Regexp) ([]string, error) {
 	client, err := prometheus.New(prometheus.Config{Address: prometheusURL})
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	queryAPI := prometheus.NewQueryAPI(client)
 
 	value, err := queryAPI.Query(context.Background(), "ALERTS", time.Now())
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	if value.Type() == model.ValVector {
 		if vector, ok := value.(model.Vector); ok {
-			var count int
+			var activeAlerts []string
 			for _, sample := range vector {
-				if alertName, isAlert := sample.Metric[model.AlertNameLabel]; isAlert {
+				if alertName, isAlert := sample.Metric[model.AlertNameLabel]; isAlert && sample.Value != 0 {
 					if filter == nil || !filter.MatchString(string(alertName)) {
-						count++
+						activeAlerts = append(activeAlerts, string(alertName))
 					}
 				}
 			}
-			return count, nil
+			return activeAlerts, nil
 		}
 	}
 
-	return 0, fmt.Errorf("Unexpected value type: %v", value)
+	return nil, fmt.Errorf("Unexpected value type: %v", value)
 }

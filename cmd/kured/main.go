@@ -80,13 +80,17 @@ func rebootRequired() bool {
 
 func rebootBlocked() bool {
 	if prometheusURL != "" {
-		count, err := alerts.PrometheusCountActive(prometheusURL, alertFilter)
+		alertNames, err := alerts.PrometheusActiveAlerts(prometheusURL, alertFilter)
 		if err != nil {
 			log.Warnf("Reboot blocked: prometheus query error: %v", err)
 			return true
 		}
+		count := len(alertNames)
+		if count > 10 {
+			alertNames = append(alertNames[:10], "...")
+		}
 		if count > 0 {
-			log.Warnf("Reboot blocked: %d active alerts", count)
+			log.Warnf("Reboot blocked: %d active alerts: %v", count, alertNames)
 			return true
 		}
 	}
