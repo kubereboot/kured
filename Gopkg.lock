@@ -1,4 +1,9 @@
-memo = "758e136fb047a3fbb8746d2e83a9e11d341db8e16e4ddc78bc0e8b41038f023b"
+[solve-meta]
+  analyzer-name = "dep"
+  analyzer-version = 1
+  inputs-digest = "758e136fb047a3fbb8746d2e83a9e11d341db8e16e4ddc78bc0e8b41038f023b"
+  solver-name = "gps-cdcl"
+  solver-version = 1
 
 [[projects]]
   name = "github.com/PuerkitoBio/purell"

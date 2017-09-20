@@ -1,0 +1,14 @@
+version: 2
+jobs:
+  build:
+    working_directory: /go/src/github.com/weaveworks/kured
+    docker:
+      - image: circleci/golang:1.8
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: go get github.com/golang/dep/cmd/dep
+      - run: dep ensure
+      - run: make
+      - run: docker login -u "$DOCKER_USER" -p "$DOCKER_PASS" quay.io
+      - run: make publish-image

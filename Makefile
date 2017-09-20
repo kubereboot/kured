@@ -2,7 +2,7 @@
 .PHONY: all clean image publish-image minikube-publish
 
 DH_ORG=weaveworks
-IMAGE_TAG=latest
+VERSION=$(shell git symbolic-ref --short HEAD)-$(shell git rev-parse --short HEAD)
 
 all: image
 
@@ -14,7 +14,6 @@ clean:
 godeps=$(shell go get $1 && go list -f '{{join .Deps "\n"}}' $1 | grep -v /vendor/ | xargs go list -f '{{if not .Standard}}{{ $$dep := . }}{{range .GoFiles}}{{$$dep.Dir}}/{{.}} {{end}}{{end}}')
 
 DEPS=$(call godeps,./cmd/kured)
-VERSION=git-$(shell git rev-parse --short=12 HEAD)
 
 cmd/kured/kured: $(DEPS)
 cmd/kured/kured: cmd/kured/*.go
@@ -23,13 +22,13 @@ cmd/kured/kured: cmd/kured/*.go
 build/.image.done: cmd/kured/Dockerfile cmd/kured/kured
 	mkdir -p build
 	cp $^ build
-	sudo -E docker build -t $(DH_ORG)/kured:$(IMAGE_TAG) -f build/Dockerfile ./build
+	sudo -E docker build -t quay.io/$(DH_ORG)/kured:$(VERSION) -f build/Dockerfile ./build
 	touch $@
 
 image: build/.image.done
 
 publish-image: image
-	sudo -E docker push $(DH_ORG)/kured:$(IMAGE_TAG)
+	sudo -E docker push quay.io/$(DH_ORG)/kured:$(VERSION)
 
 minikube-publish: image
-	sudo -E docker save $(DH_ORG)/kured:$(IMAGE_TAG) | (eval $$(minikube docker-env) && docker load)
+	sudo -E docker save quay.io/$(DH_ORG)/kured:$(VERSION) | (eval $$(minikube docker-env) && docker load)
