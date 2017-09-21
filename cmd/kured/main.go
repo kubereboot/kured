@@ -171,40 +171,6 @@ func uncordon(nodeID string) {
 	}
 }
 
-func waitForDrain(client *kubernetes.Clientset, nodeID string) {
-	for {
-		var unterminated int
-
-		namespaces, err := client.CoreV1().Namespaces().List(metav1.ListOptions{})
-		if err != nil {
-			log.Fatalf("Error waiting for drain: %v", err)
-		}
-
-		for _, namespace := range namespaces.Items {
-			drainCandidates := metav1.ListOptions{LabelSelector: "ignore_on_drain!=true"}
-			pods, err := client.CoreV1().Pods(namespace.ObjectMeta.Name).List(drainCandidates)
-			if err != nil {
-				log.Fatalf("Error waiting for drain: %v", err)
-			}
-
-			for _, pod := range pods.Items {
-				if pod.Spec.NodeName == nodeID &&
-					pod.Status.Phase != "Succeeded" &&
-					pod.Status.Phase != "Failed" {
-					unterminated++
-				}
-			}
-		}
-
-		if unterminated == 0 {
-			return
-		}
-
-		log.Infof("Waiting for %d pods to terminate", unterminated)
-		time.Sleep(time.Minute)
-	}
-}
-
 func commandReboot(nodeID string) {
 	log.Infof("Commanding reboot")
 
@@ -271,7 +237,6 @@ func rebootAsRequired(nodeID string) {
 			if acquire(lock, &nodeMeta) {
 				if !nodeMeta.Unschedulable {
 					drain(nodeID)
-					waitForDrain(client, nodeID)
 				}
 				commandReboot(nodeID)
 				for {
