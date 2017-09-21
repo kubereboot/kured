@@ -21,7 +21,7 @@ import (
 
 var (
 	version        = "unreleased"
-	period         int
+	period         time.Duration
 	dsNamespace    string
 	dsName         string
 	lockAnnotation string
@@ -38,8 +38,8 @@ func main() {
 		Short: "Kubernetes Reboot Daemon",
 		Run:   root}
 
-	rootCmd.PersistentFlags().IntVar(&period, "period", 60,
-		"reboot check period in minutes")
+	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
+		"reboot check period")
 	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-name", "kube-system",
 		"namespace containing daemonset on which to place lock")
 	rootCmd.PersistentFlags().StringVar(&dsName, "ds-namespace", "kured",
@@ -219,7 +219,7 @@ func root(cmd *cobra.Command, args []string) {
 
 	log.Infof("Node ID: %s", nodeID)
 	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
-	log.Infof("Reboot Sentinel: %s every %d minutes", rebootSentinel, period)
+	log.Infof("Reboot Sentinel: %s every %v", rebootSentinel, period)
 
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -242,7 +242,7 @@ func root(cmd *cobra.Command, args []string) {
 	}
 
 	source := rand.NewSource(time.Now().UnixNano())
-	tick := delaytick.New(source, time.Minute*time.Duration(period))
+	tick := delaytick.New(source, period)
 	for _ = range tick {
 		if rebootRequired() && !rebootBlocked() {
 			node, err := client.CoreV1().Nodes().Get(nodeID)

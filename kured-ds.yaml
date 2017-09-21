@@ -20,7 +20,7 @@ spec:
 #            - --ds-name=kube-system
 #            - --ds-namespace=kured
 #            - --lock-annotation=weave.works/kured-node-lock
-#            - --period=60
+#            - --period=1h
 #            - --prometheus-url=http://prometheus.monitoring.svc.cluster.local
 #            - --reboot-sentinel=/var/run/reboot-required
 #            - --slack-hook-url=https://hooks.slack.com/...
