@@ -10,8 +10,8 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -175,13 +175,13 @@ func waitForDrain(client *kubernetes.Clientset, nodeID string) {
 	for {
 		var unterminated int
 
-		namespaces, err := client.CoreV1().Namespaces().List(v1.ListOptions{})
+		namespaces, err := client.CoreV1().Namespaces().List(metav1.ListOptions{})
 		if err != nil {
 			log.Fatalf("Error waiting for drain: %v", err)
 		}
 
 		for _, namespace := range namespaces.Items {
-			drainCandidates := v1.ListOptions{LabelSelector: "ignore_on_drain!=true"}
+			drainCandidates := metav1.ListOptions{LabelSelector: "ignore_on_drain!=true"}
 			pods, err := client.CoreV1().Pods(namespace.ObjectMeta.Name).List(drainCandidates)
 			if err != nil {
 				log.Fatalf("Error waiting for drain: %v", err)
@@ -262,7 +262,7 @@ func rebootAsRequired(nodeID string) {
 	tick := delaytick.New(source, period)
 	for _ = range tick {
 		if rebootRequired() && !rebootBlocked() {
-			node, err := client.CoreV1().Nodes().Get(nodeID)
+			node, err := client.CoreV1().Nodes().Get(nodeID, metav1.GetOptions{})
 			if err != nil {
 				log.Fatal(err)
 			}
