@@ -2,6 +2,7 @@ package main
 
 import (
 	"math/rand"
+	"net/http"
 	"os"
 	"os/exec"
 	"regexp"
@@ -13,6 +14,8 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/weaveworks/kured/pkg/alerts"
 	"github.com/weaveworks/kured/pkg/daemonsetlock"
 	"github.com/weaveworks/kured/pkg/delaytick"
@@ -20,7 +23,9 @@ import (
 )
 
 var (
-	version        = "unreleased"
+	version = "unreleased"
+
+	// Command line flags
 	period         time.Duration
 	dsNamespace    string
 	dsName         string
@@ -30,7 +35,18 @@ var (
 	rebootSentinel string
 	slackHookURL   string
 	slackUsername  string
+
+	// Metrics
+	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Subsystem: "kured",
+		Name:      "reboot_required",
+		Help:      "OS requires reboot due to software updates.",
+	}, []string{"node"})
 )
+
+func init() {
+	prometheus.MustRegister(rebootRequiredGauge)
+}
 
 func main() {
 	rootCmd := &cobra.Command{
@@ -63,18 +79,26 @@ func main() {
 	}
 }
 
-func rebootRequired() bool {
+func sentinelExists() bool {
 	_, err := os.Stat(rebootSentinel)
 	switch {
 	case err == nil:
-		log.Infof("Reboot required")
 		return true
 	case os.IsNotExist(err):
-		log.Infof("Reboot not required")
 		return false
 	default:
-		log.Fatalf("Unable to determine if reboot required: %v", err)
+		log.Fatalf("Unable to determine existence of sentinel: %v", err)
 		return false // unreachable; prevents compilation error
+	}
+}
+
+func rebootRequired() bool {
+	if sentinelExists() {
+		log.Infof("Reboot required")
+		return true
+	} else {
+		log.Infof("Reboot not required")
+		return false
 	}
 }
 
@@ -181,7 +205,7 @@ func waitForDrain(client *kubernetes.Clientset, nodeID string) {
 	}
 }
 
-func reboot(nodeID string) {
+func commandReboot(nodeID string) {
 	log.Infof("Commanding reboot")
 
 	if slackHookURL != "" {
@@ -197,9 +221,13 @@ func reboot(nodeID string) {
 	}
 }
 
-func waitForReboot() {
+func maintainRebootRequiredMetric(nodeID string) {
 	for {
-		log.Infof("Waiting for reboot")
+		if sentinelExists() {
+			rebootRequiredGauge.WithLabelValues(nodeID).Set(1)
+		} else {
+			rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
+		}
 		time.Sleep(time.Minute)
 	}
 }
@@ -209,18 +237,7 @@ type nodeMeta struct {
 	Unschedulable bool `json:"unschedulable"`
 }
 
-func root(cmd *cobra.Command, args []string) {
-	log.Infof("Kubernetes Reboot Daemon: %s", version)
-
-	nodeID := os.Getenv("KURED_NODE_ID")
-	if nodeID == "" {
-		log.Fatal("KURED_NODE_ID environment variable required")
-	}
-
-	log.Infof("Node ID: %s", nodeID)
-	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
-	log.Infof("Reboot Sentinel: %s every %v", rebootSentinel, period)
-
+func rebootAsRequired(nodeID string) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Fatal(err)
@@ -256,11 +273,31 @@ func root(cmd *cobra.Command, args []string) {
 					drain(nodeID)
 					waitForDrain(client, nodeID)
 				}
-				reboot(nodeID)
-				break
+				commandReboot(nodeID)
+				for {
+					log.Infof("Waiting for reboot")
+					time.Sleep(time.Minute)
+				}
 			}
 		}
 	}
+}
 
-	waitForReboot()
+func root(cmd *cobra.Command, args []string) {
+	log.Infof("Kubernetes Reboot Daemon: %s", version)
+
+	nodeID := os.Getenv("KURED_NODE_ID")
+	if nodeID == "" {
+		log.Fatal("KURED_NODE_ID environment variable required")
+	}
+
+	log.Infof("Node ID: %s", nodeID)
+	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
+	log.Infof("Reboot Sentinel: %s every %v", rebootSentinel, period)
+
+	go rebootAsRequired(nodeID)
+	go maintainRebootRequiredMetric(nodeID)
+
+	http.Handle("/metrics", promhttp.Handler())
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
