@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"sort"
 	"time"
 
 	"github.com/prometheus/client_golang/api/prometheus"
@@ -27,14 +28,21 @@ func PrometheusActiveAlerts(prometheusURL string, filter *regexp.Regexp) ([]stri
 
 	if value.Type() == model.ValVector {
 		if vector, ok := value.(model.Vector); ok {
-			var activeAlerts []string
+			activeAlertSet := make(map[string]bool)
 			for _, sample := range vector {
 				if alertName, isAlert := sample.Metric[model.AlertNameLabel]; isAlert && sample.Value != 0 {
 					if filter == nil || !filter.MatchString(string(alertName)) {
-						activeAlerts = append(activeAlerts, string(alertName))
+						activeAlertSet[string(alertName)] = true
 					}
 				}
 			}
+
+			var activeAlerts []string
+			for activeAlert, _ := range activeAlertSet {
+				activeAlerts = append(activeAlerts, activeAlert)
+			}
+			sort.Sort(sort.StringSlice(activeAlerts))
+
 			return activeAlerts, nil
 		}
 	}
