@@ -1,22 +1,58 @@
 
+<img src="https://github.com/weaveworks/kured/raw/master/img/logo.png" align="right"/>
+
 * [Introduction](#introduction)
+* [Kubernetes & OS Compatibility](#kubernetes-&-os-compatibility)
+* [Installation](#installation)
 * [Configuration](#configuration)
 	* [Reboot Sentinel File & Period](#reboot-sentinel-file-&-period)
 	* [Blocking Reboots via Alerts](#blocking-reboots-via-alerts)
+	* [Prometheus Metrics](#prometheus-metrics)
+	* [Slack Notifications](#slack-notifications)
 	* [Overriding Lock Configuration](#overriding-lock-configuration)
+* [Operation](#operation)
+	* [Testing](#testing)
+	* [Disabling Reboots](#disabling-reboots)
+	* [Manual Unlock](#manual-unlock)
 * [Building](#building)
 
 ## Introduction
 
 Kured (KUbernetes REboot Daemon) is a Kubernetes daemonset that
-performs safe automatic node reboots when it is requested by the
-package management system of the underlying OS.
+performs safe automatic node reboots when the need to do so is
+indicated by the package management system of the underlying OS.
 
 * Watches for the presence of a reboot sentinel e.g. `/var/run/reboot-required` 
 * Utilises a lock in the API server to ensure only one node reboots at
   a time
 * Optionally defers reboots in the presence of active Prometheus alerts
 * Cordons & drains worker nodes before reboot, uncordoning them after
+
+## Kubernetes & OS Compatibility
+
+The daemon image contains a 1.7.x `k8s.io/client-go` and `kubectl`
+binary for the purposes of maintaining the lock and draining worker
+nodes. Whilst it has only been tested on a 1.7.x cluster, Kubernetes
+typically has good forwards/backwards compatibility so there is a
+reasonable chance it will work on adjacent versions; please file an
+issue if this is not the case.
+
+Additionally, the image contains a `systemctl` binary from Ubuntu
+16.04 in order to command reboots. Again, although this has not been
+tested against other systemd distributions there is a good chance that
+it will work.
+
+## Installation
+
+To obtain a default installation without Prometheus alerting interlock
+or Slack notifications:
+
+```
+kubectl apply -f https://github.com/weaveworks/kured/releases/download/1.0.0/kured-ds.yaml
+```
+
+If you want to customise the installation, download the manifest and
+edit it in accordance with the following section before application.
 
 ## Configuration
 
@@ -28,17 +64,19 @@ Flags:
       --ds-name string              namespace containing daemonset on which to place lock (default "kube-system")
       --ds-namespace string         name of daemonset on which to place lock (default "kured")
       --lock-annotation string      annotation in which to record locking node (default "weave.works/kured-node-lock")
-      --period int                  reboot check period in minutes (default 60)
+      --period duration             reboot check period (default 1h0m0s)
       --prometheus-url string       Prometheus instance to probe for active alerts
       --reboot-sentinel string      path to file whose existence signals need to reboot (default "/var/run/reboot-required")
+      --slack-hook-url string       slack hook URL for reboot notfications
+      --slack-username string       slack username for reboot notfications (default "kured")
 ```
 
 ### Reboot Sentinel File & Period
 
 By default kured checks for the existence of
 `/var/run/reboot-required` every sixty minutes; you can override these
-values with `--reboot-sentinel` and `--period`. Each instance of the
-reboot uses a random offset derived from the period on startup so that
+values with `--reboot-sentinel` and `--period`. Each replica of the
+daemon uses a random offset derived from the period on startup so that
 nodes don't all contend for the lock simultaneously.
 
 ### Blocking Reboots via Alerts
@@ -55,8 +93,55 @@ By default the presence of *any* active (pending or firing) alerts
 will block reboots, however you can ignore specific alerts:
 
 ```
---alert-filter-regexp=^(BenignAlert|AnotherBenignAlert|...$
+--alert-filter-regexp=^(RebootRequired|AnotherBenignAlert|...$
 ```
+
+An important application of this filter will become apparent in the
+next section.
+
+### Prometheus Metrics
+
+Each kured pod exposes a single gauge metric (`:8080/metrics`) that
+indicates the presence of the sentinel file:
+
+```
+# HELP kured_reboot_required OS requires reboot due to software updates.
+# TYPE kured_reboot_required gauge
+kured_reboot_required{node="ip-xxx-xxx-xxx-xxx.ec2.internal"} 0
+```
+
+The purpose of this metric is to power an alert which will summon an
+operator if the cluster cannot reboot itself automatically for a
+prolonged period:
+
+```
+# Alert if a reboot is required for any machines. Acts as a failsafe for the
+# reboot daemon, which will not reboot nodes if there are pending alerts save
+# this one.
+ALERT RebootRequired
+  IF          max(kured_reboot_required) != 0
+  FOR         24h
+  LABELS      { severity="warning" }
+  ANNOTATIONS {
+    summary = "Machine(s) require being rebooted, and the reboot daemon has failed to do so for 24 hours",
+    impact = "Cluster nodes more vulnerable to security exploits. Eventually, no disk space left.",
+    description = "Machine(s) require being rebooted, probably due to kernel update.",
+  }
+```
+
+If you choose to employ such an alert and have configured kured to
+probe for active alerts before rebooting, be sure to specify
+`--alert-filter-regexp=^RebootRequired$` to avoid deadlock!
+
+### Slack Notifications
+
+If you specify a Slack hook via `--slack-hook-url`, kured will notify
+you immediately prior to rebooting a node:
+
+<img src="https://github.com/weaveworks/kured/raw/master/img/slack-notification.png"/>
+
+We recommend setting `--slack-username` to be the name of the
+environment, e.g. `dev` or `prod`.
 
 ### Overriding Lock Configuration
 
@@ -68,6 +153,43 @@ the daemonset YAML provided in the repository.
 Similarly `--lock-annotation` can be used to change the name of the
 annotation kured will use to store the lock, but the default is almost
 certainly safe.
+
+## Operation
+
+The example commands in this section assume that you have not
+overriden the default lock annotation, daemonset name or namespace;
+if you have, you will have to adjust the commands accordingly.
+
+### Testing
+
+You can test your configuration by provoking a reboot on a node:
+
+```
+sudo touch /var/run/reboot-required
+```
+
+### Disabling Reboots
+
+If you need to temporarily stop kured from rebooting any nodes, you
+can take the lock manually:
+
+```
+kubectl -n kube-system annotate ds kured weave.works/kured-node-lock='{"nodeID":"manual"}'
+```
+
+Don't forget to release it afterwards!
+
+### Manual Unlock
+
+In exceptional circumstances, such as a node experiencing a permanent
+failure whilst rebooting, manual intervention may be required to
+remove the cluster lock:
+
+```
+kubectl -n kube-system annotate ds kured weave.works/kured-node-lock-
+```
+> NB the `-` at the end of the command is important - it instructs
+> `kubectl` to remove that annotation entirely.
 
 ## Building
 
