@@ -17,8 +17,8 @@ spec:
             - /usr/bin/kured
 #          args:
 #            - --alert-filter-regexp=^RebootRequired$
-#            - --ds-name=kube-system
-#            - --ds-namespace=kured
+#            - --ds-name=kured
+#            - --ds-namespace=kube-system
 #            - --lock-annotation=weave.works/kured-node-lock
 #            - --period=1h
 #            - --prometheus-url=http://prometheus.monitoring.svc.cluster.local
