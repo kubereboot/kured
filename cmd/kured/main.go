@@ -56,9 +56,9 @@ func main() {
 
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
 		"reboot check period")
-	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-name", "kube-system",
+	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-namespace", "kube-system",
 		"namespace containing daemonset on which to place lock")
-	rootCmd.PersistentFlags().StringVar(&dsName, "ds-namespace", "kured",
+	rootCmd.PersistentFlags().StringVar(&dsName, "ds-name", "kured",
 		"name of daemonset on which to place lock")
 	rootCmd.PersistentFlags().StringVar(&lockAnnotation, "lock-annotation", "weave.works/kured-node-lock",
 		"annotation in which to record locking node")
