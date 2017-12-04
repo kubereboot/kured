@@ -11,7 +11,7 @@ spec:
     spec:
       containers:
         - name: kured
-          image: quay.io/weaveworks/kured
+          image: quay.io/weaveworks/kured:1.0.0
           imagePullPolicy: IfNotPresent
           command:
             - /usr/bin/kured
