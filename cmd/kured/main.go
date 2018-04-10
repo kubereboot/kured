@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -77,6 +77,23 @@ func main() {
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// newCommand creates a new Command with stdout/stderr wired to our standard logger
+func newCommand(name string, arg ...string) *exec.Cmd {
+	cmd := exec.Command(name, arg...)
+
+	cmd.Stdout = log.NewEntry(log.StandardLogger()).
+		WithField("cmd", cmd.Args[0]).
+		WithField("std", "out").
+		WriterLevel(log.InfoLevel)
+
+	cmd.Stderr = log.NewEntry(log.StandardLogger()).
+		WithField("cmd", cmd.Args[0]).
+		WithField("std", "err").
+		WriterLevel(log.WarnLevel)
+
+	return cmd
 }
 
 func sentinelExists() bool {
@@ -156,8 +173,9 @@ func release(lock *daemonsetlock.DaemonSetLock) {
 
 func drain(nodeID string) {
 	log.Infof("Draining node %s", nodeID)
-	drainCmd := exec.Command("/usr/bin/kubectl", "drain",
+	drainCmd := newCommand("/usr/bin/kubectl", "drain",
 		"--ignore-daemonsets", "--delete-local-data", "--force", nodeID)
+
 	if err := drainCmd.Run(); err != nil {
 		log.Fatalf("Error invoking drain command: %v", err)
 	}
@@ -165,7 +183,7 @@ func drain(nodeID string) {
 
 func uncordon(nodeID string) {
 	log.Infof("Uncordoning node %s", nodeID)
-	uncordonCmd := exec.Command("/usr/bin/kubectl", "uncordon", nodeID)
+	uncordonCmd := newCommand("/usr/bin/kubectl", "uncordon", nodeID)
 	if err := uncordonCmd.Run(); err != nil {
 		log.Fatalf("Error invoking uncordon command: %v", err)
 	}
@@ -181,7 +199,7 @@ func commandReboot(nodeID string) {
 	}
 
 	// Relies on /var/run/dbus/system_bus_socket bind mount to talk to systemd
-	rebootCmd := exec.Command("/bin/systemctl", "reboot")
+	rebootCmd := newCommand("/bin/systemctl", "reboot")
 	if err := rebootCmd.Run(); err != nil {
 		log.Fatalf("Error invoking reboot command: %v", err)
 	}
