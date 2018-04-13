@@ -22,7 +22,7 @@ Kured (KUbernetes REboot Daemon) is a Kubernetes daemonset that
 performs safe automatic node reboots when the need to do so is
 indicated by the package management system of the underlying OS.
 
-* Watches for the presence of a reboot sentinel e.g. `/var/run/reboot-required` 
+* Watches for the presence of a reboot sentinel e.g. `/var/run/reboot-required`
 * Utilises a lock in the API server to ensure only one node reboots at
   a time
 * Optionally defers reboots in the presence of active Prometheus alerts
@@ -196,3 +196,15 @@ kubectl -n kube-system annotate ds kured weave.works/kured-node-lock-
 ```
 dep ensure && make
 ```
+
+
+## <a name="help"></a>Getting Help
+
+If you have any questions about, feedback for or problems with `kured`:
+
+- Invite yourself to the <a href="https://weaveworks.github.io/community-slack/" target="_blank"> #weave-community </a> slack channel.
+- Ask a question on the <a href="https://weave-community.slack.com/messages/general/"> #weave-community</a> slack channel.
+- Send an email to <a href="mailto:weave-users@weave.works">weave-users@weave.works</a>
+- <a href="https://github.com/weaveworks/kured/issues/new">File an issue.</a>
+
+Your feedback is always welcome!
