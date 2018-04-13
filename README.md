@@ -15,6 +15,7 @@
 	* [Disabling Reboots](#disabling-reboots)
 	* [Manual Unlock](#manual-unlock)
 * [Building](#building)
+* [Getting Help](#getting-help)
 
 ## Introduction
 
@@ -197,8 +198,7 @@ kubectl -n kube-system annotate ds kured weave.works/kured-node-lock-
 dep ensure && make
 ```
 
-
-## <a name="help"></a>Getting Help
+## Getting Help
 
 If you have any questions about, feedback for or problems with `kured`:
 
