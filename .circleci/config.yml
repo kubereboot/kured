@@ -15,6 +15,6 @@ jobs:
           name: Maybe push master images
           command: |
             if [ -z "${CIRCLE_TAG}" -a "${CIRCLE_BRANCH}" == "master" ]; then
-              docker login -u "$DOCKER_USER" -p "$DOCKER_PASS" quay.io
+              echo $DOCKER_PASS | docker login -u "$DOCKER_USER" --password-stdin quay.io
               make publish-image
             fi
