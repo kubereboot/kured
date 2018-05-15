@@ -70,6 +70,7 @@ Flags:
       --reboot-sentinel string      path to file whose existence signals need to reboot (default "/var/run/reboot-required")
       --slack-hook-url string       slack hook URL for reboot notfications
       --slack-username string       slack username for reboot notfications (default "kured")
+      --no-weekends-reboot bool     option to not restart during weekends (default "false")
 ```
 
 ### Reboot Sentinel File & Period
