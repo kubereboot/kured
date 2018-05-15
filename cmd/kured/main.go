@@ -135,7 +135,7 @@ func rebootRequired() bool {
 
 func rebootBlocked() bool {
 	if forceRebootsentinelExists() {
-		log.Infof("Force reebot sentinel %v exists, force reeboting activated",forceRebootSentinel)
+		log.Infof("Force reboot sentinel %v exists, force rebooting activated",forceRebootSentinel)
 		return false
 	}
 	if prometheusURL != "" {
