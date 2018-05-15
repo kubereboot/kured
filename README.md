@@ -61,15 +61,16 @@ The following arguments can be passed to kured via the daemonset pod template:
 
 ```
 Flags:
-      --alert-filter-regexp value   alert names to ignore when checking for active alerts
-      --ds-name string              namespace containing daemonset on which to place lock (default "kube-system")
-      --ds-namespace string         name of daemonset on which to place lock (default "kured")
-      --lock-annotation string      annotation in which to record locking node (default "weave.works/kured-node-lock")
-      --period duration             reboot check period (default 1h0m0s)
-      --prometheus-url string       Prometheus instance to probe for active alerts
-      --reboot-sentinel string      path to file whose existence signals need to reboot (default "/var/run/reboot-required")
-      --slack-hook-url string       slack hook URL for reboot notfications
-      --slack-username string       slack username for reboot notfications (default "kured")
+      --alert-filter-regexp value    alert names to ignore when checking for active alerts
+      --ds-name string               namespace containing daemonset on which to place lock (default "kube-system")
+      --ds-namespace string          name of daemonset on which to place lock (default "kured")
+      --lock-annotation string       annotation in which to record locking node (default "weave.works/kured-node-lock")
+      --period duration              reboot check period (default 1h0m0s)
+      --prometheus-url string        Prometheus instance to probe for active alerts
+      --reboot-sentinel string       path to file whose existence signals need to reboot (default "/var/run/reboot-required")
+      --force-reboot-sentinel string path to file whose existence signals need to force reboot aka. ignore active prometheus alerts (default "/var/run/force-reboot-required")
+      --slack-hook-url string        slack hook URL for reboot notfications
+      --slack-username string        slack username for reboot notfications (default "kured")
 ```
 
 ### Reboot Sentinel File & Period

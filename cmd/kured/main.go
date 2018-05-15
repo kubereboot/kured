@@ -26,15 +26,16 @@ var (
 	version = "unreleased"
 
 	// Command line flags
-	period         time.Duration
-	dsNamespace    string
-	dsName         string
-	lockAnnotation string
-	prometheusURL  string
-	alertFilter    *regexp.Regexp
-	rebootSentinel string
-	slackHookURL   string
-	slackUsername  string
+	period              time.Duration
+	dsNamespace         string
+	dsName              string
+	lockAnnotation      string
+	prometheusURL       string
+	alertFilter         *regexp.Regexp
+	rebootSentinel      string
+	forceRebootSentinel string
+	slackHookURL        string
+	slackUsername       string
 
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -68,7 +69,8 @@ func main() {
 		"alert names to ignore when checking for active alerts")
 	rootCmd.PersistentFlags().StringVar(&rebootSentinel, "reboot-sentinel", "/var/run/reboot-required",
 		"path to file whose existence signals need to reboot")
-
+	rootCmd.PersistentFlags().StringVar(&forceRebootSentinel, "force-reboot-sentinel", "/var/run/force-reboot-required",
+		"path to file whose existence signals need to force reboot")
 	rootCmd.PersistentFlags().StringVar(&slackHookURL, "slack-hook-url", "",
 		"slack hook URL for reboot notfications")
 	rootCmd.PersistentFlags().StringVar(&slackUsername, "slack-username", "kured",
@@ -108,6 +110,18 @@ func sentinelExists() bool {
 		return false // unreachable; prevents compilation error
 	}
 }
+func forceRebootsentinelExists() bool {
+	_, err := os.Stat(forceRebootSentinel)
+	switch {
+	case err == nil:
+		return true
+	case os.IsNotExist(err):
+		return false
+	default:
+		log.Fatalf("Unable to determine existence of force reboot sentinel: %v", err)
+		return false // unreachable; prevents compilation error
+	}
+}
 
 func rebootRequired() bool {
 	if sentinelExists() {
@@ -120,6 +134,10 @@ func rebootRequired() bool {
 }
 
 func rebootBlocked() bool {
+	if forceRebootsentinelExists() {
+		log.Infof("Force reebot sentinel %v exists, force reeboting activated",forceRebootSentinel)
+		return false
+	}
 	if prometheusURL != "" {
 		alertNames, err := alerts.PrometheusActiveAlerts(prometheusURL, alertFilter)
 		if err != nil {
