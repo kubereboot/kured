@@ -124,7 +124,7 @@ func forceRebootsentinelExists() bool {
 }
 
 func rebootRequired() bool {
-	if sentinelExists() {
+	if sentinelExists() || forceRebootsentinelExists() {
 		log.Infof("Reboot required")
 		return true
 	} else {
@@ -135,7 +135,7 @@ func rebootRequired() bool {
 
 func rebootBlocked() bool {
 	if forceRebootsentinelExists() {
-		log.Infof("Force reboot sentinel %v exists, force rebooting activated",forceRebootSentinel)
+		log.Infof("Force reboot sentinel %v exists, force rebooting activated", forceRebootSentinel)
 		return false
 	}
 	if prometheusURL != "" {
