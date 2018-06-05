@@ -4,14 +4,21 @@ kind: ClusterRole
 metadata:
   name: kured
 rules:
-# Allow kured to cordon and uncordon nodes
+# Allow kured to read spec.unschedulable
+# Allow kubectl to drain/uncordon
+#
+# NB: These permissions are tightly coupled to the bundled version of kubectl; the ones below
+# match https://github.com/kubernetes/kubernetes/blob/v1.9.6/pkg/kubectl/cmd/drain.go
+#
 - apiGroups: [""]
   resources: ["nodes"]
-  verbs:     ["get", "update"]
-# Allow kured to drain nodes
+  verbs:     ["get", "patch"]
 - apiGroups: [""]
   resources: ["pods"]
-  verbs:     ["get", "list", "delete"]
+  verbs:     ["list"]
+- apiGroups: [""]
+  resources: ["replicationcontrollers"]
+  verbs:     ["get"]
 - apiGroups: ["apps"]
   resources: ["statefulsets"]
   verbs:     ["get"]
