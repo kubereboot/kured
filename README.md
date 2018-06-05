@@ -31,12 +31,11 @@ indicated by the package management system of the underlying OS.
 
 ## Kubernetes & OS Compatibility
 
-The daemon image contains a 1.7.x `k8s.io/client-go` and `kubectl`
-binary for the purposes of maintaining the lock and draining worker
-nodes. Whilst it has only been tested on a 1.7.x cluster, Kubernetes
-typically has good forwards/backwards compatibility so there is a
-reasonable chance it will work on adjacent versions; please file an
-issue if this is not the case.
+The daemon image contains versions of `k8s.io/client-go` and the
+`kubectl` binary for the purposes of maintaining the lock and draining
+worker nodes. See the [release
+notes](https://github.com/weaveworks/kured/releases) for specific
+version compatibility information.
 
 Additionally, the image contains a `systemctl` binary from Ubuntu
 16.04 in order to command reboots. Again, although this has not been
