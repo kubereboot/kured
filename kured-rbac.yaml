@@ -4,10 +4,6 @@ kind: ClusterRole
 metadata:
   name: kured
 rules:
-# Allow kured to grab it's lock
-- apiGroups: ["extensions"]
-  resources: ["daemonsets"]
-  verbs:     ["get", "update"]
 # Allow kured to cordon and uncordon nodes
 - apiGroups: [""]
   resources: ["nodes"]
@@ -41,3 +37,29 @@ subjects:
 - kind: ServiceAccount
   name: kured
   namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: kube-system
+  name: kured
+rules:
+# Allow kured to lock/unlock itself
+- apiGroups:     ["extensions"]
+  resources:     ["daemonsets"]
+  resourceNames: ["kured"]
+  verbs:         ["update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: kube-system
+  name: kured
+subjects:
+- kind: ServiceAccount
+  namespace: kube-system
+  name: kured
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kured
