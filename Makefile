@@ -23,7 +23,8 @@ cmd/kured/kured: cmd/kured/*.go
 build/.image.done: cmd/kured/Dockerfile cmd/kured/kured
 	mkdir -p build
 	cp $^ build
-	$(SUDO) docker build -t quay.io/$(DH_ORG)/kured:$(VERSION) -f build/Dockerfile ./build
+	$(SUDO) docker build -t quay.io/$(DH_ORG)/kured -f build/Dockerfile ./build
+	$(SUDO) docker tag quay.io/$(DH_ORG)/kured quay.io/$(DH_ORG)/kured:$(VERSION)
 	touch $@
 
 image: build/.image.done
@@ -32,4 +33,4 @@ publish-image: image
 	$(SUDO) docker push quay.io/$(DH_ORG)/kured:$(VERSION)
 
 minikube-publish: image
-	$(SUDO) docker save quay.io/$(DH_ORG)/kured:$(VERSION) | (eval $$(minikube docker-env) && docker load)
+	$(SUDO) docker save quay.io/$(DH_ORG)/kured | (eval $$(minikube docker-env) && docker load)
