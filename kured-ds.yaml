@@ -1,3 +1,10 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kured
+  namespace: kube-system
+---
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
@@ -9,6 +16,7 @@ spec:
       labels:
         name: kured
     spec:
+      serviceAccountName: kured
       containers:
         - name: kured
           image: quay.io/weaveworks/kured
