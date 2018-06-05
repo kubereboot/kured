@@ -5,12 +5,17 @@ metadata:
   name: kured
   namespace: kube-system
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: kured            # Must match `--ds-name`
   namespace: kube-system # Must match `--ds-namespace`
 spec:
+  selector:
+    matchLabels:
+      name: kured
+  updateStrategy:
+   type: RollingUpdate
   template:
     metadata:
       labels:
