@@ -48,17 +48,11 @@ To obtain a default installation without Prometheus alerting interlock
 or Slack notifications:
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/weaveworks/kured/master/kured-ds.yaml
+kubectl apply -f https://github.com/weaveworks/kured/releases/download/1.0.0/kured-ds.yaml
 ```
 
 If you want to customise the installation, download the manifest and
 edit it in accordance with the following section before application.
-
-For RBAC support apply the RBAC manifest.
-
-```
-kubectl apply -f https://raw.githubusercontent.com/weaveworks/kured/master/kured-rbac.yaml
-```
 
 ## Configuration
 
