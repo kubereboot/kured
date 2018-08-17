@@ -27,6 +27,8 @@ var (
 
 	// Command line flags
 	period         time.Duration
+	gracePeriod	   int
+	timeout		   time.Duration
 	dsNamespace    string
 	dsName         string
 	lockAnnotation string
@@ -56,6 +58,10 @@ func main() {
 
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
 		"reboot check period")
+	rootCmd.PersistentFlags().IntVar(&gracePeriod, "grace-period", -1,
+		"Period of time in seconds given to each pod to terminate gracefully.")
+	rootCmd.PersistentFlags().DurationVar(&timeout, "timeout", time.Second*0,
+		"The length of time to wait before giving up, zero means infinite")
 	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-namespace", "kube-system",
 		"namespace containing daemonset on which to place lock")
 	rootCmd.PersistentFlags().StringVar(&dsName, "ds-name", "kured",
@@ -174,6 +180,7 @@ func release(lock *daemonsetlock.DaemonSetLock) {
 func drain(nodeID string) {
 	log.Infof("Draining node %s", nodeID)
 	drainCmd := newCommand("/usr/bin/kubectl", "drain",
+		"--grace-period", string(gracePeriod), "--timeout", string(timeout),
 		"--ignore-daemonsets", "--delete-local-data", "--force", nodeID)
 
 	if err := drainCmd.Run(); err != nil {
