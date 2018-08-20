@@ -20,6 +20,7 @@ import (
 	"github.com/weaveworks/kured/pkg/daemonsetlock"
 	"github.com/weaveworks/kured/pkg/delaytick"
 	"github.com/weaveworks/kured/pkg/notifications/slack"
+	"strconv"
 )
 
 var (
@@ -180,7 +181,11 @@ func release(lock *daemonsetlock.DaemonSetLock) {
 func drain(nodeID string) {
 	log.Infof("Draining node %s", nodeID)
 	drainCmd := newCommand("/usr/bin/kubectl", "drain",
-		"--grace-period", string(gracePeriod), "--timeout", string(timeout),
+		"--grace-period", strconv.Itoa(gracePeriod), "--timeout", timeout.String(),
+		"--ignore-daemonsets", "--delete-local-data", "--force", nodeID)
+
+	log.Info("/usr/bin/kubectl", "drain",
+		"--grace-period", strconv.Itoa(gracePeriod), "--timeout", timeout.String(),
 		"--ignore-daemonsets", "--delete-local-data", "--force", nodeID)
 
 	if err := drainCmd.Run(); err != nil {
