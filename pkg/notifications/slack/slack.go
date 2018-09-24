@@ -17,9 +17,9 @@ type body struct {
 	Username string `json:"username,omitempty"`
 }
 
-func NotifyReboot(hookURL, username, nodeID string) error {
+func notify(hookURL, username, message string) error {
 	msg := body{
-		Text:     fmt.Sprintf("Rebooting node %s", nodeID),
+		Text:     message,
 		Username: username,
 	}
 
@@ -39,4 +39,12 @@ func NotifyReboot(hookURL, username, nodeID string) error {
 	}
 
 	return nil
+}
+
+func NotifyDrain(hookURL, username, nodeID string) error {
+	return notify(hookURL, username, fmt.Sprintf("Draining node %s", nodeID))
+}
+
+func NotifyReboot(hookURL, username, nodeID string) error {
+	return notify(hookURL, username, fmt.Sprintf("Rebooting node %s", nodeID))
 }

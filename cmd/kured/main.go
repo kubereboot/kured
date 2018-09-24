@@ -173,6 +173,13 @@ func release(lock *daemonsetlock.DaemonSetLock) {
 
 func drain(nodeID string) {
 	log.Infof("Draining node %s", nodeID)
+
+	if slackHookURL != "" {
+		if err := slack.NotifyDrain(slackHookURL, slackUsername, nodeID); err != nil {
+			log.Warnf("Error notifying slack: %v", err)
+		}
+	}
+
 	drainCmd := newCommand("/usr/bin/kubectl", "drain",
 		"--ignore-daemonsets", "--delete-local-data", "--force", nodeID)
 
