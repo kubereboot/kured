@@ -22,6 +22,9 @@ spec:
         name: kured
     spec:
       serviceAccountName: kured
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
       containers:
         - name: kured
           image: quay.io/weaveworks/kured
