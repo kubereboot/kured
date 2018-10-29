@@ -25,13 +25,23 @@ spec:
       tolerations:
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
+      hostPID: true # Facilitate entering the host mount namespace via init
+      restartPolicy: Always
       containers:
         - name: kured
           image: quay.io/weaveworks/kured
           imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true # Give permission to nsenter /proc/1/ns/mnt
+          env:
+            # Pass in the name of the node on which this pod is scheduled
+            # for use with drain/uncordon operations and lock acquisition
+            - name: KURED_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
           command:
             - /usr/bin/kured
-#          args:
 #            - --alert-filter-regexp=^RebootRequired$
 #            - --ds-name=kured
 #            - --ds-namespace=kube-system
@@ -41,23 +51,3 @@ spec:
 #            - --reboot-sentinel=/var/run/reboot-required
 #            - --slack-hook-url=https://hooks.slack.com/...
 #            - --slack-username=prod
-#
-# NO USER SERVICEABLE PARTS BEYOND THIS POINT
-          env:
-            # Pass in the name of the node on which this pod is scheduled
-            # for use with drain/uncordon operations and lock acquisition
-            - name: KURED_NODE_ID
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-          volumeMounts:
-            # Needed for two purposes:
-            # * Testing for the existence of /var/run/reboot-required
-            # * Accessing /var/run/dbus/system_bus_socket to effect reboot
-            - name: hostrun
-              mountPath: /var/run
-      restartPolicy: Always
-      volumes:
-        - name: hostrun
-          hostPath:
-            path: /var/run
