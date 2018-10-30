@@ -15,6 +15,7 @@
 	* [Disabling Reboots](#disabling-reboots)
 	* [Manual Unlock](#manual-unlock)
 * [Building](#building)
+* [Frequently Asked/Anticipated Questions](#frequently-askedanticipated-questions)
 * [Getting Help](#getting-help)
 
 ## Introduction
@@ -37,10 +38,8 @@ worker nodes. See the [release
 notes](https://github.com/weaveworks/kured/releases) for specific
 version compatibility information.
 
-Additionally, the image contains a `systemctl` binary from Ubuntu
-16.04 in order to command reboots. Again, although this has not been
-tested against other systemd distributions there is a good chance that
-it will work.
+Versions >=1.1.0 enter the host mount namespace to invoke
+`systemctl reboot`, so should work on any systemd distribution.
 
 ## Installation
 
@@ -48,7 +47,7 @@ To obtain a default installation without Prometheus alerting interlock
 or Slack notifications:
 
 ```
-kubectl apply -f https://github.com/weaveworks/kured/releases/download/1.0.0/kured-ds.yaml
+kubectl apply -f https://github.com/weaveworks/kured/releases/download/1.1.0/kured-1.1.0.yaml
 ```
 
 If you want to customise the installation, download the manifest and
@@ -196,6 +195,16 @@ kubectl -n kube-system annotate ds kured weave.works/kured-node-lock-
 ```
 dep ensure && make
 ```
+
+## Frequently Asked/Anticipated Questions
+
+### Why is there no `latest` tag on quay.io?
+
+Use of `latest` for production deployments is bad practice - see
+[here](https://kubernetes.io/docs/concepts/configuration/overview) for
+details. The manifest on `master` refers to `latest` for local
+development testing with minikube only; for production use choose a
+versioned manifest from the [release page](https://github.com/weaveworks/kured/releases/).
 
 ## Getting Help
 
