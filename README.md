@@ -34,9 +34,17 @@ indicated by the package management system of the underlying OS.
 
 The daemon image contains versions of `k8s.io/client-go` and the
 `kubectl` binary for the purposes of maintaining the lock and draining
-worker nodes. See the [release
-notes](https://github.com/weaveworks/kured/releases) for specific
-version compatibility information.
+worker nodes. Kubernetes aims to provide forwards & backwards
+compatibility of one minor version between client and server:
+
+| kured  | kubectl | k8s.io/client-go | k8s.io/apimachinery | expected kubernetes compatibility |
+|--------|---------|------------------|---------------------|-----------------------------------|
+| 1.1.0  | 1.12.1  | v9.0.0           | release-1.12        | 1.11.x, 1.12.x, 1.13.x            |
+| 1.0.0  | 1.7.6   | v4.0.0           | release-1.7         | 1.6.x, 1.7.x, 1.8.x               | 
+
+See the [release notes](https://github.com/weaveworks/kured/releases)
+for specific version compatibility information, including which
+combination have been formally tested.
 
 Versions >=1.1.0 enter the host mount namespace to invoke
 `systemctl reboot`, so should work on any systemd distribution.
