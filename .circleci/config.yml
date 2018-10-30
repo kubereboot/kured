@@ -9,12 +9,21 @@ jobs:
       - setup_remote_docker
       - run: go get github.com/golang/dep/cmd/dep
       - run: dep ensure
-      - run: make
-
       - deploy:
-          name: Maybe push master images
+          name: Build and push image
           command: |
-            if [ -z "${CIRCLE_TAG}" -a "${CIRCLE_BRANCH}" == "master" ]; then
-              docker login -u "$DOCKER_USER" -p "$DOCKER_PASS" quay.io
-              make publish-image
+            docker login -u "$DOCKER_USER" -p "$DOCKER_PASS" quay.io
+            if [ -z "${CIRCLE_TAG}" ]; then
+                make publish-image
+            else
+                make VERSION="${CIRCLE_TAG}" publish-image
             fi
+
+workflows:
+  version: 2
+  build:
+    jobs:
+     - build:
+         filters:
+           tags:
+             only: /.*/
