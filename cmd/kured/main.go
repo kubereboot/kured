@@ -26,15 +26,16 @@ var (
 	version = "unreleased"
 
 	// Command line flags
-	period         time.Duration
-	dsNamespace    string
-	dsName         string
-	lockAnnotation string
-	prometheusURL  string
-	alertFilter    *regexp.Regexp
-	rebootSentinel string
-	slackHookURL   string
-	slackUsername  string
+	period          time.Duration
+	dsNamespace     string
+	dsName          string
+	lockAnnotation  string
+	alertmanagerURL string
+	prometheusURL   string
+	alertFilter     *regexp.Regexp
+	rebootSentinel  string
+	slackHookURL    string
+	slackUsername   string
 
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -62,6 +63,8 @@ func main() {
 		"name of daemonset on which to place lock")
 	rootCmd.PersistentFlags().StringVar(&lockAnnotation, "lock-annotation", "weave.works/kured-node-lock",
 		"annotation in which to record locking node")
+	rootCmd.PersistentFlags().StringVar(&alertmanagerURL, "alertmanager-url", "",
+		"Alertmanager instance to probe for active alerts")
 	rootCmd.PersistentFlags().StringVar(&prometheusURL, "prometheus-url", "",
 		"Prometheus instance to probe for active alerts")
 	rootCmd.PersistentFlags().Var(&regexpValue{&alertFilter}, "alert-filter-regexp",
@@ -131,6 +134,20 @@ func rebootBlocked() bool {
 		alertNames, err := alerts.PrometheusActiveAlerts(prometheusURL, alertFilter)
 		if err != nil {
 			log.Warnf("Reboot blocked: prometheus query error: %v", err)
+			return true
+		}
+		count := len(alertNames)
+		if count > 10 {
+			alertNames = append(alertNames[:10], "...")
+		}
+		if count > 0 {
+			log.Warnf("Reboot blocked: %d active alerts: %v", count, alertNames)
+			return true
+		}
+	} else if alertmanagerURL != "" {
+		alertNames, err := alerts.AlertmanagerActiveAlerts(alertmanagerURL, alertFilter)
+		if err != nil {
+			log.Warnf("Reboot blocked: AlertManager query error: %v", err)
 			return true
 		}
 		count := len(alertNames)
