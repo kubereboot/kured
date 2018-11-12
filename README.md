@@ -74,6 +74,7 @@ Flags:
       --period duration             reboot check period (default 1h0m0s)
       --prometheus-url string       Prometheus instance to probe for active alerts
       --reboot-sentinel string      path to file whose existence signals need to reboot (default "/var/run/reboot-required")
+      --metric-only bool            do not reboot - expose just the metric (default false)
       --slack-hook-url string       slack hook URL for reboot notfications
       --slack-username string       slack username for reboot notfications (default "kured")
 ```

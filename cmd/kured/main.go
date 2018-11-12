@@ -33,6 +33,7 @@ var (
 	prometheusURL  string
 	alertFilter    *regexp.Regexp
 	rebootSentinel string
+	metricOnly     bool
 	slackHookURL   string
 	slackUsername  string
 
@@ -68,6 +69,8 @@ func main() {
 		"alert names to ignore when checking for active alerts")
 	rootCmd.PersistentFlags().StringVar(&rebootSentinel, "reboot-sentinel", "/var/run/reboot-required",
 		"path to file whose existence signals need to reboot")
+	rootCmd.PersistentFlags().BoolVar(&metricOnly, "metric-only", false,
+		"do not reboot - expose just the metric")
 
 	rootCmd.PersistentFlags().StringVar(&slackHookURL, "slack-hook-url", "",
 		"slack hook URL for reboot notfications")
@@ -292,7 +295,11 @@ func root(cmd *cobra.Command, args []string) {
 	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
 	log.Infof("Reboot Sentinel: %s every %v", rebootSentinel, period)
 
-	go rebootAsRequired(nodeID)
+	if !metricOnly {
+		go rebootAsRequired(nodeID)
+	} else {
+		log.Infof("Reboot Disabled - reporting just the metric")
+	}
 	go maintainRebootRequiredMetric(nodeID)
 
 	http.Handle("/metrics", promhttp.Handler())
