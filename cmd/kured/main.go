@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
 	"net/http"
 	"os"
@@ -35,6 +36,7 @@ var (
 	rebootSentinel string
 	slackHookURL   string
 	slackUsername  string
+	podSelectors   []string
 
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -73,6 +75,9 @@ func main() {
 		"slack hook URL for reboot notfications")
 	rootCmd.PersistentFlags().StringVar(&slackUsername, "slack-username", "kured",
 		"slack username for reboot notfications")
+
+	rootCmd.PersistentFlags().StringArrayVar(&podSelectors, "blocking-pod-selector", nil,
+		"label selector identifying pods whose presence should prevent reboots")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
@@ -126,7 +131,7 @@ func rebootRequired() bool {
 	}
 }
 
-func rebootBlocked() bool {
+func rebootBlocked(client *kubernetes.Clientset, nodeID string) bool {
 	if prometheusURL != "" {
 		alertNames, err := alerts.PrometheusActiveAlerts(prometheusURL, alertFilter)
 		if err != nil {
@@ -142,6 +147,31 @@ func rebootBlocked() bool {
 			return true
 		}
 	}
+
+	fieldSelector := fmt.Sprintf("spec.nodeName=%s", nodeID)
+	for _, labelSelector := range podSelectors {
+		podList, err := client.CoreV1().Pods("").List(metav1.ListOptions{
+			LabelSelector: labelSelector,
+			FieldSelector: fieldSelector,
+			Limit:         10})
+		if err != nil {
+			log.Warnf("Reboot blocked: pod query error: %v", err)
+			return true
+		}
+
+		if len(podList.Items) > 0 {
+			podNames := make([]string, 0, len(podList.Items))
+			for _, pod := range podList.Items {
+				podNames = append(podNames, pod.Name)
+			}
+			if len(podList.Continue) > 0 {
+				podNames = append(podNames, "...")
+			}
+			log.Warnf("Reboot blocked: matching pods: %v", podNames)
+			return true
+		}
+	}
+
 	return false
 }
 
@@ -259,7 +289,7 @@ func rebootAsRequired(nodeID string) {
 	source := rand.NewSource(time.Now().UnixNano())
 	tick := delaytick.New(source, period)
 	for _ = range tick {
-		if rebootRequired() && !rebootBlocked() {
+		if rebootRequired() && !rebootBlocked(client, nodeID) {
 			node, err := client.CoreV1().Nodes().Get(nodeID, metav1.GetOptions{})
 			if err != nil {
 				log.Fatal(err)
@@ -291,6 +321,7 @@ func root(cmd *cobra.Command, args []string) {
 	log.Infof("Node ID: %s", nodeID)
 	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
 	log.Infof("Reboot Sentinel: %s every %v", rebootSentinel, period)
+	log.Infof("Blocking Pod Selectors: %v", podSelectors)
 
 	go rebootAsRequired(nodeID)
 	go maintainRebootRequiredMetric(nodeID)
