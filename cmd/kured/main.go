@@ -20,6 +20,7 @@ import (
 	"github.com/weaveworks/kured/pkg/daemonsetlock"
 	"github.com/weaveworks/kured/pkg/delaytick"
 	"github.com/weaveworks/kured/pkg/notifications/slack"
+	"github.com/weaveworks/kured/pkg/notifications/teams"
 )
 
 var (
@@ -35,6 +36,7 @@ var (
 	rebootSentinel string
 	slackHookURL   string
 	slackUsername  string
+	teamsHookURL   string
 
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -73,6 +75,9 @@ func main() {
 		"slack hook URL for reboot notfications")
 	rootCmd.PersistentFlags().StringVar(&slackUsername, "slack-username", "kured",
 		"slack username for reboot notfications")
+
+	rootCmd.PersistentFlags().StringVar(&teamsHookURL, "teams-hook-url", "kured",
+		"Microsoft teams hook URL for notfications")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
@@ -187,6 +192,12 @@ func drain(nodeID string) {
 		}
 	}
 
+	if teamsHookURL != "" {
+		if err := teams.NotifyDrain(teamsHookURL, nodeID); err != nil {
+			log.Warnf("Error notifying teams: %v", err)
+		}
+	}
+
 	drainCmd := newCommand("/usr/bin/kubectl", "drain",
 		"--ignore-daemonsets", "--delete-local-data", "--force", nodeID)
 
@@ -209,6 +220,12 @@ func commandReboot(nodeID string) {
 	if slackHookURL != "" {
 		if err := slack.NotifyReboot(slackHookURL, slackUsername, nodeID); err != nil {
 			log.Warnf("Error notifying slack: %v", err)
+		}
+	}
+
+	if teamsHookURL != "" {
+		if err := teams.NotifyReboot(teamsHookURL, nodeID); err != nil {
+			log.Warnf("Error notifying teams: %v", err)
 		}
 	}
 

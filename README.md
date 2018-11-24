@@ -76,6 +76,7 @@ Flags:
       --reboot-sentinel string      path to file whose existence signals need to reboot (default "/var/run/reboot-required")
       --slack-hook-url string       slack hook URL for reboot notfications
       --slack-username string       slack username for reboot notfications (default "kured")
+      --teams-hook-url string       Microsoft Teams hook URL for notifications
 ```
 
 ### Reboot Sentinel File & Period
@@ -140,7 +141,9 @@ If you choose to employ such an alert and have configured kured to
 probe for active alerts before rebooting, be sure to specify
 `--alert-filter-regexp=^RebootRequired$` to avoid deadlock!
 
-### Slack Notifications
+###  Notifications
+
+#### Slack
 
 If you specify a Slack hook via `--slack-hook-url`, kured will notify
 you immediately prior to rebooting a node:
@@ -149,6 +152,11 @@ you immediately prior to rebooting a node:
 
 We recommend setting `--slack-username` to be the name of the
 environment, e.g. `dev` or `prod`.
+
+#### Microsoft Teams
+
+A similar mechanism exists with Microsoft Teams. Just add the `--teams-hook-url` parameter and 
+kured will notify you immediately prior to draining/rebooting a node.
 
 ### Overriding Lock Configuration
 
