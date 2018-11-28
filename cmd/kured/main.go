@@ -26,16 +26,16 @@ var (
 	version = "unreleased"
 
 	// Command line flags
-	period          time.Duration
-	dsNamespace     string
-	dsName          string
-	lockAnnotation  string
-	prometheusURL   string
-	alertFilter     *regexp.Regexp
-	rebootSentinel  string
-	slackHookURL    string
-	slackUsername   string
-	noWeekendReboot bool
+    period          time.Duration
+    dsNamespace     string
+    dsName          string
+    lockAnnotation  string
+    prometheusURL   string
+    alertFilter     *regexp.Regexp
+    rebootSentinel  string
+    slackHookURL    string
+    slackUsername   string
+    daysToExclude   []string
 
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -43,6 +43,22 @@ var (
 		Name:      "reboot_required",
 		Help:      "OS requires reboot due to software updates.",
 	}, []string{"node"})
+    daysOfWeek = map[string]time.Weekday{
+		"Sunday":    time.Sunday,
+		"sunday":    time.Sunday,
+		"Monday":    time.Monday,
+        "monday":    time.Monday,
+		"Tuesday":   time.Tuesday,
+		"tuesday":   time.Tuesday,
+		"Wednesday": time.Wednesday,
+		"wednesday": time.Wednesday,
+		"Thursday":  time.Thursday,
+		"thursday":  time.Thursday,
+		"Friday":    time.Friday,
+		"friday":    time.Friday,
+		"Saturday":  time.Saturday,
+		"saturday":  time.Saturday,
+    }
 )
 
 func init() {
@@ -74,7 +90,7 @@ func main() {
 		"slack hook URL for reboot notfications")
 	rootCmd.PersistentFlags().StringVar(&slackUsername, "slack-username", "kured",
 		"slack username for reboot notfications")
-	rootCmd.PersistentFlags().BoolVar(&noWeekendReboot, "no-weekends-reboot", false, "if true no reboots will be performed during weekends")
+	rootCmd.PersistentFlags().StringSliceVar(&daysToExclude, "days-to-exclude", []string{}, "List of days where rebooting should be disabled e.g. 'Sunday, Monday'")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
@@ -124,11 +140,13 @@ func rebootRequired() bool {
 func rebootBlocked() bool {
 	if prometheusURL != "" {
 		alertNames, err := alerts.PrometheusActiveAlerts(prometheusURL, alertFilter)
-		weekday := time.Now().Weekday()
-		if noWeekendReboot && (int(weekday) == 0 || int(weekday) == 6) {
-			log.Warnf("Reboot blocked: day of week: %v",weekday)
-			return true
-		}
+        weekday := time.Now().Weekday()
+    	for i := 0; i < len(daysToExclude); i++ {
+	        if  weekday == daysOfWeek[daysToExclude[i]] {
+			    log.Infof("Reboot blocked: day of week: %v",weekday)
+	    		return true
+            }
+    	}
 		if err != nil {
 			log.Warnf("Reboot blocked: prometheus query error: %v", err)
 			return true
