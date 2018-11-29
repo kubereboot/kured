@@ -26,16 +26,16 @@ var (
 	version = "unreleased"
 
 	// Command line flags
-    period          time.Duration
-    dsNamespace     string
-    dsName          string
-    lockAnnotation  string
-    prometheusURL   string
-    alertFilter     *regexp.Regexp
-    rebootSentinel  string
-    slackHookURL    string
-    slackUsername   string
-    daysToExclude   []string
+	period         time.Duration
+	dsNamespace    string
+	dsName         string
+	lockAnnotation string
+	prometheusURL  string
+	alertFilter    *regexp.Regexp
+	rebootSentinel string
+	slackHookURL   string
+	slackUsername  string
+	daysToExclude  []string
 
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -43,11 +43,11 @@ var (
 		Name:      "reboot_required",
 		Help:      "OS requires reboot due to software updates.",
 	}, []string{"node"})
-    daysOfWeek = map[string]time.Weekday{
+	daysOfWeek = map[string]time.Weekday{
 		"Sunday":    time.Sunday,
 		"sunday":    time.Sunday,
 		"Monday":    time.Monday,
-        "monday":    time.Monday,
+		"monday":    time.Monday,
 		"Tuesday":   time.Tuesday,
 		"tuesday":   time.Tuesday,
 		"Wednesday": time.Wednesday,
@@ -58,7 +58,7 @@ var (
 		"friday":    time.Friday,
 		"Saturday":  time.Saturday,
 		"saturday":  time.Saturday,
-    }
+	}
 )
 
 func init() {
@@ -140,13 +140,13 @@ func rebootRequired() bool {
 func rebootBlocked() bool {
 	if prometheusURL != "" {
 		alertNames, err := alerts.PrometheusActiveAlerts(prometheusURL, alertFilter)
-        weekday := time.Now().Weekday()
-    	for i := 0; i < len(daysToExclude); i++ {
-	        if  weekday == daysOfWeek[daysToExclude[i]] {
-			    log.Infof("Reboot blocked: day of week: %v",weekday)
-	    		return true
-            }
-    	}
+		weekday := time.Now().Weekday()
+		for i := 0; i < len(daysToExclude); i++ {
+			if weekday == daysOfWeek[daysToExclude[i]] {
+				log.Infof("Reboot blocked: day of week: %v", weekday)
+				return true
+			}
+		}
 		if err != nil {
 			log.Warnf("Reboot blocked: prometheus query error: %v", err)
 			return true
