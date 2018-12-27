@@ -58,6 +58,12 @@ or Slack notifications:
 kubectl apply -f https://github.com/weaveworks/kured/releases/download/1.1.0/kured-1.1.0.yaml
 ```
 
+To install on arm64:
+
+```
+curl -sSL https://github.com/weaveworks/kured/releases/download/1.1.0/kured-1.1.0.yaml | sed 's/1.1.0/1.1.0-arm64/g' | kubectl apply -f -
+```
+
 If you want to customise the installation, download the manifest and
 edit it in accordance with the following section before application.
 
