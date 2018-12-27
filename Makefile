@@ -1,7 +1,7 @@
 .DEFAULT: all
 .PHONY: all clean image publish-image minikube-publish
 
-DH_ORG="quay.io/weaveworks"
+DH_ORG=quay.io/weaveworks
 VERSION=$(shell git symbolic-ref --short HEAD)-$(shell git rev-parse --short HEAD)
 SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
 
