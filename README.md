@@ -7,6 +7,7 @@
 * [Configuration](#configuration)
 	* [Reboot Sentinel File & Period](#reboot-sentinel-file-&-period)
 	* [Blocking Reboots via Alerts](#blocking-reboots-via-alerts)
+	* [Blocking Reboots via Pods](#blocking-reboots-via-pods)
 	* [Prometheus Metrics](#prometheus-metrics)
 	* [Slack Notifications](#slack-notifications)
 	* [Overriding Lock Configuration](#overriding-lock-configuration)
@@ -27,7 +28,7 @@ indicated by the package management system of the underlying OS.
 * Watches for the presence of a reboot sentinel e.g. `/var/run/reboot-required`
 * Utilises a lock in the API server to ensure only one node reboots at
   a time
-* Optionally defers reboots in the presence of active Prometheus alerts
+* Optionally defers reboots in the presence of active Prometheus alerts or selected pods
 * Cordons & drains worker nodes before reboot, uncordoning them after
 
 ## Kubernetes & OS Compatibility
@@ -67,15 +68,17 @@ The following arguments can be passed to kured via the daemonset pod template:
 
 ```
 Flags:
-      --alert-filter-regexp value   alert names to ignore when checking for active alerts
-      --ds-name string              namespace containing daemonset on which to place lock (default "kube-system")
-      --ds-namespace string         name of daemonset on which to place lock (default "kured")
-      --lock-annotation string      annotation in which to record locking node (default "weave.works/kured-node-lock")
-      --period duration             reboot check period (default 1h0m0s)
-      --prometheus-url string       Prometheus instance to probe for active alerts
-      --reboot-sentinel string      path to file whose existence signals need to reboot (default "/var/run/reboot-required")
-      --slack-hook-url string       slack hook URL for reboot notfications
-      --slack-username string       slack username for reboot notfications (default "kured")
+      --alert-filter-regexp regexp.Regexp   alert names to ignore when checking for active alerts
+      --blocking-pod-selector stringArray   label selector identifying pods whose presence should prevent reboots
+      --ds-name string                      name of daemonset on which to place lock (default "kured")
+      --ds-namespace string                 namespace containing daemonset on which to place lock (default "kube-system")
+  -h, --help                                help for kured
+      --lock-annotation string              annotation in which to record locking node (default "weave.works/kured-node-lock")
+      --period duration                     reboot check period (default 1h0m0s)
+      --prometheus-url string               Prometheus instance to probe for active alerts
+      --reboot-sentinel string              path to file whose existence signals need to reboot (default "/var/run/reboot-required")
+      --slack-hook-url string               slack hook URL for reboot notfications
+      --slack-username string               slack username for reboot notfications (default "kured")
 ```
 
 ### Reboot Sentinel File & Period
@@ -103,8 +106,33 @@ will block reboots, however you can ignore specific alerts:
 --alert-filter-regexp=^(RebootRequired|AnotherBenignAlert|...$
 ```
 
-An important application of this filter will become apparent in the
-next section.
+See the section on Prometheus metrics for an important application of this
+filter.
+
+### Blocking Reboots via Pods
+
+You can also block reboots of an _individual node_ when specific pods
+are scheduled on it:
+
+```
+--blocking-pod-selector=runtime=long,cost=expensive
+```
+
+Since label selector strings use commas to express logical 'and', you can
+specify this parameter multiple times for 'or':
+
+```
+--blocking-pod-selector=runtime=long,cost=expensive
+--blocking-pod-selector=name=temperamental
+```
+
+In this case, the presence of either an (appropriately labelled) expensive long
+running job or a known temperamental pod on a node will stop it rebooting.
+
+> Try not to abuse this mechanism - it's better to strive for
+> restartability where possible. If you do use it, make sure you set
+> up a RebootRequired alert as described in the next section so that
+> you can intervene manually if reboots are blocked for too long.
 
 ### Prometheus Metrics
 
