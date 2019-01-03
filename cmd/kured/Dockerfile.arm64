@@ -1,5 +1,5 @@
 FROM alpine:3.8 as fetch-kubectl
-ADD https://storage.googleapis.com/kubernetes-release/release/v1.13.1/bin/linux/arm64/kubectl /kubectl
+ADD https://storage.googleapis.com/kubernetes-release/release/v1.12.1/bin/linux/arm64/kubectl /kubectl
 RUN chmod 0755 /kubectl
 
 FROM arm64v8/alpine:3.8
