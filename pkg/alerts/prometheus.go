@@ -7,19 +7,20 @@ import (
 	"sort"
 	"time"
 
-	"github.com/prometheus/client_golang/api/prometheus"
+	"github.com/prometheus/client_golang/api"
+	"github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 )
 
 // Returns a list of names of active (e.g. pending or firing) alerts, filtered
 // by the supplied regexp.
 func PrometheusActiveAlerts(prometheusURL string, filter *regexp.Regexp) ([]string, error) {
-	client, err := prometheus.New(prometheus.Config{Address: prometheusURL})
+	client, err := api.NewClient(api.Config{Address: prometheusURL})
 	if err != nil {
 		return nil, err
 	}
 
-	queryAPI := prometheus.NewQueryAPI(client)
+	queryAPI := v1.NewAPI(client)
 
 	value, err := queryAPI.Query(context.Background(), "ALERTS", time.Now())
 	if err != nil {

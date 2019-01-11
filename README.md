@@ -7,6 +7,7 @@
 * [Configuration](#configuration)
 	* [Reboot Sentinel File & Period](#reboot-sentinel-file-&-period)
 	* [Blocking Reboots via Alerts](#blocking-reboots-via-alerts)
+	* [Blocking Reboots via Pods](#blocking-reboots-via-pods)
 	* [Prometheus Metrics](#prometheus-metrics)
 	* [Slack Notifications](#slack-notifications)
 	* [Overriding Lock Configuration](#overriding-lock-configuration)
@@ -15,6 +16,7 @@
 	* [Disabling Reboots](#disabling-reboots)
 	* [Manual Unlock](#manual-unlock)
 * [Building](#building)
+* [Frequently Asked/Anticipated Questions](#frequently-askedanticipated-questions)
 * [Getting Help](#getting-help)
 
 ## Introduction
@@ -26,22 +28,27 @@ indicated by the package management system of the underlying OS.
 * Watches for the presence of a reboot sentinel e.g. `/var/run/reboot-required`
 * Utilises a lock in the API server to ensure only one node reboots at
   a time
-* Optionally defers reboots in the presence of active Prometheus alerts
+* Optionally defers reboots in the presence of active Prometheus alerts or selected pods
 * Cordons & drains worker nodes before reboot, uncordoning them after
 
 ## Kubernetes & OS Compatibility
 
-The daemon image contains a 1.7.x `k8s.io/client-go` and `kubectl`
-binary for the purposes of maintaining the lock and draining worker
-nodes. Whilst it has only been tested on a 1.7.x cluster, Kubernetes
-typically has good forwards/backwards compatibility so there is a
-reasonable chance it will work on adjacent versions; please file an
-issue if this is not the case.
+The daemon image contains versions of `k8s.io/client-go` and the
+`kubectl` binary for the purposes of maintaining the lock and draining
+worker nodes. Kubernetes aims to provide forwards & backwards
+compatibility of one minor version between client and server:
 
-Additionally, the image contains a `systemctl` binary from Ubuntu
-16.04 in order to command reboots. Again, although this has not been
-tested against other systemd distributions there is a good chance that
-it will work.
+| kured  | kubectl | k8s.io/client-go | k8s.io/apimachinery | expected kubernetes compatibility |
+|--------|---------|------------------|---------------------|-----------------------------------|
+| 1.1.0  | 1.12.1  | v9.0.0           | release-1.12        | 1.11.x, 1.12.x, 1.13.x            |
+| 1.0.0  | 1.7.6   | v4.0.0           | release-1.7         | 1.6.x, 1.7.x, 1.8.x               | 
+
+See the [release notes](https://github.com/weaveworks/kured/releases)
+for specific version compatibility information, including which
+combination have been formally tested.
+
+Versions >=1.1.0 enter the host mount namespace to invoke
+`systemctl reboot`, so should work on any systemd distribution.
 
 ## Installation
 
@@ -49,7 +56,7 @@ To obtain a default installation without Prometheus alerting interlock
 or Slack notifications:
 
 ```
-kubectl apply -f https://github.com/weaveworks/kured/releases/download/1.0.0/kured-ds.yaml
+kubectl apply -f https://github.com/weaveworks/kured/releases/download/1.1.0/kured-1.1.0.yaml
 ```
 
 If you want to customise the installation, download the manifest and
@@ -61,15 +68,17 @@ The following arguments can be passed to kured via the daemonset pod template:
 
 ```
 Flags:
-      --alert-filter-regexp value   alert names to ignore when checking for active alerts
-      --ds-name string              namespace containing daemonset on which to place lock (default "kube-system")
-      --ds-namespace string         name of daemonset on which to place lock (default "kured")
-      --lock-annotation string      annotation in which to record locking node (default "weave.works/kured-node-lock")
-      --period duration             reboot check period (default 1h0m0s)
-      --prometheus-url string       Prometheus instance to probe for active alerts
-      --reboot-sentinel string      path to file whose existence signals need to reboot (default "/var/run/reboot-required")
-      --slack-hook-url string       slack hook URL for reboot notfications
-      --slack-username string       slack username for reboot notfications (default "kured")
+      --alert-filter-regexp regexp.Regexp   alert names to ignore when checking for active alerts
+      --blocking-pod-selector stringArray   label selector identifying pods whose presence should prevent reboots
+      --ds-name string                      name of daemonset on which to place lock (default "kured")
+      --ds-namespace string                 namespace containing daemonset on which to place lock (default "kube-system")
+  -h, --help                                help for kured
+      --lock-annotation string              annotation in which to record locking node (default "weave.works/kured-node-lock")
+      --period duration                     reboot check period (default 1h0m0s)
+      --prometheus-url string               Prometheus instance to probe for active alerts
+      --reboot-sentinel string              path to file whose existence signals need to reboot (default "/var/run/reboot-required")
+      --slack-hook-url string               slack hook URL for reboot notfications
+      --slack-username string               slack username for reboot notfications (default "kured")
       --days-to-exclude []string    List of days where rebooting should be disabled e.g. 'Sunday, Monday
 ```
 
@@ -98,8 +107,33 @@ will block reboots, however you can ignore specific alerts:
 --alert-filter-regexp=^(RebootRequired|AnotherBenignAlert|...$
 ```
 
-An important application of this filter will become apparent in the
-next section.
+See the section on Prometheus metrics for an important application of this
+filter.
+
+### Blocking Reboots via Pods
+
+You can also block reboots of an _individual node_ when specific pods
+are scheduled on it:
+
+```
+--blocking-pod-selector=runtime=long,cost=expensive
+```
+
+Since label selector strings use commas to express logical 'and', you can
+specify this parameter multiple times for 'or':
+
+```
+--blocking-pod-selector=runtime=long,cost=expensive
+--blocking-pod-selector=name=temperamental
+```
+
+In this case, the presence of either an (appropriately labelled) expensive long
+running job or a known temperamental pod on a node will stop it rebooting.
+
+> Try not to abuse this mechanism - it's better to strive for
+> restartability where possible. If you do use it, make sure you set
+> up a RebootRequired alert as described in the next section so that
+> you can intervene manually if reboots are blocked for too long.
 
 ### Prometheus Metrics
 
@@ -199,13 +233,22 @@ kubectl -n kube-system annotate ds kured weave.works/kured-node-lock-
 dep ensure && make
 ```
 
+## Frequently Asked/Anticipated Questions
+
+### Why is there no `latest` tag on quay.io?
+
+Use of `latest` for production deployments is bad practice - see
+[here](https://kubernetes.io/docs/concepts/configuration/overview) for
+details. The manifest on `master` refers to `latest` for local
+development testing with minikube only; for production use choose a
+versioned manifest from the [release page](https://github.com/weaveworks/kured/releases/).
+
 ## Getting Help
 
 If you have any questions about, feedback for or problems with `kured`:
 
-- Invite yourself to the <a href="https://weaveworks.github.io/community-slack/" target="_blank"> #weave-community </a> slack channel.
-- Ask a question on the <a href="https://weave-community.slack.com/messages/general/"> #weave-community</a> slack channel.
-- Send an email to <a href="mailto:weave-users@weave.works">weave-users@weave.works</a>
-- <a href="https://github.com/weaveworks/kured/issues/new">File an issue.</a>
+- Invite yourself to the <a href="https://slack.weave.works/" target="_blank">Weave Users Slack</a>.
+- Ask a question on the [#general](https://weave-community.slack.com/messages/general/) slack channel.
+- [File an issue](https://github.com/weaveworks/kured/issues/new).
 
 Your feedback is always welcome!

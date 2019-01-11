@@ -1,22 +1,54 @@
-apiVersion: extensions/v1beta1
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kured
+  namespace: kube-system
+---
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: kured            # Must match `--ds-name`
   namespace: kube-system # Must match `--ds-namespace`
 spec:
+  selector:
+    matchLabels:
+      name: kured
+  updateStrategy:
+   type: RollingUpdate
   template:
     metadata:
       labels:
         name: kured
     spec:
+      serviceAccountName: kured
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+      hostPID: true # Facilitate entering the host mount namespace via init
+      restartPolicy: Always
       containers:
         - name: kured
-          image: quay.io/weaveworks/kured
+          image: quay.io/weaveworks/kured # If you find yourself here
+                                          # wondering why there is no
+                                          # :latest tag on quay.io, see
+                                          # the FAQ in the README
           imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true # Give permission to nsenter /proc/1/ns/mnt
+          env:
+            # Pass in the name of the node on which this pod is scheduled
+            # for use with drain/uncordon operations and lock acquisition
+            - name: KURED_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
           command:
             - /usr/bin/kured
-#          args:
 #            - --alert-filter-regexp=^RebootRequired$
+#            - --blocking-pod-selector=runtime=long,cost=expensive
+#            - --blocking-pod-selector=name=temperamental
+#            - --blocking-pod-selector=...
 #            - --ds-name=kured
 #            - --ds-namespace=kube-system
 #            - --lock-annotation=weave.works/kured-node-lock
@@ -25,23 +57,3 @@ spec:
 #            - --reboot-sentinel=/var/run/reboot-required
 #            - --slack-hook-url=https://hooks.slack.com/...
 #            - --slack-username=prod
-#
-# NO USER SERVICEABLE PARTS BEYOND THIS POINT
-          env:
-            # Pass in the name of the node on which this pod is scheduled
-            # for use with drain/uncordon operations and lock acquisition
-            - name: KURED_NODE_ID
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-          volumeMounts:
-            # Needed for two purposes:
-            # * Testing for the existence of /var/run/reboot-required
-            # * Accessing /var/run/dbus/system_bus_socket to effect reboot
-            - name: hostrun
-              mountPath: /var/run
-      restartPolicy: Always
-      volumes:
-        - name: hostrun
-          hostPath:
-            path: /var/run

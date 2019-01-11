@@ -3,6 +3,7 @@
 
 DH_ORG=weaveworks
 VERSION=$(shell git symbolic-ref --short HEAD)-$(shell git rev-parse --short HEAD)
+SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
 
 all: image
 
@@ -22,13 +23,14 @@ cmd/kured/kured: cmd/kured/*.go
 build/.image.done: cmd/kured/Dockerfile cmd/kured/kured
 	mkdir -p build
 	cp $^ build
-	sudo -E docker build -t quay.io/$(DH_ORG)/kured:$(VERSION) -f build/Dockerfile ./build
+	$(SUDO) docker build -t quay.io/$(DH_ORG)/kured -f build/Dockerfile ./build
+	$(SUDO) docker tag quay.io/$(DH_ORG)/kured quay.io/$(DH_ORG)/kured:$(VERSION)
 	touch $@
 
 image: build/.image.done
 
 publish-image: image
-	sudo -E docker push quay.io/$(DH_ORG)/kured:$(VERSION)
+	$(SUDO) docker push quay.io/$(DH_ORG)/kured:$(VERSION)
 
 minikube-publish: image
-	sudo -E docker save quay.io/$(DH_ORG)/kured:$(VERSION) | (eval $$(minikube docker-env) && docker load)
+	$(SUDO) docker save quay.io/$(DH_ORG)/kured | (eval $$(minikube docker-env) && docker load)

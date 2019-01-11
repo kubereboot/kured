@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
 	"net/http"
 	"os"
@@ -36,6 +37,7 @@ var (
 	slackHookURL   string
 	slackUsername  string
 	daysToExclude  []string
+	podSelectors   []string
 
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -92,6 +94,9 @@ func main() {
 		"slack username for reboot notfications")
 	rootCmd.PersistentFlags().StringSliceVar(&daysToExclude, "days-to-exclude", []string{}, "List of days where rebooting should be disabled e.g. 'Sunday, Monday'")
 
+	rootCmd.PersistentFlags().StringArrayVar(&podSelectors, "blocking-pod-selector", nil,
+		"label selector identifying pods whose presence should prevent reboots")
+
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
 	}
@@ -115,16 +120,23 @@ func newCommand(name string, arg ...string) *exec.Cmd {
 }
 
 func sentinelExists() bool {
-	_, err := os.Stat(rebootSentinel)
-	switch {
-	case err == nil:
-		return true
-	case os.IsNotExist(err):
-		return false
-	default:
-		log.Fatalf("Unable to determine existence of sentinel: %v", err)
-		return false // unreachable; prevents compilation error
+	// Relies on hostPID:true and privileged:true to enter host mount space
+	sentinelCmd := newCommand("/usr/bin/nsenter", "-m/proc/1/ns/mnt", "--", "/usr/bin/test", "-f", rebootSentinel)
+	if err := sentinelCmd.Run(); err != nil {
+		switch err := err.(type) {
+		case *exec.ExitError:
+			// We assume a non-zero exit code means 'reboot not required', but of course
+			// the user could have misconfigured the sentinel command or something else
+			// went wrong during its execution. In that case, not entering a reboot loop
+			// is the right thing to do, and we are logging stdout/stderr of the command
+			// so it should be obvious what is wrong.
+			return false
+		default:
+			// Something was grossly misconfigured, such as the command path being wrong.
+			log.Fatalf("Error invoking sentinel command: %v", err)
+		}
 	}
+	return true
 }
 
 func rebootRequired() bool {
@@ -137,7 +149,7 @@ func rebootRequired() bool {
 	}
 }
 
-func rebootBlocked() bool {
+func rebootBlocked(client *kubernetes.Clientset, nodeID string) bool {
 	if prometheusURL != "" {
 		alertNames, err := alerts.PrometheusActiveAlerts(prometheusURL, alertFilter)
 		weekday := time.Now().Weekday()
@@ -160,6 +172,31 @@ func rebootBlocked() bool {
 			return true
 		}
 	}
+
+	fieldSelector := fmt.Sprintf("spec.nodeName=%s", nodeID)
+	for _, labelSelector := range podSelectors {
+		podList, err := client.CoreV1().Pods("").List(metav1.ListOptions{
+			LabelSelector: labelSelector,
+			FieldSelector: fieldSelector,
+			Limit:         10})
+		if err != nil {
+			log.Warnf("Reboot blocked: pod query error: %v", err)
+			return true
+		}
+
+		if len(podList.Items) > 0 {
+			podNames := make([]string, 0, len(podList.Items))
+			for _, pod := range podList.Items {
+				podNames = append(podNames, pod.Name)
+			}
+			if len(podList.Continue) > 0 {
+				podNames = append(podNames, "...")
+			}
+			log.Warnf("Reboot blocked: matching pods: %v", podNames)
+			return true
+		}
+	}
+
 	return false
 }
 
@@ -198,6 +235,13 @@ func release(lock *daemonsetlock.DaemonSetLock) {
 
 func drain(nodeID string) {
 	log.Infof("Draining node %s", nodeID)
+
+	if slackHookURL != "" {
+		if err := slack.NotifyDrain(slackHookURL, slackUsername, nodeID); err != nil {
+			log.Warnf("Error notifying slack: %v", err)
+		}
+	}
+
 	drainCmd := newCommand("/usr/bin/kubectl", "drain",
 		"--ignore-daemonsets", "--delete-local-data", "--force", nodeID)
 
@@ -223,8 +267,8 @@ func commandReboot(nodeID string) {
 		}
 	}
 
-	// Relies on /var/run/dbus/system_bus_socket bind mount to talk to systemd
-	rebootCmd := newCommand("/bin/systemctl", "reboot")
+	// Relies on hostPID:true and privileged:true to enter host mount space
+	rebootCmd := newCommand("/usr/bin/nsenter", "-m/proc/1/ns/mnt", "/bin/systemctl", "reboot")
 	if err := rebootCmd.Run(); err != nil {
 		log.Fatalf("Error invoking reboot command: %v", err)
 	}
@@ -270,7 +314,7 @@ func rebootAsRequired(nodeID string) {
 	source := rand.NewSource(time.Now().UnixNano())
 	tick := delaytick.New(source, period)
 	for _ = range tick {
-		if rebootRequired() && !rebootBlocked() {
+		if rebootRequired() && !rebootBlocked(client, nodeID) {
 			node, err := client.CoreV1().Nodes().Get(nodeID, metav1.GetOptions{})
 			if err != nil {
 				log.Fatal(err)
@@ -302,6 +346,7 @@ func root(cmd *cobra.Command, args []string) {
 	log.Infof("Node ID: %s", nodeID)
 	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
 	log.Infof("Reboot Sentinel: %s every %v", rebootSentinel, period)
+	log.Infof("Blocking Pod Selectors: %v", podSelectors)
 
 	go rebootAsRequired(nodeID)
 	go maintainRebootRequiredMetric(nodeID)
