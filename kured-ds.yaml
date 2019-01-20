@@ -46,6 +46,9 @@ spec:
           command:
             - /usr/bin/kured
 #            - --alert-filter-regexp=^RebootRequired$
+#            - --blocking-pod-selector=runtime=long,cost=expensive
+#            - --blocking-pod-selector=name=temperamental
+#            - --blocking-pod-selector=...
 #            - --ds-name=kured
 #            - --ds-namespace=kube-system
 #            - --lock-annotation=weave.works/kured-node-lock
