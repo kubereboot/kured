@@ -1,47 +1,65 @@
-.DEFAULT: all
-.PHONY: all clean image publish-image minikube-publish
+.PHONY: all clean all-publish build-image publish-image publish-manifest minikube-publish
 
-DH_ORG=quay.io/weaveworks
-VERSION=$(shell git symbolic-ref --short HEAD)-$(shell git rev-parse --short HEAD)
-SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
+DH_ORG:=weaveworks
+DH_IMAGE:=$(DH_ORG)/kured
+VERSION:=$(shell git symbolic-ref --short HEAD)-$(shell git rev-parse --short HEAD)
+SUDO:=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
+ALL_ARCHES:=amd64 arm arm64
 
-all: image
+# This option is for running the docker manifest command
+export DOCKER_CLI_EXPERIMENTAL := enabled
+
+ifeq ($(ARCH),amd64)
+	BASEIMAGE?=alpine:3.8
+endif
+ifeq ($(ARCH),arm)
+	BASEIMAGE?=arm32v6/alpine:3.8
+endif
+ifeq ($(ARCH),arm64)
+	BASEIMAGE?=arm64v8/alpine:3.8
+endif
+
+all: all-build
+
+all-build: $(addprefix build/kured-,$(ALL_ARCHES))
+
+sub-publish-image-%:
+	$(MAKE) ARCH=$* publish-image
+
+all-publish-image: $(addprefix sub-publish-image-,$(ALL_ARCHES))
+
+all-publish: all-build all-publish-image publish-manifest
 
 clean:
 	go clean
-	rm -f cmd/kured/kured
-	rm -rf ./build*
+	rm -f cmd/kured/kured*
+	rm -rf ./build/
 
 godeps=$(shell go get $1 && go list -f '{{join .Deps "\n"}}' $1 | grep -v /vendor/ | xargs go list -f '{{if not .Standard}}{{ $$dep := . }}{{range .GoFiles}}{{$$dep.Dir}}/{{.}} {{end}}{{end}}')
 
 DEPS=$(call godeps,./cmd/kured)
 
 cmd/kured/kured: $(DEPS)
-cmd/kured/kured: cmd/kured/*.go
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=$(VERSION)" -o $@ cmd/kured/*.go
+build/kured-%: cmd/kured/*.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=$* go build -ldflags "-X main.version=$(VERSION)" -o $@ $^
+	$(MAKE) ARCH=$* build-image
 
-cmd/kured/kured-arm64: cmd/kured/*.go
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "-X main.version=$(VERSION)" -o $@ cmd/kured/*.go
+build-image:
+	cat Dockerfile.build | sed "s|BASEIMAGE|$(BASEIMAGE)|g" | sed "s|ARCH|$(ARCH)|g" \
+		> build/Dockerfile-$(ARCH)
+	$(SUDO) docker build -t $(DH_IMAGE) -f build/Dockerfile-$(ARCH) ./build
+	@# We need to specify arch here for manifest build/push to work correctly
+	$(SUDO) docker tag $(DH_IMAGE) $(DH_ORG)/kured:$(VERSION)-$(ARCH)
 
-build/.image.done: cmd/kured/Dockerfile cmd/kured/kured
-	mkdir -p build
-	cp $^ build
-	$(SUDO) docker build -t $(DH_ORG)/kured -f build/Dockerfile ./build
-	$(SUDO) docker tag $(DH_ORG)/kured $(DH_ORG)/kured:$(VERSION)
-	touch $@
+publish-image:
+	$(SUDO) docker push $(DH_IMAGE):$(VERSION)-$(ARCH)
 
-build/.image-arm64.done: cmd/kured/Dockerfile.arm64 cmd/kured/kured-arm64
-	mkdir -p build-arm64
-	cp $^ build-arm64
-	$(SUDO) docker build -t $(DH_ORG)/kured-arm64 -f build-arm64/Dockerfile.arm64 ./build-arm64
-	$(SUDO) docker tag $(DH_ORG)/kured-arm64 $(DH_ORG)/kured:$(VERSION)-arm64
-	touch $@
+publish-manifest:
+	docker manifest create --amend $(DH_IMAGE):$(VERSION) $(shell echo $(ALL_ARCHES) | sed -e "s~[^ ]*~$(DH_IMAGE):$(VERSION)\-&~g")
+	@for arch in $(ALL_ARCHES); do \
+		docker manifest annotate --arch $${arch} ${DH_IMAGE}:${VERSION} ${DH_IMAGE}:${VERSION}-$${arch}; \
+	done
+	docker manifest push --purge ${DH_IMAGE}:${VERSION}
 
-image: build/.image.done build/.image-arm64.done
-
-publish-image: image
-	$(SUDO) docker push $(DH_ORG)/kured:$(VERSION)
-	$(SUDO) docker push $(DH_ORG)/kured:$(VERSION)-arm64
-
-minikube-publish: image
+minikube-publish:
 	$(SUDO) docker save $(DH_ORG)/kured | (eval $$(minikube docker-env) && docker load)

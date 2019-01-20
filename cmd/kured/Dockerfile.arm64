@@ -1,9 +1,0 @@
-FROM alpine:3.8 as fetch-kubectl
-ADD https://storage.googleapis.com/kubernetes-release/release/v1.12.1/bin/linux/arm64/kubectl /kubectl
-RUN chmod 0755 /kubectl
-
-FROM arm64v8/alpine:3.8
-# NB: you may need to update RBAC permissions when upgrading kubectl - see kured-rbac.yaml for details
-COPY --from=fetch-kubectl /kubectl /usr/bin/kubectl
-COPY ./kured-arm64 /usr/bin/kured
-ENTRYPOINT ["/usr/bin/kured"]

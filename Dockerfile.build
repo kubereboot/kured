@@ -1,0 +1,14 @@
+FROM alpine:3.8 as builder
+RUN apk add --no-cache ca-certificates
+ADD https://storage.googleapis.com/kubernetes-release/release/v1.12.1/bin/linux/ARCH/kubectl /kubectl
+RUN chmod 0755 /kubectl
+
+FROM BASEIMAGE
+# NB: you may need to update RBAC permissions when upgrading kubectl - see kured-rbac.yaml for details
+COPY --from=builder /kubectl /usr/bin/kubectl
+# Copy certificates
+COPY --from=builder /usr/share/ca-certificates /usr/share/ca-certificates
+COPY --from=builder /etc/ssl/certs /etc/ssl/certs
+# Assume we are in the build directory
+COPY ./kured-ARCH /usr/bin/kured
+ENTRYPOINT ["/usr/bin/kured"]
