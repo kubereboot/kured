@@ -57,3 +57,5 @@ spec:
 #            - --reboot-sentinel=/var/run/reboot-required
 #            - --slack-hook-url=https://hooks.slack.com/...
 #            - --slack-username=prod
+#            - --telemetrics
+#            - --telemetrics-level=2

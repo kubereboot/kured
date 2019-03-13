@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -21,6 +21,7 @@ import (
 	"github.com/weaveworks/kured/pkg/daemonsetlock"
 	"github.com/weaveworks/kured/pkg/delaytick"
 	"github.com/weaveworks/kured/pkg/notifications/slack"
+	"github.com/weaveworks/kured/pkg/notifications/telemetrics"
 )
 
 var (
@@ -37,6 +38,8 @@ var (
 	slackHookURL   string
 	slackUsername  string
 	podSelectors   []string
+	telemetricsEnabled bool
+	telemetricsLevel int
 
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -44,6 +47,8 @@ var (
 		Name:      "reboot_required",
 		Help:      "OS requires reboot due to software updates.",
 	}, []string{"node"})
+
+	log = logrus.New()
 )
 
 func init() {
@@ -79,6 +84,11 @@ func main() {
 	rootCmd.PersistentFlags().StringArrayVar(&podSelectors, "blocking-pod-selector", nil,
 		"label selector identifying pods whose presence should prevent reboots")
 
+	rootCmd.PersistentFlags().BoolVarP(&telemetricsEnabled, "telemetrics", "", false,
+		"Enable telemetrics messages")
+	rootCmd.PersistentFlags().IntVarP(&telemetricsLevel, "telemetrics-level", "", 2,
+		"Only telemetrics messages with this or a higher severity level are submitted")
+
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
 	}
@@ -88,15 +98,15 @@ func main() {
 func newCommand(name string, arg ...string) *exec.Cmd {
 	cmd := exec.Command(name, arg...)
 
-	cmd.Stdout = log.NewEntry(log.StandardLogger()).
+	cmd.Stdout = logrus.NewEntry(logrus.StandardLogger()).
 		WithField("cmd", cmd.Args[0]).
 		WithField("std", "out").
-		WriterLevel(log.InfoLevel)
+		WriterLevel(logrus.InfoLevel)
 
-	cmd.Stderr = log.NewEntry(log.StandardLogger()).
+	cmd.Stderr = logrus.NewEntry(logrus.StandardLogger()).
 		WithField("cmd", cmd.Args[0]).
 		WithField("std", "err").
-		WriterLevel(log.WarnLevel)
+		WriterLevel(logrus.WarnLevel)
 
 	return cmd
 }
@@ -216,6 +226,9 @@ func drain(nodeID string) {
 			log.Warnf("Error notifying slack: %v", err)
 		}
 	}
+	if telemetricsEnabled {
+	        telemetrics.NotifyDrain(nodeID)
+	}
 
 	drainCmd := newCommand("/usr/bin/kubectl", "drain",
 		"--ignore-daemonsets", "--delete-local-data", "--force", nodeID)
@@ -240,6 +253,9 @@ func commandReboot(nodeID string) {
 		if err := slack.NotifyReboot(slackHookURL, slackUsername, nodeID); err != nil {
 			log.Warnf("Error notifying slack: %v", err)
 		}
+	}
+	if telemetricsEnabled {
+	        telemetrics.NotifyReboot(nodeID)
 	}
 
 	// Relies on hostPID:true and privileged:true to enter host mount space
@@ -322,6 +338,13 @@ func root(cmd *cobra.Command, args []string) {
 	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
 	log.Infof("Reboot Sentinel: %s every %v", rebootSentinel, period)
 	log.Infof("Blocking Pod Selectors: %v", podSelectors)
+
+	if telemetricsEnabled {
+		hook, err := telemetrics.NewTelemetricsHook(telemetricsEnabled, telemetricsLevel)
+		if err == nil {
+			log.Hooks.Add(hook)
+		}
+	}
 
 	go rebootAsRequired(nodeID)
 	go maintainRebootRequiredMetric(nodeID)
