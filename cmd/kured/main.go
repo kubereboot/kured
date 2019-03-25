@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -23,6 +24,11 @@ import (
 	"github.com/weaveworks/kured/pkg/notifications/slack"
 )
 
+// nodeMeta is used to remember information across reboots
+type nodeMeta struct {
+	Unschedulable bool `json:"unschedulable"`
+}
+
 var (
 	version = "unreleased"
 
@@ -37,6 +43,20 @@ var (
 	slackHookURL   string
 	slackUsername  string
 	podSelectors   []string
+
+	// Kubernetes specific
+	nodeID        string
+	nodeIPAddress string
+
+	// OS Specific
+	kubeCtlPath           string
+	rebootCommand         string
+	sentinelExistsCommand string
+	baseCommand           string
+
+	// credentials
+	powershellUserName string
+	powershellPassword string
 
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -84,6 +104,191 @@ func main() {
 	}
 }
 
+func isWindows() bool {
+	return runtime.GOOS == "windows"
+}
+
+func configureOsVariables() {
+	if isWindows() {
+		configureWindowsVariables()
+		trustHost()
+	} else {
+		configureLinuxVariables()
+	}
+}
+
+func root(cmd *cobra.Command, args []string) {
+	log.Infof("Kubernetes Reboot Daemon: %s", version)
+	log.Infof("Kubernetes Runtime Operating System: %s", runtime.GOOS)
+
+	nodeID = os.Getenv("KURED_NODE_ID")
+	if nodeID == "" {
+		log.Fatal("KURED_NODE_ID environment variable required")
+	}
+
+	log.Infof("Node ID: %s", nodeID)
+	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
+	log.Infof("Reboot Sentinel: %s every %v", rebootSentinel, period)
+	log.Infof("Blocking Pod Selectors: %v", podSelectors)
+
+	configureOsVariables()
+
+	go rebootAsRequired()
+	go maintainRebootRequiredMetric()
+
+	http.Handle("/metrics", promhttp.Handler())
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+func configureLinuxVariables() {
+	kubeCtlPath = "/usr/bin/kubectl"
+	baseCommand = "/usr/bin/nsenter"
+	// Relies on hostPID:true and privileged:true to enter host mount space
+	rebootCommand = "-m/proc/1/ns/mnt /bin/systemctl reboot"
+	// Relies on hostPID:true and privileged:true to enter host mount space
+	sentinelExistsCommand = "-m/proc/1/ns/mnt -- /usr/bin/test -f"
+}
+
+func configureWindowsVariables() {
+	powershellUserName = os.Getenv("KURED_POWERSHELL_USER_NAME")
+	if powershellUserName == "" {
+		log.Fatal("KURED_POWERSHELL_USER_NAME environment variable required")
+	}
+
+	powershellPassword = os.Getenv("KURED_POWERSHELL_PASSWORD")
+	if powershellPassword == "" {
+		log.Fatal("KURED_POWERSHELL_PASSWORD environment variable required")
+	}
+
+	nodeIPAddress = os.Getenv("KURED_NODE_IP_ADDRESS")
+	if nodeIPAddress == "" {
+		log.Fatal("KURED_NODE_IP_ADDRESS environment variable required")
+	}
+
+	kubeCtlPath = "C:\\k\\kubectl.exe"
+	baseCommand = "powershell"
+	rebootCommand = createPowerShellCommandString("shutdown /r /t 60 /c \"kured forcing reboot due to pending Windows updates\"")
+	sentinelExistsCommand = createPowerShellCommandString("REG QUERY \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate\\Auto Update\\RebootRequired\"")
+}
+
+func trustHost() {
+	trustCommand := newCommand("powershell", "Set-Item", "wsman:\\localhost\\client\\trustedhosts", nodeIPAddress, "-Force")
+	if err := trustCommand.Run(); err != nil {
+		// Cannot continue further as we can't trust the windows host
+		log.Fatalf("Error trusting host %s: %v", nodeIPAddress, err)
+	}
+}
+
+func createPowerShellCommandString(scriptBlock string) string {
+	return fmt.Sprintf("$userName = \"%s\" ; $pwd = ConvertTo-SecureString \"%s\" -AsPlainText -Force; $credential = New-Object PSCredential $userName, $pwd; Invoke-Command -ComputerName %s -ScriptBlock { %s } -Credential $credential", powershellUserName, powershellPassword, nodeIPAddress, scriptBlock)
+}
+
+func drain() {
+	log.Infof("Draining node %s", nodeID)
+
+	if slackHookURL != "" {
+		if err := slack.NotifyDrain(slackHookURL, slackUsername, nodeID); err != nil {
+			log.Warnf("Error notifying slack: %v", err)
+		}
+	}
+
+	drainCmd := newCommand(kubeCtlPath, "drain", "--ignore-daemonsets", "--delete-local-data", "--force", nodeID)
+
+	if err := drainCmd.Run(); err != nil {
+		log.Fatalf("Error invoking drain command: %v", err)
+	}
+}
+
+func uncordon() {
+	log.Infof("Uncordoning node %s", nodeID)
+	uncordonCmd := newCommand(kubeCtlPath, "uncordon", nodeID)
+	if err := uncordonCmd.Run(); err != nil {
+		log.Fatalf("Error invoking uncordon command: %v", err)
+	}
+}
+
+func commandReboot() {
+	log.Infof("Commanding reboot")
+
+	if slackHookURL != "" {
+		if err := slack.NotifyReboot(slackHookURL, slackUsername, nodeID); err != nil {
+			log.Warnf("Error notifying slack: %v", err)
+		}
+	}
+
+	rebootCmd := newCommand(baseCommand, rebootCommand)
+
+	if err := rebootCmd.Run(); err != nil {
+		log.Fatalf("Error invoking reboot command: %v", err)
+	}
+}
+
+func maintainRebootRequiredMetric() {
+	for {
+		if sentinelExists() {
+			rebootRequiredGauge.WithLabelValues(nodeID).Set(1)
+		} else {
+			rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
+		}
+		time.Sleep(time.Minute)
+	}
+}
+
+func rebootAsRequired() {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	lock := daemonsetlock.New(client, nodeID, dsNamespace, dsName, lockAnnotation)
+
+	nodeMeta := nodeMeta{}
+	if holding(lock, &nodeMeta) {
+		if !nodeMeta.Unschedulable {
+			uncordon()
+		}
+		release(lock)
+	}
+
+	source := rand.NewSource(time.Now().UnixNano())
+	tick := delaytick.New(source, period)
+	for _ = range tick {
+		if rebootRequired() && !rebootBlocked(client) {
+			node, err := client.CoreV1().Nodes().Get(nodeID, metav1.GetOptions{})
+			if err != nil {
+				log.Fatal(err)
+			}
+			nodeMeta.Unschedulable = node.Spec.Unschedulable
+
+			if acquire(lock, &nodeMeta) {
+				if !nodeMeta.Unschedulable {
+					drain()
+				}
+				commandReboot()
+				for {
+					log.Infof("Waiting for reboot")
+					time.Sleep(time.Minute)
+				}
+			}
+		}
+	}
+}
+
+func rebootRequired() bool {
+	if sentinelExists() {
+		log.Infof("Reboot required")
+		return true
+	} else {
+		log.Infof("Reboot not required")
+		return false
+	}
+}
+
 // newCommand creates a new Command with stdout/stderr wired to our standard logger
 func newCommand(name string, arg ...string) *exec.Cmd {
 	cmd := exec.Command(name, arg...)
@@ -101,37 +306,7 @@ func newCommand(name string, arg ...string) *exec.Cmd {
 	return cmd
 }
 
-func sentinelExists() bool {
-	// Relies on hostPID:true and privileged:true to enter host mount space
-	sentinelCmd := newCommand("/usr/bin/nsenter", "-m/proc/1/ns/mnt", "--", "/usr/bin/test", "-f", rebootSentinel)
-	if err := sentinelCmd.Run(); err != nil {
-		switch err := err.(type) {
-		case *exec.ExitError:
-			// We assume a non-zero exit code means 'reboot not required', but of course
-			// the user could have misconfigured the sentinel command or something else
-			// went wrong during its execution. In that case, not entering a reboot loop
-			// is the right thing to do, and we are logging stdout/stderr of the command
-			// so it should be obvious what is wrong.
-			return false
-		default:
-			// Something was grossly misconfigured, such as the command path being wrong.
-			log.Fatalf("Error invoking sentinel command: %v", err)
-		}
-	}
-	return true
-}
-
-func rebootRequired() bool {
-	if sentinelExists() {
-		log.Infof("Reboot required")
-		return true
-	} else {
-		log.Infof("Reboot not required")
-		return false
-	}
-}
-
-func rebootBlocked(client *kubernetes.Clientset, nodeID string) bool {
+func rebootBlocked(client *kubernetes.Clientset) bool {
 	if prometheusURL != "" {
 		alertNames, err := alerts.PrometheusActiveAlerts(prometheusURL, alertFilter)
 		if err != nil {
@@ -148,7 +323,7 @@ func rebootBlocked(client *kubernetes.Clientset, nodeID string) bool {
 		}
 	}
 
-	fieldSelector := fmt.Sprintf("spec.nodeName=%s", nodeID)
+	fieldSelector := fmt.Sprintf("spenodeName=%s", nodeID)
 	for _, labelSelector := range podSelectors {
 		podList, err := client.CoreV1().Pods("").List(metav1.ListOptions{
 			LabelSelector: labelSelector,
@@ -208,124 +383,27 @@ func release(lock *daemonsetlock.DaemonSetLock) {
 	}
 }
 
-func drain(nodeID string) {
-	log.Infof("Draining node %s", nodeID)
+func sentinelExists() bool {
+	var sentinelCmd *exec.Cmd
+	if isWindows() {
+		sentinelCmd = newCommand(baseCommand, sentinelExistsCommand)
+	} else {
+		sentinelCmd = newCommand(baseCommand, sentinelExistsCommand, rebootSentinel)
+	}
 
-	if slackHookURL != "" {
-		if err := slack.NotifyDrain(slackHookURL, slackUsername, nodeID); err != nil {
-			log.Warnf("Error notifying slack: %v", err)
+	if err := sentinelCmd.Run(); err != nil {
+		switch err := err.(type) {
+		case *exec.ExitError:
+			// We assume a non-zero exit code means 'reboot not required', but of course
+			// the user could have misconfigured the sentinel command or something else
+			// went wrong during its execution. In that case, not entering a reboot loop
+			// is the right thing to do, and we are logging stdout/stderr of the command
+			// so it should be obvious what is wrong.
+			return false
+		default:
+			// Something was grossly misconfigured, such as the command path being wrong.
+			log.Fatalf("Error invoking sentinel command: %v", err)
 		}
 	}
-
-	drainCmd := newCommand("/usr/bin/kubectl", "drain",
-		"--ignore-daemonsets", "--delete-local-data", "--force", nodeID)
-
-	if err := drainCmd.Run(); err != nil {
-		log.Fatalf("Error invoking drain command: %v", err)
-	}
-}
-
-func uncordon(nodeID string) {
-	log.Infof("Uncordoning node %s", nodeID)
-	uncordonCmd := newCommand("/usr/bin/kubectl", "uncordon", nodeID)
-	if err := uncordonCmd.Run(); err != nil {
-		log.Fatalf("Error invoking uncordon command: %v", err)
-	}
-}
-
-func commandReboot(nodeID string) {
-	log.Infof("Commanding reboot")
-
-	if slackHookURL != "" {
-		if err := slack.NotifyReboot(slackHookURL, slackUsername, nodeID); err != nil {
-			log.Warnf("Error notifying slack: %v", err)
-		}
-	}
-
-	// Relies on hostPID:true and privileged:true to enter host mount space
-	rebootCmd := newCommand("/usr/bin/nsenter", "-m/proc/1/ns/mnt", "/bin/systemctl", "reboot")
-	if err := rebootCmd.Run(); err != nil {
-		log.Fatalf("Error invoking reboot command: %v", err)
-	}
-}
-
-func maintainRebootRequiredMetric(nodeID string) {
-	for {
-		if sentinelExists() {
-			rebootRequiredGauge.WithLabelValues(nodeID).Set(1)
-		} else {
-			rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
-		}
-		time.Sleep(time.Minute)
-	}
-}
-
-// nodeMeta is used to remember information across reboots
-type nodeMeta struct {
-	Unschedulable bool `json:"unschedulable"`
-}
-
-func rebootAsRequired(nodeID string) {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	client, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	lock := daemonsetlock.New(client, nodeID, dsNamespace, dsName, lockAnnotation)
-
-	nodeMeta := nodeMeta{}
-	if holding(lock, &nodeMeta) {
-		if !nodeMeta.Unschedulable {
-			uncordon(nodeID)
-		}
-		release(lock)
-	}
-
-	source := rand.NewSource(time.Now().UnixNano())
-	tick := delaytick.New(source, period)
-	for _ = range tick {
-		if rebootRequired() && !rebootBlocked(client, nodeID) {
-			node, err := client.CoreV1().Nodes().Get(nodeID, metav1.GetOptions{})
-			if err != nil {
-				log.Fatal(err)
-			}
-			nodeMeta.Unschedulable = node.Spec.Unschedulable
-
-			if acquire(lock, &nodeMeta) {
-				if !nodeMeta.Unschedulable {
-					drain(nodeID)
-				}
-				commandReboot(nodeID)
-				for {
-					log.Infof("Waiting for reboot")
-					time.Sleep(time.Minute)
-				}
-			}
-		}
-	}
-}
-
-func root(cmd *cobra.Command, args []string) {
-	log.Infof("Kubernetes Reboot Daemon: %s", version)
-
-	nodeID := os.Getenv("KURED_NODE_ID")
-	if nodeID == "" {
-		log.Fatal("KURED_NODE_ID environment variable required")
-	}
-
-	log.Infof("Node ID: %s", nodeID)
-	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
-	log.Infof("Reboot Sentinel: %s every %v", rebootSentinel, period)
-	log.Infof("Blocking Pod Selectors: %v", podSelectors)
-
-	go rebootAsRequired(nodeID)
-	go maintainRebootRequiredMetric(nodeID)
-
-	http.Handle("/metrics", promhttp.Handler())
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	return true
 }
