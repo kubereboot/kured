@@ -43,7 +43,6 @@ var (
 	slackHookURL   string
 	slackUsername  string
 	podSelectors   []string
-	kubeCtlPath    string
 
 	// Kubernetes specific
 	nodeID        string
@@ -99,9 +98,6 @@ func main() {
 
 	rootCmd.PersistentFlags().StringArrayVar(&podSelectors, "blocking-pod-selector", nil,
 		"label selector identifying pods whose presence should prevent reboots")
-
-	rootCmd.PersistentFlags().StringVar(&kubeCtlPath, "kube-ctl-path", "",
-		"path to kubectl command")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
