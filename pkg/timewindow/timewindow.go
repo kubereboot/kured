@@ -53,7 +53,7 @@ func (tw *TimeWindow) String() string {
 }
 
 func parseTime(s string, loc *time.Location) (time.Time, error) {
-	fmts := []string{"15:04", "15:04:06", "03:04pm", "15", "03pm"}
+	fmts := []string{"15:04", "15:04:06", "03:04pm", "15", "03pm", "3pm"}
 	for _, f := range fmts {
 		if t, err := time.ParseInLocation(f, s, loc); err == nil {
 			return t, nil
