@@ -333,7 +333,6 @@ func root(cmd *cobra.Command, args []string) {
 		log.Fatal("KURED_NODE_ID environment variable required")
 	}
 
-	// Make sure location is loadable (to prevent errors down the line)
 	window, err := timewindow.New(rebootDays, rebootStart, rebootEnd, timezone)
 	if err != nil {
 		log.Fatalf("Failed to build time window: %v", err)
