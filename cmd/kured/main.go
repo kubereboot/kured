@@ -85,7 +85,7 @@ func main() {
 	rootCmd.PersistentFlags().StringArrayVar(&podSelectors, "blocking-pod-selector", nil,
 		"label selector identifying pods whose presence should prevent reboots")
 
-	rootCmd.PersistentFlags().StringSliceVar(&rebootDays, "reboot-on-days", []string{"sun", "mon", "tue", "wed", "thu", "fri", "sat"},
+	rootCmd.PersistentFlags().StringSliceVar(&rebootDays, "reboot-on-days", timewindow.EveryDay,
 		"only reboot on these days")
 	rootCmd.PersistentFlags().StringVar(&rebootStart, "start-time", "0:00",
 		"only reboot after this time of day")

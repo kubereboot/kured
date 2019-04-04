@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Represents a time window
+// TimeWindow specifies a schedule of days and times.
 type TimeWindow struct {
 	days      weekdays
 	location  *time.Location
@@ -13,6 +13,7 @@ type TimeWindow struct {
 	endTime   time.Time
 }
 
+// New creates a TimeWindow instance based on string inputs specifying a schedule.
 func New(days []string, startTime, endTime, location string) (*TimeWindow, error) {
 	tw := &TimeWindow{}
 
@@ -36,6 +37,7 @@ func New(days []string, startTime, endTime, location string) (*TimeWindow, error
 	return tw, nil
 }
 
+// Contains determines whether the specified time is within this time window.
 func (tw *TimeWindow) Contains(t time.Time) bool {
 	loctime := t.In(tw.location)
 	if !tw.days.Contains(loctime.Weekday()) {
@@ -48,10 +50,12 @@ func (tw *TimeWindow) Contains(t time.Time) bool {
 	return loctime.After(start) && loctime.Before(end)
 }
 
+// String returns a string representation of this time window.
 func (tw *TimeWindow) String() string {
 	return fmt.Sprintf("%s between %02d:%02d and %02d:%02d %s", tw.days.String(), tw.startTime.Hour(), tw.startTime.Minute(), tw.endTime.Hour(), tw.endTime.Minute(), tw.location.String())
 }
 
+// parseTime tries to parse a time with several formats.
 func parseTime(s string, loc *time.Location) (time.Time, error) {
 	fmts := []string{"15:04", "15:04:06", "03:04pm", "15", "03pm", "3pm"}
 	for _, f := range fmts {

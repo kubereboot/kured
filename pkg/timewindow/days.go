@@ -7,6 +7,9 @@ import (
 	"time"
 )
 
+var EveryDay = []string{"su", "mo", "tu", "we", "th", "fr", "sa"}
+
+// dayStrings maps day strings to time.Weekdays
 var dayStrings = map[string]time.Weekday{
 	"su":        time.Sunday,
 	"sun":       time.Sunday,
@@ -31,39 +34,48 @@ var dayStrings = map[string]time.Weekday{
 	"saturday":  time.Saturday,
 }
 
-type weekdays []time.Weekday
+type weekdays uint32
 
+// parseWeekdays creates a set of weekdays from a string slice
 func parseWeekdays(days []string) (weekdays, error) {
-	var result []time.Weekday
+	var result uint32
 	for _, day := range days {
-		weekday, err := parseWeekday(day)
-		if err != nil {
-			return nil, err
+		if len(day) == 0 {
+			continue
 		}
 
-		result = append(result, weekday)
+		weekday, err := parseWeekday(day)
+		if err != nil {
+			return weekdays(0), err
+		}
+
+		result |= 1 << uint32(weekday)
 	}
 
 	return weekdays(result), nil
 }
 
+// Contains returns true if the specified weekday is a member of this set.
 func (w weekdays) Contains(day time.Weekday) bool {
-	for _, d := range w {
-		if d == day {
-			return true
+	return uint32(w)&(1<<uint32(day)) != 0
+}
+
+// String returns a string representation of the set of weekdays.
+func (w weekdays) String() string {
+	if uint32(w) == 0 {
+		return "(No days)"
+	}
+
+	var b strings.Builder
+	for i := uint32(0); i < 7; i++ {
+		if uint32(w)&(1<<i) != 0 {
+			b.WriteString(time.Weekday(i).String()[0:3])
+		} else {
+			b.WriteString("---")
 		}
 	}
 
-	return false
-}
-
-func (w weekdays) String() string {
-	var days []string
-	for _, d := range w {
-		days = append(days, d.String())
-	}
-
-	return strings.Join(days, ",")
+	return b.String()
 }
 
 func parseWeekday(day string) (time.Weekday, error) {
@@ -75,8 +87,8 @@ func parseWeekday(day string) (time.Weekday, error) {
 		}
 	}
 
-	if day, ok := dayStrings[strings.ToLower(day)]; ok {
-		return day, nil
+	if weekday, ok := dayStrings[strings.ToLower(day)]; ok {
+		return weekday, nil
 	} else {
 		return time.Sunday, fmt.Errorf("Invalid weekday: %s", day)
 	}
