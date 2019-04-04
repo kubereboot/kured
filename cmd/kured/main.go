@@ -85,14 +85,14 @@ func main() {
 	rootCmd.PersistentFlags().StringArrayVar(&podSelectors, "blocking-pod-selector", nil,
 		"label selector identifying pods whose presence should prevent reboots")
 
-	rootCmd.PersistentFlags().StringSliceVar(&rebootDays, "reboot-on-days", timewindow.EveryDay,
-		"only reboot on these days")
+	rootCmd.PersistentFlags().StringSliceVar(&rebootDays, "reboot-days", timewindow.EveryDay,
+		"schedule reboot on these days")
 	rootCmd.PersistentFlags().StringVar(&rebootStart, "start-time", "0:00",
-		"only reboot after this time of day")
+		"schedule reboot only after this time of day")
 	rootCmd.PersistentFlags().StringVar(&rebootEnd, "end-time", "23:59",
-		"only reboot before this time of day")
+		"schedule reboot only before this time of day")
 	rootCmd.PersistentFlags().StringVar(&timezone, "time-zone", "UTC",
-		"use this timezone to calculate allowed reboot time")
+		"use this timezone for schedule inputs")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
