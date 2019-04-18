@@ -165,7 +165,11 @@ func configureWindowsVariables() {
 		log.Fatal("KURED_NODE_IP_ADDRESS environment variable required")
 	}
 
-	kubeCtlPath = "C:\\k\\kubectl.exe"
+	kubeCtlPath = os.Getenv("KUBE_CTL_PATH")
+	if kubeCtlPath == "" {
+		log.Fatal("KUBE_CTL_PATH environment variable required")
+	}
+
 	baseCommand = "powershell"
 	rebootCommand = createPowerShellCommandString("shutdown /r /t 60 /c \"kured forcing reboot due to pending Windows updates\"")
 	sentinelExistsCommand = createPowerShellCommandString("REG QUERY \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate\\Auto Update\\RebootRequired\"")

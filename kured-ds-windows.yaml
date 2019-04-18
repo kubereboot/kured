@@ -51,6 +51,8 @@ spec:
               value: "WINDOWS ADMIN USERNAME"
             - name: KURED_POWERSHELL_PASSWORD
               value: "INSERT PASSWORD HERE"
+            - name: KUBE_CTL_PATH
+              value: "C:\\KUBE_CTL_PATH"
           command: ["C:\\kured.exe"]
 #         args:["--alert-filter-regexp=^RebootRequired$",
 #            "--blocking-pod-selector=runtime=long,cost=expensive",
