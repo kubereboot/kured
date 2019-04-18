@@ -8,7 +8,7 @@ metadata:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: kured            # Must match `--ds-name`
+  name: kured-windows    # Must match `--ds-name`
   namespace: kube-system # Must match `--ds-namespace`
 spec:
   selector:
@@ -58,7 +58,7 @@ spec:
 #            "--blocking-pod-selector=runtime=long,cost=expensive",
 #            "--blocking-pod-selector=name=temperamental",
 #            "--blocking-pod-selector=...",
-#            "--ds-name=kured",
+#            "--ds-name=kured-windows",
 #            "--ds-namespace=kube-system",
 #            "--lock-annotation=weave.works/kured-node-lock",
 #            "--period=1h",
