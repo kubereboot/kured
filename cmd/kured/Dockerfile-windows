@@ -1,0 +1,5 @@
+FROM microsoft/windowsservercore:1803
+# NB: you may need to update RBAC permissions when upgrading kubectl - see kured-rbac.yaml for details
+ADD https://storage.googleapis.com/kubernetes-release/release/v1.12.1/bin/windows/amd64/kubectl.exe /k/kubectl.exe
+COPY kured.exe kured.exe
+ENTRYPOINT ["C:\\kured.exe"]
