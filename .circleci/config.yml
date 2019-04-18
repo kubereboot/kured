@@ -12,7 +12,7 @@ jobs:
       - deploy:
           name: Build and push image
           command: |
-            docker login -u "$DOCKER_USER" -p "$DOCKER_PASS" quay.io
+            echo "$DOCKER_PASS" | docker login --username "$DOCKER_USER" --password-stdin
             if [ -z "${CIRCLE_TAG}" ]; then
                 make publish-image
             else
