@@ -45,11 +45,11 @@ spec:
                   fieldPath: spec.nodeName
           command:
             - /usr/bin/kured
+            - --ds-name=kured-unix
 #            - --alert-filter-regexp=^RebootRequired$
 #            - --blocking-pod-selector=runtime=long,cost=expensive
 #            - --blocking-pod-selector=name=temperamental
 #            - --blocking-pod-selector=...
-#            - --ds-name=kured-unix
 #            - --ds-namespace=kube-system
 #            - --lock-annotation=weave.works/kured-node-lock
 #            - --period=1h

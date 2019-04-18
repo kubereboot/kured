@@ -54,11 +54,11 @@ spec:
             - name: KUBE_CTL_PATH
               value: "C:\\KUBE_CTL_PATH"
           command: ["C:\\kured.exe"]
-#         args:["--alert-filter-regexp=^RebootRequired$",
+          args: ["--ds-name=kured-windows"]
+#            "--alert-filter-regexp=^RebootRequired$",
 #            "--blocking-pod-selector=runtime=long,cost=expensive",
 #            "--blocking-pod-selector=name=temperamental",
 #            "--blocking-pod-selector=...",
-#            "--ds-name=kured-windows",
 #            "--ds-namespace=kube-system",
 #            "--lock-annotation=weave.works/kured-node-lock",
 #            "--period=1h",
