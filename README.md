@@ -234,7 +234,7 @@ dep ensure && make
 
 ## Frequently Asked/Anticipated Questions
 
-### Why is there no `latest` tag on quay.io?
+### Why is there no `latest` tag on Docker Hub?
 
 Use of `latest` for production deployments is bad practice - see
 [here](https://kubernetes.io/docs/concepts/configuration/overview) for
