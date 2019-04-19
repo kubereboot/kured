@@ -45,9 +45,9 @@ func (tw *TimeWindow) Contains(t time.Time) bool {
 	}
 
 	start := time.Date(loctime.Year(), loctime.Month(), loctime.Day(), tw.startTime.Hour(), tw.startTime.Minute(), tw.startTime.Second(), 0, tw.location)
-	end := time.Date(loctime.Year(), loctime.Month(), loctime.Day(), tw.endTime.Hour(), tw.endTime.Minute(), tw.endTime.Second(), 0, tw.location)
+	end := time.Date(loctime.Year(), loctime.Month(), loctime.Day(), tw.endTime.Hour(), tw.endTime.Minute(), tw.endTime.Second(), 1e9-1, tw.location)
 
-	return loctime.After(start) && loctime.Before(end)
+	return (loctime.After(start) || loctime.Equal(start)) && (loctime.Before(end) || loctime.Equal(end))
 }
 
 // String returns a string representation of this time window.
@@ -57,7 +57,7 @@ func (tw *TimeWindow) String() string {
 
 // parseTime tries to parse a time with several formats.
 func parseTime(s string, loc *time.Location) (time.Time, error) {
-	fmts := []string{"15:04", "15:04:06", "03:04pm", "15", "03pm", "3pm"}
+	fmts := []string{"15:04", "15:04:05", "03:04pm", "15", "03pm", "3pm"}
 	for _, f := range fmts {
 		if t, err := time.ParseInLocation(f, s, loc); err == nil {
 			return t, nil

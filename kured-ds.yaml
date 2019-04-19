@@ -51,7 +51,7 @@ spec:
 #            - --blocking-pod-selector=...
 #            - --ds-name=kured
 #            - --ds-namespace=kube-system
-#            - --end-time=23:59
+#            - --end-time=23:59:59
 #            - --lock-annotation=weave.works/kured-node-lock
 #            - --period=1h
 #            - --prometheus-url=http://prometheus.monitoring.svc.cluster.local

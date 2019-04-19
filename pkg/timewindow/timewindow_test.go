@@ -36,6 +36,10 @@ func TestTimeWindows(t *testing.T) {
 			{"2019/04/10 10:30 PDT", true},
 			{"2019/04/11 10:30 PDT", false},
 		}},
+		{"mo,tu,we,th,fr", "00:00", "23:59:59", "UTC", []testcase{
+			{"2019/04/18 00:00 UTC", true},
+			{"2019/04/18 23:59 UTC", true},
+		}},
 	}
 
 	for i, tst := range tests {

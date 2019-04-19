@@ -89,7 +89,7 @@ func main() {
 		"schedule reboot on these days")
 	rootCmd.PersistentFlags().StringVar(&rebootStart, "start-time", "0:00",
 		"schedule reboot only after this time of day")
-	rootCmd.PersistentFlags().StringVar(&rebootEnd, "end-time", "23:59",
+	rootCmd.PersistentFlags().StringVar(&rebootEnd, "end-time", "23:59:59",
 		"schedule reboot only before this time of day")
 	rootCmd.PersistentFlags().StringVar(&timezone, "time-zone", "UTC",
 		"use this timezone for schedule inputs")
