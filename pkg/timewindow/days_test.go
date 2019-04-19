@@ -15,8 +15,8 @@ func TestParseWeekdays(t *testing.T) {
 		{"sunday,tu,thu", "Sun---Tue---Thu------"},
 		{"THURSDAY", "------------Thu------"},
 		{"we,WED,WeDnEsDaY", "---------Wed---------"},
-		{"", "(No days)"},
-		{",,,", "(No days)"},
+		{"", "---------------------"},
+		{",,,", "---------------------"},
 	}
 
 	for _, tst := range tests {

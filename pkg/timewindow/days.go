@@ -62,10 +62,6 @@ func (w weekdays) Contains(day time.Weekday) bool {
 
 // String returns a string representation of the set of weekdays.
 func (w weekdays) String() string {
-	if uint32(w) == 0 {
-		return "(No days)"
-	}
-
 	var b strings.Builder
 	for i := uint32(0); i < 7; i++ {
 		if uint32(w)&(1<<i) != 0 {
