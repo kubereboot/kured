@@ -8,7 +8,6 @@ SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
 all: image
 
 clean:
-	go clean
 	rm -f cmd/kured/kured
 	rm -rf ./build
 
