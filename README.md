@@ -230,9 +230,15 @@ kubectl -n kube-system annotate ds kured weave.works/kured-node-lock-
 
 ## Building
 
+See the [CircleCI config](.circleci/config.yml) for the preferred
+version of Golang. Kured now uses Go Modules, so a simple
+
 ```
-dep ensure && make
+make
 ```
+
+is sufficient to download the required dependencies and build the
+Docker image.
 
 ## Frequently Asked/Anticipated Questions
 
