@@ -41,6 +41,7 @@ compatibility of one minor version between client and server:
 | kured  | kubectl | k8s.io/client-go | k8s.io/apimachinery | expected kubernetes compatibility |
 |--------|---------|------------------|---------------------|-----------------------------------|
 | master | 1.13.6  | v10.0.0          | release-1.13        | 1.12.x, 1.13.x, 1.14.x            |
+| 1.2.0  | 1.13.6  | v10.0.0          | release-1.13        | 1.12.x, 1.13.x, 1.14.x            |
 | 1.1.0  | 1.12.1  | v9.0.0           | release-1.12        | 1.11.x, 1.12.x, 1.13.x            |
 | 1.0.0  | 1.7.6   | v4.0.0           | release-1.7         | 1.6.x, 1.7.x, 1.8.x               | 
 
@@ -57,7 +58,7 @@ To obtain a default installation without Prometheus alerting interlock
 or Slack notifications:
 
 ```
-kubectl apply -f https://github.com/weaveworks/kured/releases/download/1.1.0/kured-1.1.0-dockerhub.yaml
+kubectl apply -f https://github.com/weaveworks/kured/releases/download/1.2.0/kured-1.2.0-dockerhub.yaml
 ```
 
 If you want to customise the installation, download the manifest and
