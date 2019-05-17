@@ -19,9 +19,6 @@ rules:
 - apiGroups: ["apps"]
   resources: ["daemonsets"]
   verbs:     ["get"]
-- apiGroups: ["extensions"]
-  resources: ["daemonsets"]
-  verbs:     ["get"]
 - apiGroups: [""]
   resources: ["pods/eviction"]
   verbs:     ["create"]
@@ -46,7 +43,7 @@ metadata:
   name: kured
 rules:
 # Allow kured to lock/unlock itself
-- apiGroups:     ["extensions"]
+- apiGroups:     ["apps"]
   resources:     ["daemonsets"]
   resourceNames: ["kured"]
   verbs:         ["update"]
