@@ -29,7 +29,7 @@ func New(client *kubernetes.Clientset, nodeID, namespace, name, annotation strin
 
 func (dsl *DaemonSetLock) Acquire(metadata interface{}) (acquired bool, owner string, err error) {
 	for {
-		ds, err := dsl.client.ExtensionsV1beta1().DaemonSets(dsl.namespace).Get(dsl.name, metav1.GetOptions{})
+		ds, err := dsl.client.AppsV1().DaemonSets(dsl.namespace).Get(dsl.name, metav1.GetOptions{})
 		if err != nil {
 			return false, "", err
 		}
@@ -53,7 +53,7 @@ func (dsl *DaemonSetLock) Acquire(metadata interface{}) (acquired bool, owner st
 		}
 		ds.ObjectMeta.Annotations[dsl.annotation] = string(valueBytes)
 
-		_, err = dsl.client.ExtensionsV1beta1().DaemonSets(dsl.namespace).Update(ds)
+		_, err = dsl.client.AppsV1().DaemonSets(dsl.namespace).Update(ds)
 		if err != nil {
 			if se, ok := err.(*errors.StatusError); ok && se.ErrStatus.Reason == metav1.StatusReasonConflict {
 				// Something else updated the resource between us reading and writing - try again soon
@@ -68,7 +68,7 @@ func (dsl *DaemonSetLock) Acquire(metadata interface{}) (acquired bool, owner st
 }
 
 func (dsl *DaemonSetLock) Test(metadata interface{}) (holding bool, err error) {
-	ds, err := dsl.client.ExtensionsV1beta1().DaemonSets(dsl.namespace).Get(dsl.name, metav1.GetOptions{})
+	ds, err := dsl.client.AppsV1().DaemonSets(dsl.namespace).Get(dsl.name, metav1.GetOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -87,7 +87,7 @@ func (dsl *DaemonSetLock) Test(metadata interface{}) (holding bool, err error) {
 
 func (dsl *DaemonSetLock) Release() error {
 	for {
-		ds, err := dsl.client.ExtensionsV1beta1().DaemonSets(dsl.namespace).Get(dsl.name, metav1.GetOptions{})
+		ds, err := dsl.client.AppsV1().DaemonSets(dsl.namespace).Get(dsl.name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -107,7 +107,7 @@ func (dsl *DaemonSetLock) Release() error {
 
 		delete(ds.ObjectMeta.Annotations, dsl.annotation)
 
-		_, err = dsl.client.ExtensionsV1beta1().DaemonSets(dsl.namespace).Update(ds)
+		_, err = dsl.client.AppsV1().DaemonSets(dsl.namespace).Update(ds)
 		if err != nil {
 			if se, ok := err.(*errors.StatusError); ok && se.ErrStatus.Reason == metav1.StatusReasonConflict {
 				// Something else updated the resource between us reading and writing - try again soon

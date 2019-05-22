@@ -8,7 +8,7 @@ rules:
 # Allow kubectl to drain/uncordon
 #
 # NB: These permissions are tightly coupled to the bundled version of kubectl; the ones below
-# match https://github.com/kubernetes/kubernetes/blob/v1.12.1/pkg/kubectl/cmd/drain.go
+# match https://github.com/kubernetes/kubernetes/blob/v1.14.1/pkg/kubectl/cmd/drain/drain.go
 #
 - apiGroups: [""]
   resources: ["nodes"]
@@ -16,7 +16,7 @@ rules:
 - apiGroups: [""]
   resources: ["pods"]
   verbs:     ["list","delete","get"]
-- apiGroups: ["extensions"]
+- apiGroups: ["apps"]
   resources: ["daemonsets"]
   verbs:     ["get"]
 - apiGroups: [""]
@@ -43,7 +43,7 @@ metadata:
   name: kured
 rules:
 # Allow kured to lock/unlock itself
-- apiGroups:     ["extensions"]
+- apiGroups:     ["apps"]
   resources:     ["daemonsets"]
   resourceNames: ["kured"]
   verbs:         ["update"]
