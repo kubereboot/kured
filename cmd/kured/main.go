@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -27,16 +28,17 @@ var (
 	version = "unreleased"
 
 	// Command line flags
-	period         time.Duration
-	dsNamespace    string
-	dsName         string
-	lockAnnotation string
-	prometheusURL  string
-	alertFilter    *regexp.Regexp
-	rebootSentinel string
-	slackHookURL   string
-	slackUsername  string
-	podSelectors   []string
+	period                time.Duration
+	dsNamespace           string
+	dsName                string
+	lockAnnotation        string
+	prometheusURL         string
+	alertFilter           *regexp.Regexp
+	rebootSentinel        string
+	rebootSentinelCommand string
+	slackHookURL          string
+	slackUsername         string
+	podSelectors          []string
 
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -69,7 +71,9 @@ func main() {
 	rootCmd.PersistentFlags().Var(&regexpValue{&alertFilter}, "alert-filter-regexp",
 		"alert names to ignore when checking for active alerts")
 	rootCmd.PersistentFlags().StringVar(&rebootSentinel, "reboot-sentinel", "/var/run/reboot-required",
-		"path to file whose existence signals need to reboot")
+		"path to file whose existence signals need to reboot.")
+	rootCmd.PersistentFlags().StringVar(&rebootSentinelCommand, "reboot-sentinel-command", "",
+		"command to run to determine if reboot is required. This overrides reboot-sentinel if set.")
 
 	rootCmd.PersistentFlags().StringVar(&slackHookURL, "slack-hook-url", "",
 		"slack hook URL for reboot notfications")
@@ -101,9 +105,20 @@ func newCommand(name string, arg ...string) *exec.Cmd {
 	return cmd
 }
 
+func sentinelCommand() *exec.Cmd {
+	args := []string{"-m/proc/1/ns/mnt", "--"}
+	if rebootSentinelCommand != "" {
+		args = append(args, strings.Split(rebootSentinelCommand, " ")...)
+	} else {
+		args = append(args, []string{"/usr/bin/test", "-f", rebootSentinel}...)
+	}
+	log.Infof("Executing /usr/bin/nsenter %s", strings.Join(args, " "))
+	return newCommand("/usr/bin/nsenter", args...)
+}
+
 func sentinelExists() bool {
 	// Relies on hostPID:true and privileged:true to enter host mount space
-	sentinelCmd := newCommand("/usr/bin/nsenter", "-m/proc/1/ns/mnt", "--", "/usr/bin/test", "-f", rebootSentinel)
+	sentinelCmd := sentinelCommand()
 	if err := sentinelCmd.Run(); err != nil {
 		switch err := err.(type) {
 		case *exec.ExitError:
