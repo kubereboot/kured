@@ -44,7 +44,7 @@ compatibility of one minor version between client and server:
 | master | 1.14.1  | v11.0.0          | release-1.14        | 1.13.x, 1.14.x, 1.15.x            |
 | 1.2.0  | 1.13.6  | v10.0.0          | release-1.13        | 1.12.x, 1.13.x, 1.14.x            |
 | 1.1.0  | 1.12.1  | v9.0.0           | release-1.12        | 1.11.x, 1.12.x, 1.13.x            |
-| 1.0.0  | 1.7.6   | v4.0.0           | release-1.7         | 1.6.x, 1.7.x, 1.8.x               | 
+| 1.0.0  | 1.7.6   | v4.0.0           | release-1.7         | 1.6.x, 1.7.x, 1.8.x               |
 
 See the [release notes](https://github.com/weaveworks/kured/releases)
 for specific version compatibility information, including which
@@ -79,6 +79,7 @@ Flags:
   -h, --help                                help for kured
       --lock-annotation string              annotation in which to record locking node (default "weave.works/kured-node-lock")
       --period duration                     reboot check period (default 1h0m0s)
+      --drain-timeout duration              abort drain if not succeeded within duration (default 10m0s)
       --prometheus-url string               Prometheus instance to probe for active alerts
       --reboot-days strings                 only reboot on these days (default [su,mo,tu,we,th,fr,sa])
       --reboot-sentinel string              path to file whose existence signals need to reboot (default "/var/run/reboot-required")

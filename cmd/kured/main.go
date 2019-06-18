@@ -29,6 +29,7 @@ var (
 
 	// Command line flags
 	period         time.Duration
+	drainTimeout   time.Duration
 	dsNamespace    string
 	dsName         string
 	lockAnnotation string
@@ -64,6 +65,8 @@ func main() {
 
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
 		"reboot check period")
+	rootCmd.PersistentFlags().DurationVar(&drainTimeout, "drain-timeout", time.Minute*10,
+		"drain timeout")
 	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-namespace", "kube-system",
 		"namespace containing daemonset on which to place lock")
 	rootCmd.PersistentFlags().StringVar(&dsName, "ds-name", "kured",
@@ -235,8 +238,44 @@ func drain(nodeID string) {
 	drainCmd := newCommand("/usr/bin/kubectl", "drain",
 		"--ignore-daemonsets", "--delete-local-data", "--force", nodeID)
 
-	if err := drainCmd.Run(); err != nil {
+	if err := drainCmd.Start(); err != nil {
 		log.Fatalf("Error invoking drain command: %v", err)
+	}
+
+	done := make(chan error)
+	go func() { done <- drainCmd.Wait() }()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			log.Fatalf("Error invoking drain command: %v", err)
+		}
+	case <-time.After(drainTimeout):
+		// The drain command did not finish within the given time so we kill it,
+		// uncordon the node, release the lock, wait for a period in order to let
+		// other nodes a chance to get the lock and we finally exit.
+		drainCmd.Process.Kill()
+
+		log.Errorf("Drain timeout after %s", drainTimeout)
+
+		config, err := rest.InClusterConfig()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		client, err := kubernetes.NewForConfig(config)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		lock := daemonsetlock.New(client, nodeID, dsNamespace, dsName, lockAnnotation)
+
+		uncordon(nodeID)
+		release(lock)
+
+		log.Infof("Waiting %s before exiting.", period)
+		time.After(period)
+		os.Exit(1)
 	}
 }
 
