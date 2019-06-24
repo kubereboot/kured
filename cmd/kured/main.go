@@ -108,7 +108,7 @@ func newCommand(name string, arg ...string) *exec.Cmd {
 func sentinelCommand() *exec.Cmd {
 	args := []string{"-m/proc/1/ns/mnt", "--"}
 	if rebootSentinelCommand != "" {
-		args = append(args, strings.Split(rebootSentinelCommand, " ")...)
+		args = append(args, []string{"sh", "-c", rebootSentinelCommand}...)
 	} else {
 		args = append(args, []string{"/usr/bin/test", "-f", rebootSentinel}...)
 	}
