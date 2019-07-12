@@ -346,13 +346,16 @@ func rebootAsRequired(nodeID string) {
 		if !nodeMeta.Unschedulable {
 			uncordon(nodeID)
 		}
-		releaseTick := time.NewTicker(releaseDelay)
-		for _ = range releaseTick.C {
-			if holding(lock, &nodeMeta) && !releaseBlocked(client, nodeID) {
-				release(lock)
-				releaseTick.Stop()
+
+		if releaseDelay > 0 {
+			releaseTicker := time.NewTicker(releaseDelay)
+			for _ = range releaseTicker.C {
+				if !releaseBlocked(client, nodeID) {
+					releaseTicker.Stop()
+				}
 			}
 		}
+		release(lock)
 	}
 
 	source := rand.NewSource(time.Now().UnixNano())
