@@ -70,7 +70,7 @@ func main() {
 
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
 		"reboot check period")
-	rootCmd.PersistentFlags().DurationVar(&releaseDelay, "release-delay", time.Minute,
+	rootCmd.PersistentFlags().DurationVar(&releaseDelay, "release-delay", 0,
 		"delay between un-cordon and lock release, interval for release checks")
 	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-namespace", "kube-system",
 		"namespace containing daemonset on which to place lock")
@@ -106,7 +106,7 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&timezone, "time-zone", "UTC",
 		"use this timezone for schedule inputs")
 	rootCmd.PersistentFlags().StringArrayVar(&releasePodSelectors, "release-pod-selector", nil,
-		"label selector identifying pods required to be ready before releasing lock")
+		"label selector identifying pods that need to be ready before releasing lock")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
