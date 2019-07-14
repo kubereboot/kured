@@ -8,6 +8,8 @@
 	* [Reboot Sentinel File & Period](#reboot-sentinel-file-&-period)
 	* [Blocking Reboots via Alerts](#blocking-reboots-via-alerts)
 	* [Blocking Reboots via Pods](#blocking-reboots-via-pods)
+  * [Post-Reboot Unlock Delay](#post-reboot-unlock-delay)
+  * [Blocking Lock Release via Pods](#blocking-lock-release-via-pods)
 	* [Prometheus Metrics](#prometheus-metrics)
 	* [Slack Notifications](#slack-notifications)
 	* [Overriding Lock Configuration](#overriding-lock-configuration)
@@ -79,6 +81,8 @@ Flags:
       --period duration                     reboot check period (default 1h0m0s)
       --prometheus-url string               Prometheus instance to probe for active alerts
       --reboot-sentinel string              path to file whose existence signals need to reboot (default "/var/run/reboot-required")
+      --release-delay duration              delay between un-cordon and lock release, interval for release checks
+      --release-pod-selector stringArray    label selector identifying pods that need to be ready before releasing lock
       --slack-hook-url string               slack hook URL for reboot notfications
       --slack-username string               slack username for reboot notfications (default "kured")
 ```
@@ -135,6 +139,22 @@ running job or a known temperamental pod on a node will stop it rebooting.
 > restartability where possible. If you do use it, make sure you set
 > up a RebootRequired alert as described in the next section so that
 > you can intervene manually if reboots are blocked for too long.
+
+### Post-Reboot Unlock Delay
+
+By specifying a `--release-delay` you can delay the release of the reboot lock
+This could be useful if you need to make sure that services have time to restart
+before other cluster nodes are able to reboot. 
+
+### Blocking Lock Release via Pods 
+
+After a node reboots, you can wait for certain pods to become ready before 
+releasing the reboot lock.  To do this, provide a `--release-pod-selector` to
+select the pods that need to be ready and a `--release-delay` to specify the
+interval between ready checks.
+
+> The release-pod-selector will only check pods that have been created and 
+> scheduled to this node.  If no pods are found, the lock will be released.
 
 ### Prometheus Metrics
 
