@@ -40,6 +40,7 @@ var (
 	slackUsername  string
 	slackChannel   string
 	podSelectors   []string
+	command        string
 
 	rebootDays  []string
 	rebootStart string
@@ -67,7 +68,7 @@ func main() {
 		Run:   root}
 
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
-		"reboot check period")
+		"sentinel check period")
 	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-namespace", "kube-system",
 		"namespace containing daemonset on which to place lock")
 	rootCmd.PersistentFlags().StringVar(&dsName, "ds-name", "kured",
@@ -79,14 +80,16 @@ func main() {
 	rootCmd.PersistentFlags().Var(&regexpValue{&alertFilter}, "alert-filter-regexp",
 		"alert names to ignore when checking for active alerts")
 	rootCmd.PersistentFlags().StringVar(&rebootSentinel, "reboot-sentinel", "/var/run/reboot-required",
-		"path to file whose existence signals need to reboot")
+		"path to file whose existence signals need to run command")
+	rootCmd.PersistentFlags().StringVar(&command, "command", "reboot",
+		"systemctl command to run when sentinel is found, default: reboot")
 
 	rootCmd.PersistentFlags().StringVar(&slackHookURL, "slack-hook-url", "",
-		"slack hook URL for reboot notfications")
+		"slack hook URL for notfications")
 	rootCmd.PersistentFlags().StringVar(&slackUsername, "slack-username", "kured",
-		"slack username for reboot notfications")
+		"slack username for notfications")
 	rootCmd.PersistentFlags().StringVar(&slackChannel, "slack-channel", "",
-		"slack channel for reboot notfications")
+		"slack channel for notfications")
 
 	rootCmd.PersistentFlags().StringArrayVar(&podSelectors, "blocking-pod-selector", nil,
 		"label selector identifying pods whose presence should prevent reboots")
@@ -258,7 +261,7 @@ func uncordon(nodeID string) {
 }
 
 func commandReboot(nodeID string) {
-	log.Infof("Commanding reboot for node: %s", nodeID)
+	log.Infof("Running command: %s for node: %s", command, nodeID)
 
 	if slackHookURL != "" {
 		if err := slack.NotifyReboot(slackHookURL, slackUsername, slackChannel, nodeID); err != nil {
@@ -267,9 +270,9 @@ func commandReboot(nodeID string) {
 	}
 
 	// Relies on hostPID:true and privileged:true to enter host mount space
-	rebootCmd := newCommand("/usr/bin/nsenter", "-m/proc/1/ns/mnt", "/bin/systemctl", "reboot")
+	rebootCmd := newCommand("/usr/bin/nsenter", "-m/proc/1/ns/mnt", "/bin/systemctl", command)
 	if err := rebootCmd.Run(); err != nil {
-		log.Fatalf("Error invoking reboot command: %v", err)
+		log.Fatalf("Error invoking %s command: %v", command, err)
 	}
 }
 
@@ -357,6 +360,7 @@ func root(cmd *cobra.Command, args []string) {
 	} else {
 		log.Info("Force annotation cleanup disabled.")
 	}
+	log.Infof("Command: %s", command)
 
 	go rebootAsRequired(nodeID, window, annotationTTL)
 	go maintainRebootRequiredMetric(nodeID)

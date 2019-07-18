@@ -81,6 +81,7 @@ Flags:
       --annotation-ttl time                  force clean annotation after this ammount of time (default 0, disabled)
       --alert-filter-regexp regexp.Regexp   alert names to ignore when checking for active alerts
       --blocking-pod-selector stringArray   label selector identifying pods whose presence should prevent reboots
+      --command string                      systemctl command to run when sentinel is found (default "reboot")
       --ds-name string                      name of daemonset on which to place lock (default "kured")
       --ds-namespace string                 namespace containing daemonset on which to place lock (default "kube-system")
       --end-time string                     only reboot before this time of day (default "23:59")
