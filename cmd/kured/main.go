@@ -37,6 +37,7 @@ var (
 	slackHookURL   string
 	slackUsername  string
 	podSelectors   []string
+	dryRun         bool
 
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -75,6 +76,8 @@ func main() {
 		"slack hook URL for reboot notfications")
 	rootCmd.PersistentFlags().StringVar(&slackUsername, "slack-username", "kured",
 		"slack username for reboot notfications")
+
+	rootCmd.PersistentFlags().BoolVarP(&dryRun, "dry-run", "", false, "dry-run (no reboot)")
 
 	rootCmd.PersistentFlags().StringArrayVar(&podSelectors, "blocking-pod-selector", nil,
 		"label selector identifying pods whose presence should prevent reboots")
@@ -132,6 +135,11 @@ func rebootRequired() bool {
 }
 
 func rebootBlocked(client *kubernetes.Clientset, nodeID string) bool {
+	if dryRun {
+		log.Warn("Reboot blocked: dry-run enabled")
+		return true
+	}
+
 	if prometheusURL != "" {
 		alertNames, err := alerts.PrometheusActiveAlerts(prometheusURL, alertFilter)
 		if err != nil {
