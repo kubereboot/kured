@@ -25,6 +25,12 @@ spec:
       tolerations:
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
+        - key: CriticalAddonsOnly
+          operator: Exists
+        - effect: NoExecute
+          operator: Exists
+        - effect: NoSchedule
+          operator: Exists
       hostPID: true # Facilitate entering the host mount namespace via init
       restartPolicy: Always
       containers:
