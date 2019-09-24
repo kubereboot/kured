@@ -24,6 +24,7 @@ spec:
       serviceAccountName: kured
       tolerations:
         - key: node-role.kubernetes.io/master
+          operator: Exists
           effect: NoSchedule
       hostPID: true # Facilitate entering the host mount namespace via init
       restartPolicy: Always
