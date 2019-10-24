@@ -51,9 +51,13 @@ spec:
 #            - --blocking-pod-selector=...
 #            - --ds-name=kured
 #            - --ds-namespace=kube-system
+#            - --end-time=23:59:59
 #            - --lock-annotation=weave.works/kured-node-lock
 #            - --period=1h
 #            - --prometheus-url=http://prometheus.monitoring.svc.cluster.local
+#            - --reboot-days=sun,mon,tue,wed,thu,fri,sat
 #            - --reboot-sentinel=/var/run/reboot-required
 #            - --slack-hook-url=https://hooks.slack.com/...
 #            - --slack-username=prod
+#            - --start-time=0:00
+#            - --time-zone=UTC

@@ -6,6 +6,7 @@
 * [Installation](#installation)
 * [Configuration](#configuration)
 	* [Reboot Sentinel File & Period](#reboot-sentinel-file-&-period)
+	* [Setting a schedule](#setting-a-schedule)
 	* [Blocking Reboots via Alerts](#blocking-reboots-via-alerts)
 	* [Blocking Reboots via Pods](#blocking-reboots-via-pods)
 	* [Prometheus Metrics](#prometheus-metrics)
@@ -74,13 +75,17 @@ Flags:
       --blocking-pod-selector stringArray   label selector identifying pods whose presence should prevent reboots
       --ds-name string                      name of daemonset on which to place lock (default "kured")
       --ds-namespace string                 namespace containing daemonset on which to place lock (default "kube-system")
+      --end-time string                     only reboot before this time of day (default "23:59")
   -h, --help                                help for kured
       --lock-annotation string              annotation in which to record locking node (default "weave.works/kured-node-lock")
       --period duration                     reboot check period (default 1h0m0s)
       --prometheus-url string               Prometheus instance to probe for active alerts
+      --reboot-days strings                 only reboot on these days (default [su,mo,tu,we,th,fr,sa])
       --reboot-sentinel string              path to file whose existence signals need to reboot (default "/var/run/reboot-required")
       --slack-hook-url string               slack hook URL for reboot notfications
       --slack-username string               slack username for reboot notfications (default "kured")
+      --start-time string                   only reboot after this time of day (default "0:00")
+      --time-zone string                    use this timezone to calculate allowed reboot time (default "UTC")
 ```
 
 ### Reboot Sentinel File & Period
@@ -90,6 +95,29 @@ By default kured checks for the existence of
 values with `--reboot-sentinel` and `--period`. Each replica of the
 daemon uses a random offset derived from the period on startup so that
 nodes don't all contend for the lock simultaneously.
+
+### Setting a schedule
+
+By default, kured will reboot any time it detects the sentinel, but this
+may cause reboots during odd hours.  While service disruption does not
+normally occur, anything is possible and operators may want to restrict
+reboots to predictable schedules.  Use `--reboot-days`, `--start-time`,
+`--end-time`, and `--time-zone` to set a schedule.  For example, business
+hours on the west coast USA can be specified with:
+
+```
+	--reboot-days mon,tue,wed,thu,fri
+	--start-time 9am
+	--end-time 5pm
+	--time-zone America/Los_Angeles
+```
+
+Times can be formatted in numerous ways, including `5pm`, `5:00pm` `17:00`,
+and `17`.  `--time-zone` represents a Go `time.Location`, and can be `UTC`,
+`Local`, or any entry in the standard Linux tz database.
+
+Note that when using smaller time windows, you should consider shortening
+the sentinel check period (`--period`).
 
 ### Blocking Reboots via Alerts
 
