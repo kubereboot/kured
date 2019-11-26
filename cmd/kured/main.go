@@ -37,6 +37,7 @@ var (
 	rebootSentinel string
 	slackHookURL   string
 	slackUsername  string
+	slackChannel   string
 	podSelectors   []string
 
 	rebootDays  []string
@@ -81,6 +82,8 @@ func main() {
 		"slack hook URL for reboot notfications")
 	rootCmd.PersistentFlags().StringVar(&slackUsername, "slack-username", "kured",
 		"slack username for reboot notfications")
+	rootCmd.PersistentFlags().StringVar(&slackChannel, "slack-channel", "",
+		"slack channel for reboot notfications")
 
 	rootCmd.PersistentFlags().StringArrayVar(&podSelectors, "blocking-pod-selector", nil,
 		"label selector identifying pods whose presence should prevent reboots")
@@ -227,7 +230,7 @@ func drain(nodeID string) {
 	log.Infof("Draining node %s", nodeID)
 
 	if slackHookURL != "" {
-		if err := slack.NotifyDrain(slackHookURL, slackUsername, nodeID); err != nil {
+		if err := slack.NotifyDrain(slackHookURL, slackUsername, slackChannel, nodeID); err != nil {
 			log.Warnf("Error notifying slack: %v", err)
 		}
 	}
@@ -252,7 +255,7 @@ func commandReboot(nodeID string) {
 	log.Infof("Commanding reboot")
 
 	if slackHookURL != "" {
-		if err := slack.NotifyReboot(slackHookURL, slackUsername, nodeID); err != nil {
+		if err := slack.NotifyReboot(slackHookURL, slackUsername, slackChannel, nodeID); err != nil {
 			log.Warnf("Error notifying slack: %v", err)
 		}
 	}

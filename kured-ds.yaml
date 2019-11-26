@@ -59,5 +59,6 @@ spec:
 #            - --reboot-sentinel=/var/run/reboot-required
 #            - --slack-hook-url=https://hooks.slack.com/...
 #            - --slack-username=prod
+#            - --slack-channel=alerting
 #            - --start-time=0:00
 #            - --time-zone=UTC
