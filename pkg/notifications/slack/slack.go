@@ -15,12 +15,14 @@ var (
 type body struct {
 	Text     string `json:"text,omitempty"`
 	Username string `json:"username,omitempty"`
+	Channel  string `json:"channel,omitempty"`
 }
 
-func notify(hookURL, username, message string) error {
+func notify(hookURL, username, channel, message string) error {
 	msg := body{
 		Text:     message,
 		Username: username,
+		Channel:  channel,
 	}
 
 	var buf bytes.Buffer
@@ -41,10 +43,10 @@ func notify(hookURL, username, message string) error {
 	return nil
 }
 
-func NotifyDrain(hookURL, username, nodeID string) error {
-	return notify(hookURL, username, fmt.Sprintf("Draining node %s", nodeID))
+func NotifyDrain(hookURL, username, channel, nodeID string) error {
+	return notify(hookURL, username, channel, fmt.Sprintf("Draining node %s", nodeID))
 }
 
-func NotifyReboot(hookURL, username, nodeID string) error {
-	return notify(hookURL, username, fmt.Sprintf("Rebooting node %s", nodeID))
+func NotifyReboot(hookURL, username, channel, nodeID string) error {
+	return notify(hookURL, username, channel, fmt.Sprintf("Rebooting node %s", nodeID))
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/weaveworks/kured/pkg/daemonsetlock"
 	"github.com/weaveworks/kured/pkg/delaytick"
 	"github.com/weaveworks/kured/pkg/notifications/slack"
+	"github.com/weaveworks/kured/pkg/timewindow"
 )
 
 var (
@@ -36,8 +37,14 @@ var (
 	rebootSentinel string
 	slackHookURL   string
 	slackUsername  string
+	slackChannel   string
 	podSelectors   []string
 	dryRun         bool
+
+	rebootDays  []string
+	rebootStart string
+	rebootEnd   string
+	timezone    string
 
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -76,11 +83,22 @@ func main() {
 		"slack hook URL for reboot notfications")
 	rootCmd.PersistentFlags().StringVar(&slackUsername, "slack-username", "kured",
 		"slack username for reboot notfications")
+	rootCmd.PersistentFlags().StringVar(&slackChannel, "slack-channel", "",
+		"slack channel for reboot notfications")
 
 	rootCmd.PersistentFlags().BoolVarP(&dryRun, "dry-run", "", false, "dry-run (no reboot)")
 
 	rootCmd.PersistentFlags().StringArrayVar(&podSelectors, "blocking-pod-selector", nil,
 		"label selector identifying pods whose presence should prevent reboots")
+
+	rootCmd.PersistentFlags().StringSliceVar(&rebootDays, "reboot-days", timewindow.EveryDay,
+		"schedule reboot on these days")
+	rootCmd.PersistentFlags().StringVar(&rebootStart, "start-time", "0:00",
+		"schedule reboot only after this time of day")
+	rootCmd.PersistentFlags().StringVar(&rebootEnd, "end-time", "23:59:59",
+		"schedule reboot only before this time of day")
+	rootCmd.PersistentFlags().StringVar(&timezone, "time-zone", "UTC",
+		"use this timezone for schedule inputs")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
@@ -220,7 +238,7 @@ func drain(nodeID string) {
 	log.Infof("Draining node %s", nodeID)
 
 	if slackHookURL != "" {
-		if err := slack.NotifyDrain(slackHookURL, slackUsername, nodeID); err != nil {
+		if err := slack.NotifyDrain(slackHookURL, slackUsername, slackChannel, nodeID); err != nil {
 			log.Warnf("Error notifying slack: %v", err)
 		}
 	}
@@ -245,7 +263,7 @@ func commandReboot(nodeID string) {
 	log.Infof("Commanding reboot")
 
 	if slackHookURL != "" {
-		if err := slack.NotifyReboot(slackHookURL, slackUsername, nodeID); err != nil {
+		if err := slack.NotifyReboot(slackHookURL, slackUsername, slackChannel, nodeID); err != nil {
 			log.Warnf("Error notifying slack: %v", err)
 		}
 	}
@@ -273,7 +291,7 @@ type nodeMeta struct {
 	Unschedulable bool `json:"unschedulable"`
 }
 
-func rebootAsRequired(nodeID string) {
+func rebootAsRequired(nodeID string, window *timewindow.TimeWindow) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Fatal(err)
@@ -297,7 +315,7 @@ func rebootAsRequired(nodeID string) {
 	source := rand.NewSource(time.Now().UnixNano())
 	tick := delaytick.New(source, period)
 	for _ = range tick {
-		if rebootRequired() && !rebootBlocked(client, nodeID) {
+		if window.Contains(time.Now()) && rebootRequired() && !rebootBlocked(client, nodeID) {
 			node, err := client.CoreV1().Nodes().Get(nodeID, metav1.GetOptions{})
 			if err != nil {
 				log.Fatal(err)
@@ -326,12 +344,18 @@ func root(cmd *cobra.Command, args []string) {
 		log.Fatal("KURED_NODE_ID environment variable required")
 	}
 
+	window, err := timewindow.New(rebootDays, rebootStart, rebootEnd, timezone)
+	if err != nil {
+		log.Fatalf("Failed to build time window: %v", err)
+	}
+
 	log.Infof("Node ID: %s", nodeID)
 	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
 	log.Infof("Reboot Sentinel: %s every %v", rebootSentinel, period)
 	log.Infof("Blocking Pod Selectors: %v", podSelectors)
+	log.Infof("Reboot on: %v", window)
 
-	go rebootAsRequired(nodeID)
+	go rebootAsRequired(nodeID, window)
 	go maintainRebootRequiredMetric(nodeID)
 
 	http.Handle("/metrics", promhttp.Handler())
