@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"regexp"
 	"time"
+	"strconv"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -28,17 +29,21 @@ var (
 	version = "unreleased"
 
 	// Command line flags
-	period         time.Duration
-	dsNamespace    string
-	dsName         string
-	lockAnnotation string
-	prometheusURL  string
-	alertFilter    *regexp.Regexp
-	rebootSentinel string
-	slackHookURL   string
-	slackUsername  string
-	slackChannel   string
-	podSelectors   []string
+	forceDrain       bool
+	forceReboot      bool
+	period           time.Duration
+	drainTimeout     time.Duration
+	drainGracePeriod int64
+	dsNamespace      string
+	dsName           string
+	lockAnnotation   string
+	prometheusURL    string
+	alertFilter      *regexp.Regexp
+	rebootSentinel   string
+	slackHookURL     string
+	slackUsername    string
+	slackChannel     string
+	podSelectors     []string
 
 	rebootDays  []string
 	rebootStart string
@@ -63,6 +68,14 @@ func main() {
 		Short: "Kubernetes Reboot Daemon",
 		Run:   root}
 
+	rootCmd.PersistentFlags().BoolVar(&forceDrain, "force-drain", true,
+		"enable/disable force drain")
+	rootCmd.PersistentFlags().BoolVar(&forceReboot, "force-reboot", false,
+		"enable/disable force reboot")
+	rootCmd.PersistentFlags().Int64Var(&drainGracePeriod, "drain-grace-period", -1,
+		"drain grace period in seconds")
+	rootCmd.PersistentFlags().DurationVar(&drainTimeout, "drain-timeout", time.Minute*60,
+		"total drain timeout")
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
 		"reboot check period")
 	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-namespace", "kube-system",
@@ -236,10 +249,25 @@ func drain(nodeID string) {
 	}
 
 	drainCmd := newCommand("/usr/bin/kubectl", "drain",
-		"--ignore-daemonsets", "--delete-local-data", "--force", nodeID)
+		"--ignore-daemonsets", "--delete-local-data", "--grace-period", strconv.FormatInt(drainGracePeriod, 10), fmt.Sprintf("--force=%t", forceDrain), nodeID)
 
-	if err := drainCmd.Run(); err != nil {
+	if err := drainCmd.Start(); err != nil {
 		log.Fatalf("Error invoking drain command: %v", err)
+	}
+
+	if forceReboot == true {
+	    select {
+	    case <-time.After(drainTimeout):
+	    	// The drain command did not finish within the given time so we kill it,
+	    	// and force a reboot
+	    	    drainCmd.Process.Kill()
+
+	    	    log.Errorf("Drain command took longer than specified timeout (%s) so it was killed", drainTimeout)
+		}
+	} else {
+		if err := drainCmd.Wait(); err != nil {
+		    log.Fatalf("Error invoking drain command: %v", err)
+	    }
 	}
 }
 
