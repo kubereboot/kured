@@ -277,6 +277,11 @@ make
 GO111MODULE=on make
 ```
 
+If you are interested in contributing code to kured, please take a look at
+our [development][development] docs.
+
+[development]: DEVELOPMENT.md
+
 ## Frequently Asked/Anticipated Questions
 
 ### Why is there no `latest` tag on Docker Hub?
