@@ -77,10 +77,25 @@ real life testing.
 
 ## Publishing a new kured release
 
-This is the most straight-forward in the whole process.
+Check that `README.md` has an updated compatibility matrix and that the
+url in the `kubectl` incantation (under "Installation") is updated to the
+new version you want to release.
 
-Picking a suitable tag and creating the release through the Github UI should
-release the image just fine.
+Now create the `kured-<release>-dockerhub.yaml` for e.g. `1.3.0`:
+
+```sh
+VERSION=1.3.0
+MANIFEST="kured-$VERSION-dockerhub.yaml"
+cat kured-rbac.yaml > "$MANIFEST"
+cat kured-ds.yaml >> "$MANIFEST"
+sed -i "s#docker.io/weaveworks/kured#docker.io/weaveworks/kured:$VERSION#g" "$MANIFEST"
+```
+
+The last thing you need to do is update the `image:` to point to the release
+tag, e.g. `docker.io/weaveworks/kured:1.3.0`.
+
+Now you can head to the Github UI, use the version number as tag and upload the
+`kured-<release>-dockerhub.yaml` file.
 
 ### Release notes
 
@@ -88,4 +103,4 @@ Please describe what's new and noteworthy in the release notes, list the PRs
 that landed and give a shout-out to everyone who contributed.
 
 Please also note down on which releases the upcoming `kured` release was
-tested on.
+tested on. (Check old release notes if you're unsure.)
