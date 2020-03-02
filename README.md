@@ -6,6 +6,7 @@
 * [Installation](#installation)
 * [Configuration](#configuration)
 	* [Reboot Sentinel File & Period](#reboot-sentinel-file-&-period)
+	* [Setting a schedule](#setting-a-schedule)
 	* [Blocking Reboots via Alerts](#blocking-reboots-via-alerts)
 	* [Blocking Reboots via Pods](#blocking-reboots-via-pods)
 	* [Prometheus Metrics](#prometheus-metrics)
@@ -40,6 +41,9 @@ compatibility of one minor version between client and server:
 
 | kured  | kubectl | k8s.io/client-go | k8s.io/apimachinery | expected kubernetes compatibility |
 |--------|---------|------------------|---------------------|-----------------------------------|
+| master | 1.15.10 | v12.0.0          | release-1.15        | 1.15.x, 1.16.x, 1.17.x            |
+| 1.3.0  | 1.15.10 | v12.0.0          | release-1.15        | 1.15.x, 1.16.x, 1.17.x            |
+| 1.2.0  | 1.13.6  | v10.0.0          | release-1.13        | 1.12.x, 1.13.x, 1.14.x            |
 | 1.1.0  | 1.12.1  | v9.0.0           | release-1.12        | 1.11.x, 1.12.x, 1.13.x            |
 | 1.0.0  | 1.7.6   | v4.0.0           | release-1.7         | 1.6.x, 1.7.x, 1.8.x               | 
 
@@ -56,7 +60,7 @@ To obtain a default installation without Prometheus alerting interlock
 or Slack notifications:
 
 ```
-kubectl apply -f https://github.com/weaveworks/kured/releases/download/1.1.0/kured-1.1.0.yaml
+kubectl apply -f https://github.com/weaveworks/kured/releases/download/1.3.0/kured-1.3.0-dockerhub.yaml
 ```
 
 If you want to customise the installation, download the manifest and
@@ -72,13 +76,18 @@ Flags:
       --blocking-pod-selector stringArray   label selector identifying pods whose presence should prevent reboots
       --ds-name string                      name of daemonset on which to place lock (default "kured")
       --ds-namespace string                 namespace containing daemonset on which to place lock (default "kube-system")
+      --end-time string                     only reboot before this time of day (default "23:59")
   -h, --help                                help for kured
       --lock-annotation string              annotation in which to record locking node (default "weave.works/kured-node-lock")
       --period duration                     reboot check period (default 1h0m0s)
       --prometheus-url string               Prometheus instance to probe for active alerts
+      --reboot-days strings                 only reboot on these days (default [su,mo,tu,we,th,fr,sa])
       --reboot-sentinel string              path to file whose existence signals need to reboot (default "/var/run/reboot-required")
+      --slack-channel string                slack channel for reboot notfications
       --slack-hook-url string               slack hook URL for reboot notfications
       --slack-username string               slack username for reboot notfications (default "kured")
+      --start-time string                   only reboot after this time of day (default "0:00")
+      --time-zone string                    use this timezone to calculate allowed reboot time (default "UTC")
 ```
 
 ### Reboot Sentinel File & Period
@@ -88,6 +97,29 @@ By default kured checks for the existence of
 values with `--reboot-sentinel` and `--period`. Each replica of the
 daemon uses a random offset derived from the period on startup so that
 nodes don't all contend for the lock simultaneously.
+
+### Setting a schedule
+
+By default, kured will reboot any time it detects the sentinel, but this
+may cause reboots during odd hours.  While service disruption does not
+normally occur, anything is possible and operators may want to restrict
+reboots to predictable schedules.  Use `--reboot-days`, `--start-time`,
+`--end-time`, and `--time-zone` to set a schedule.  For example, business
+hours on the west coast USA can be specified with:
+
+```
+	--reboot-days mon,tue,wed,thu,fri
+	--start-time 9am
+	--end-time 5pm
+	--time-zone America/Los_Angeles
+```
+
+Times can be formatted in numerous ways, including `5pm`, `5:00pm` `17:00`,
+and `17`.  `--time-zone` represents a Go `time.Location`, and can be `UTC`,
+`Local`, or any entry in the standard Linux tz database.
+
+Note that when using smaller time windows, you should consider shortening
+the sentinel check period (`--period`).
 
 ### Blocking Reboots via Alerts
 
@@ -228,13 +260,32 @@ kubectl -n kube-system annotate ds kured weave.works/kured-node-lock-
 
 ## Building
 
+See the [CircleCI config](.circleci/config.yml) for the preferred
+version of Golang. Kured now uses [Go
+Modules](https://github.com/golang/go/wiki/Modules), so build
+instructions vary depending on where you have checked out the
+repository:
+
+**Building outside $GOPATH:**
+
 ```
-dep ensure && make
+make
 ```
+
+**Building inside $GOPATH:**
+
+```
+GO111MODULE=on make
+```
+
+If you are interested in contributing code to kured, please take a look at
+our [development][development] docs.
+
+[development]: DEVELOPMENT.md
 
 ## Frequently Asked/Anticipated Questions
 
-### Why is there no `latest` tag on quay.io?
+### Why is there no `latest` tag on Docker Hub?
 
 Use of `latest` for production deployments is bad practice - see
 [here](https://kubernetes.io/docs/concepts/configuration/overview) for

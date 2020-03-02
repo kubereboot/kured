@@ -8,11 +8,10 @@ SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
 all: image
 
 clean:
-	go clean
 	rm -f cmd/kured/kured
 	rm -rf ./build
 
-godeps=$(shell go get $1 && go list -f '{{join .Deps "\n"}}' $1 | grep -v /vendor/ | xargs go list -f '{{if not .Standard}}{{ $$dep := . }}{{range .GoFiles}}{{$$dep.Dir}}/{{.}} {{end}}{{end}}')
+godeps=$(shell go list -f '{{join .Deps "\n"}}' $1 | grep -v /vendor/ | xargs go list -f '{{if not .Standard}}{{ $$dep := . }}{{range .GoFiles}}{{$$dep.Dir}}/{{.}} {{end}}{{end}}')
 
 DEPS=$(call godeps,./cmd/kured)
 
@@ -23,14 +22,14 @@ cmd/kured/kured: cmd/kured/*.go
 build/.image.done: cmd/kured/Dockerfile cmd/kured/kured
 	mkdir -p build
 	cp $^ build
-	$(SUDO) docker build -t quay.io/$(DH_ORG)/kured -f build/Dockerfile ./build
-	$(SUDO) docker tag quay.io/$(DH_ORG)/kured quay.io/$(DH_ORG)/kured:$(VERSION)
+	$(SUDO) docker build -t docker.io/$(DH_ORG)/kured -f build/Dockerfile ./build
+	$(SUDO) docker tag docker.io/$(DH_ORG)/kured docker.io/$(DH_ORG)/kured:$(VERSION)
 	touch $@
 
 image: build/.image.done
 
 publish-image: image
-	$(SUDO) docker push quay.io/$(DH_ORG)/kured:$(VERSION)
+	$(SUDO) docker push docker.io/$(DH_ORG)/kured:$(VERSION)
 
 minikube-publish: image
-	$(SUDO) docker save quay.io/$(DH_ORG)/kured | (eval $$(minikube docker-env) && docker load)
+	$(SUDO) docker save docker.io/$(DH_ORG)/kured | (eval $$(minikube docker-env) && docker load)

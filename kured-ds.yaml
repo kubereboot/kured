@@ -29,10 +29,9 @@ spec:
       restartPolicy: Always
       containers:
         - name: kured
-          image: quay.io/weaveworks/kured # If you find yourself here
-                                          # wondering why there is no
-                                          # :latest tag on quay.io, see
-                                          # the FAQ in the README
+          image: docker.io/weaveworks/kured
+                 # If you find yourself here wondering why there is no
+                 # :latest tag on Docker Hub,see the FAQ in the README
           imagePullPolicy: IfNotPresent
           securityContext:
             privileged: true # Give permission to nsenter /proc/1/ns/mnt
@@ -51,11 +50,16 @@ spec:
 #            - --blocking-pod-selector=...
 #            - --ds-name=kured
 #            - --ds-namespace=kube-system
+#            - --end-time=23:59:59
 #            - --lock-annotation=weave.works/kured-node-lock
 #            - --period=1h
 #            - --prometheus-url=http://prometheus.monitoring.svc.cluster.local
+#            - --reboot-days=sun,mon,tue,wed,thu,fri,sat
 #            - --reboot-sentinel=/var/run/reboot-required
 #            - --slack-hook-url=https://hooks.slack.com/...
 #            - --slack-username=prod
+#            - --slack-channel=alerting
+#            - --start-time=0:00
+#            - --time-zone=UTC
 #            - --telemetrics
 #            - --telemetrics-level=2
