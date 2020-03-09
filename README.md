@@ -16,6 +16,7 @@
 	* [Testing](#testing)
 	* [Disabling Reboots](#disabling-reboots)
 	* [Manual Unlock](#manual-unlock)
+  * [Automatic Unlock](#automatic-unlock)
 * [Building](#building)
 * [Frequently Asked/Anticipated Questions](#frequently-askedanticipated-questions)
 * [Getting Help](#getting-help)
@@ -46,7 +47,7 @@ compatibility of one minor version between client and server:
 | 1.3.0  | 1.15.10 | v12.0.0          | release-1.15        | 1.15.x, 1.16.x, 1.17.x            |
 | 1.2.0  | 1.13.6  | v10.0.0          | release-1.13        | 1.12.x, 1.13.x, 1.14.x            |
 | 1.1.0  | 1.12.1  | v9.0.0           | release-1.12        | 1.11.x, 1.12.x, 1.13.x            |
-| 1.0.0  | 1.7.6   | v4.0.0           | release-1.7         | 1.6.x, 1.7.x, 1.8.x               | 
+| 1.0.0  | 1.7.6   | v4.0.0           | release-1.7         | 1.6.x, 1.7.x, 1.8.x               |
 
 See the [release notes](https://github.com/weaveworks/kured/releases)
 for specific version compatibility information, including which
@@ -73,6 +74,7 @@ The following arguments can be passed to kured via the daemonset pod template:
 
 ```
 Flags:
+      --annotationTTL time                  force clean annotation after this ammount of time (default 0, disabled)
       --alert-filter-regexp regexp.Regexp   alert names to ignore when checking for active alerts
       --blocking-pod-selector stringArray   label selector identifying pods whose presence should prevent reboots
       --ds-name string                      name of daemonset on which to place lock (default "kured")
@@ -258,6 +260,13 @@ kubectl -n kube-system annotate ds kured weave.works/kured-node-lock-
 ```
 > NB the `-` at the end of the command is important - it instructs
 > `kubectl` to remove that annotation entirely.
+
+### Automatic Unlock
+
+In exceptional circumstances (especially when used with cluster-autoscaler) a node
+which holds lock might be killed thus annotation will stay there for ever.
+
+Using `--annotationTTL=30m` will allow other nodes to take over if TTL has expired (in this case 30min) and continue reboot process.
 
 ## Building
 
