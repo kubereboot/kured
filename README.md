@@ -298,7 +298,7 @@ versioned manifest from the [release page](https://github.com/weaveworks/kured/r
 If you have any questions about, feedback for or problems with `kured`:
 
 - Invite yourself to the <a href="https://slack.weave.works/" target="_blank">Weave Users Slack</a>.
-- Ask a question on the [#general](https://weave-community.slack.com/messages/general/) slack channel.
+- Ask a question on the [#kured](https://weave-community.slack.com/messages/kured/) slack channel.
 - [File an issue](https://github.com/weaveworks/kured/issues/new).
 
 Your feedback is always welcome!
