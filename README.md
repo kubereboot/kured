@@ -300,5 +300,7 @@ If you have any questions about, feedback for or problems with `kured`:
 - Invite yourself to the <a href="https://slack.weave.works/" target="_blank">Weave Users Slack</a>.
 - Ask a question on the [#kured](https://weave-community.slack.com/messages/kured/) slack channel.
 - [File an issue](https://github.com/weaveworks/kured/issues/new).
+- Join us in [our monthly meeting](https://docs.google.com/document/d/1bsHTjHhqaaZ7yJnXF6W8c89UB_yn-OoSZEmDnIP34n8/edit#),
+  every fourth Wednesday of the month at 16:00 UTC.
 
 Your feedback is always welcome!
