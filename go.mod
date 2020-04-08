@@ -1,6 +1,6 @@
 module github.com/weaveworks/kured
 
-go 1.13
+go 1.14
 
 require (
 	github.com/googleapis/gnostic v0.2.0 // indirect
