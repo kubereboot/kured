@@ -1,4 +1,4 @@
-FROM alpine:3.11.3
+FROM alpine:3.11
 RUN apk update && apk add ca-certificates tzdata && rm -rf /var/cache/apk/*
 # NB: you may need to update RBAC permissions when upgrading kubectl - see kured-rbac.yaml for details
 ADD https://storage.googleapis.com/kubernetes-release/release/v1.18.0/bin/linux/amd64/kubectl /usr/bin/kubectl
