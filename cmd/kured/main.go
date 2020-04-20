@@ -253,7 +253,7 @@ func uncordon(nodeID string) {
 }
 
 func commandReboot(nodeID string) {
-	log.Infof("Commanding reboot")
+	log.Infof("Commanding reboot for node: %s", nodeID)
 
 	if slackHookURL != "" {
 		if err := slack.NotifyReboot(slackHookURL, slackUsername, slackChannel, nodeID); err != nil {
