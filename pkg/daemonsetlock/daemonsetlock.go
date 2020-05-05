@@ -134,7 +134,7 @@ func (dsl *DaemonSetLock) Release() error {
 }
 
 func ttlExpired(created time.Time, ttl time.Duration) bool {
-	if ttl > 0 && time.Now().UTC().Sub(created) >= ttl {
+	if ttl > 0 && time.Since(created) >= ttl {
 		return true
 	}
 	return false
