@@ -352,9 +352,9 @@ func root(cmd *cobra.Command, args []string) {
 	log.Infof("Blocking Pod Selectors: %v", podSelectors)
 	log.Infof("Reboot on: %v", window)
 	if annotationTTL > 0 {
-		log.Info("Force annotation cleanup disabled.")
-	} else {
 		log.Infof("Force annotation cleanup after: %v", annotationTTL)
+	} else {
+		log.Info("Force annotation cleanup disabled.")
 	}
 
 	go rebootAsRequired(nodeID, window, annotationTTL)
