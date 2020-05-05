@@ -99,7 +99,7 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&timezone, "time-zone", "UTC",
 		"use this timezone for schedule inputs")
 
-	rootCmd.PersistentFlags().DurationVar(&annotationTTL, "annotationTTL", 0,
+	rootCmd.PersistentFlags().DurationVar(&annotationTTL, "annotation-ttl", 0,
 		"force clean annotation after this ammount of time (default 0, disabled)")
 
 	if err := rootCmd.Execute(); err != nil {

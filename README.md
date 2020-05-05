@@ -74,7 +74,7 @@ The following arguments can be passed to kured via the daemonset pod template:
 
 ```
 Flags:
-      --annotationTTL time                  force clean annotation after this ammount of time (default 0, disabled)
+      --annotation-ttl time                  force clean annotation after this ammount of time (default 0, disabled)
       --alert-filter-regexp regexp.Regexp   alert names to ignore when checking for active alerts
       --blocking-pod-selector stringArray   label selector identifying pods whose presence should prevent reboots
       --ds-name string                      name of daemonset on which to place lock (default "kured")
@@ -266,7 +266,7 @@ kubectl -n kube-system annotate ds kured weave.works/kured-node-lock-
 In exceptional circumstances (especially when used with cluster-autoscaler) a node
 which holds lock might be killed thus annotation will stay there for ever.
 
-Using `--annotationTTL=30m` will allow other nodes to take over if TTL has expired (in this case 30min) and continue reboot process.
+Using `--annotation-ttl=30m` will allow other nodes to take over if TTL has expired (in this case 30min) and continue reboot process.
 
 ## Building
 
