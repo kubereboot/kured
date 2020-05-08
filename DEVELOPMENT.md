@@ -75,6 +75,37 @@ If all the tests ran well, kured maintainers can reach out to the Weaveworks
 team to get an upcoming `kured` release tested in the Dev environment for
 real life testing.
 
+### Testing with `kind`
+
+The `kind.sh` script requires bash >=4, (e)grep, kubectl, and kind installed.
+
+A test-run with `kind` consists of setting environment variables, and
+run the `kind.sh` script.
+
+First, set mandatory environment variables:
+
+```console
+export KURED_IMAGE_DEST=docker.io/<yourdockerhubusername>/kured:latest
+```
+
+This will be used to build and publish the image, for consumption into the
+kind cluster.
+
+Optionally, you can also set the following env vars:
+
+```
+# If you want to use a different kind image
+#export KIND_IMAGE=
+# Set this if you want a name different than "kured" for your kind cluster.
+export KIND_CLUSTER_NAME="kured"
+```
+
+Then, you run `kind.sh`, which will create a 5 nodes cluster, install kind,
+trigger a restart of all nodes, and watch every node is properly
+drained/coming back alive, automatically.
+It will also tear down the cluster unless `DO_NOT_TEARDOWN='true'`
+was set in an environment variable.
+
 ## Publishing a new kured release
 
 Check that `README.md` has an updated compatibility matrix and that the
