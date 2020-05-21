@@ -43,13 +43,9 @@ func (dsl *DaemonSetLock) Acquire(metadata interface{}, TTL time.Duration) (acqu
 				return false, "", err
 			}
 
-			if ttlExpired(value.Created, value.TTL) {
-				if err := dsl.Release(); err != nil {
-					return false, "", err
-				}
+			if !ttlExpired(value.Created, value.TTL) {
+				return value.NodeID == dsl.nodeID, value.NodeID, nil
 			}
-
-			return value.NodeID == dsl.nodeID, value.NodeID, nil
 		}
 
 		if ds.ObjectMeta.Annotations == nil {
