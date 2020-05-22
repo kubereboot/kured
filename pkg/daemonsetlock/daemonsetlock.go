@@ -72,27 +72,23 @@ func (dsl *DaemonSetLock) Acquire(metadata interface{}, TTL time.Duration) (acqu
 	}
 }
 
-func (dsl *DaemonSetLock) Test(metadata interface{}) (holding bool, err error) {
+func (dsl *DaemonSetLock) Test(metadata interface{}) (holding bool, expired bool, err error) {
 	ds, err := dsl.client.AppsV1().DaemonSets(dsl.namespace).Get(dsl.name, metav1.GetOptions{})
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 
 	valueString, exists := ds.ObjectMeta.Annotations[dsl.annotation]
 	if exists {
 		value := lockAnnotationValue{Metadata: metadata}
 		if err := json.Unmarshal([]byte(valueString), &value); err != nil {
-			return false, err
+			return false, false, err
 		}
 
-		if ttlExpired(value.Created, value.TTL) {
-			return true, nil
-		}
-
-		return value.NodeID == dsl.nodeID, nil
+		return value.NodeID == dsl.nodeID, ttlExpired(value.Created, value.TTL), nil
 	}
 
-	return false, nil
+	return false, false, nil
 }
 
 func (dsl *DaemonSetLock) Release() error {

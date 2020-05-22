@@ -199,7 +199,7 @@ func rebootBlocked(client *kubernetes.Clientset, nodeID string) bool {
 }
 
 func holding(lock *daemonsetlock.DaemonSetLock, metadata interface{}) bool {
-	holding, err := lock.Test(metadata)
+	holding, _, err := lock.Test(metadata)
 	if err != nil {
 		log.Fatalf("Error testing lock: %v", err)
 	}
@@ -207,6 +207,17 @@ func holding(lock *daemonsetlock.DaemonSetLock, metadata interface{}) bool {
 		log.Infof("Holding lock")
 	}
 	return holding
+}
+
+func ttlExpired(lock *daemonsetlock.DaemonSetLock, metadata interface{}) bool {
+	_, expired, err := lock.Test(metadata)
+	if err != nil {
+		log.Fatalf("Error testing lock: %v", err)
+	}
+	if expired {
+		log.Infof("TTL expired")
+	}
+	return expired
 }
 
 func acquire(lock *daemonsetlock.DaemonSetLock, metadata interface{}, TTL time.Duration) bool {
@@ -306,6 +317,8 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Dur
 		if !nodeMeta.Unschedulable {
 			uncordon(nodeID)
 		}
+		release(lock)
+	} else if ttlExpired(lock, &nodeMeta) {
 		release(lock)
 	}
 
