@@ -74,12 +74,12 @@ Flags:
       --alert-filter-regexp regexp.Regexp   alert names to ignore when checking for active alerts
       --blocking-pod-selector stringArray   label selector identifying pods whose presence should prevent reboots
       --drain-grace-period int64            period of time to wait for node drain in seconds (default -1)
-      --drain-timeout duration              period of time overall to wait for the drain to complete (default 60m)
       --ds-name string                      name of daemonset on which to place lock (default "kured")
       --ds-namespace string                 namespace containing daemonset on which to place lock (default "kube-system")
       --end-time string                     only reboot before this time of day (default "23:59")
       --force-drain bool                    whether to add the force flag to the kubectl drain command (default true)
       --force-reboot bool                   whether to force a reboot even if the drain command is still running (default false)
+      --force-timeout duration              total drain timeout which only applies when force-reboot is set to true (default 60m)
   -h, --help                                help for kured
       --lock-annotation string              annotation in which to record locking node (default "weave.works/kured-node-lock")
       --period duration                     reboot check period (default 1h0m0s)

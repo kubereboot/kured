@@ -31,8 +31,8 @@ var (
 	// Command line flags
 	forceDrain       bool
 	forceReboot      bool
+	forceTimeout     time.Duration
 	period           time.Duration
-	drainTimeout     time.Duration
 	drainGracePeriod int64
 	dsNamespace      string
 	dsName           string
@@ -74,8 +74,8 @@ func main() {
 		"enable/disable force reboot")
 	rootCmd.PersistentFlags().Int64Var(&drainGracePeriod, "drain-grace-period", -1,
 		"drain grace period in seconds")
-	rootCmd.PersistentFlags().DurationVar(&drainTimeout, "drain-timeout", time.Minute*60,
-		"total drain timeout")
+	rootCmd.PersistentFlags().DurationVar(&forceTimeout, "force-timeout", time.Minute*60,
+		"total drain timeout which only applies when force-reboot is set to true")
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
 		"reboot check period")
 	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-namespace", "kube-system",
@@ -255,28 +255,21 @@ func drain(nodeID string) {
 		log.Fatalf("Error invoking drain command: %v", err)
 	}
 
-	done := make(chan error)
-	go func() { done <- drainCmd.Wait() }()
+    done := make(chan error)
 
 	if forceReboot == true {
+	    go func() { done <- drainCmd.Wait() }()
 	    select {
 	    case err := <-done:
 		    if err != nil {
 			    log.Fatalf("Error invoking drain command: %v", err)
 		    }
-	    case <-time.After(drainTimeout):
+	    case <-time.After(forceTimeout):
 	    	// The drain command did not finish within the given time so we kill it,
 	    	// and force a reboot
 	    	    drainCmd.Process.Kill()
 
-	    	    log.Errorf("Drain command took longer than specified timeout (%s) so it was killed", drainTimeout)
-		}
-	} else {
-	    select {
-	    case err := <-done:
-		    if err != nil {
-			    log.Fatalf("Error invoking drain command: %v", err)
-		    }
+	    	    log.Errorf("Drain command took longer than specified timeout (%s) so it was killed", forceTimeout)
 		}
 	}
 }
