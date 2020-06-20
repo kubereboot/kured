@@ -4,6 +4,10 @@ image:
   pullPolicy: IfNotPresent
   pullSecrets: []
 
+updateStrategy: OnDelete
+
+podAnnotations: {}
+
 extraArgs: {}
 
 configuration:
@@ -25,23 +29,23 @@ configuration:
 rbac:
   create: true
 
-podSecurityPolicy:
-  create: false
-
 serviceAccount:
   create: true
   name:
 
+podSecurityPolicy:
+  create: false
+
+resources: {}
+
 metrics:
-  enabled: false
+  create: false
   serviceMonitor:
-    enabled: true
+    create: true
     namespace: ""
     labels: {}
     interval: 60s
     scrapeTimeout: ""
-
-updateStrategy: OnDelete
 
 priorityClassName: ""
 
@@ -52,5 +56,3 @@ tolerations:
 affinity: {}
 
 nodeSelector: {}
-
-podAnnotations: {}
