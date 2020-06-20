@@ -32,6 +32,15 @@ serviceAccount:
   create: true
   name:
 
+metrics:
+  enabled: false
+  serviceMonitor:
+    enabled: true
+    namespace: ""
+    labels: {}
+    interval: 60s
+    scrapeTimeout: ""
+
 updateStrategy: OnDelete
 
 priorityClassName: ""
