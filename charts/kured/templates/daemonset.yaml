@@ -45,6 +45,48 @@ spec:
           args:
             - --ds-name={{ template "kured.fullname" . }}
             - --ds-namespace={{ .Release.Namespace }}
+          {{- if .Values.configuration.annotationTtl }}
+            - --annotation-ttl={{ .Values.configuration.annotationTtl }}
+          {{- end }}
+          {{- if .Values.configuration.alertFilterRegexp }}
+            - --alert-filter-regexp={{ .Values.configuration.alertFilterRegexp | quote }}
+          {{- end }}
+          {{- if .Values.configuration.blockingPodSelector }}
+            - --blocking-pod-selector={{ .Values.configuration.blockingPodSelector | quote }}
+          {{- end }}
+          {{- if .Values.configuration.endTime }}
+            - --end-time={{ .Values.configuration.endTime | quote }}
+          {{- end }}
+          {{- if .Values.configuration.lockAnnotation }}
+            - --lock-annotation={{ .Values.configuration.lockAnnotation | quote }}
+          {{- end }}
+          {{- if .Values.configuration.period }}
+            - --period={{ .Values.configuration.period | quote }}
+          {{- end }}
+          {{- if .Values.configuration.prometheusUrl }}
+            - --prometheus-url={{ .Values.configuration.prometheusUrl | quote }}
+          {{- end }}
+          {{- if .Values.configuration.rebootDays }}
+            - --reboot-days={{ .Values.configuration.rebootDays | quote }}
+          {{- end }}
+          {{- if .Values.configuration.rebootSentinel }}
+            - --reboot-sentinel={{ .Values.configuration.rebootSentinel | quote }}
+          {{- end }}
+          {{- if .Values.configuration.slackChannel }}
+            - --slack-channel={{ .Values.configuration.slackChannel | quote }}
+          {{- end }}
+          {{- if .Values.configuration.slackHookUrl }}
+            - --slack-hook-url={{ .Values.configuration.slackHookUrl | quote }}
+          {{- end }}
+          {{- if .Values.configuration.slackUsername }}
+            - --slack-username={{ .Values.configuration.slackUsername | quote }}
+          {{- end }}
+          {{- if .Values.configuration.startTime }}
+            - --start-time={{ .Values.configuration.startTime | quote }}
+          {{- end }}
+          {{- if .Values.configuration.timeZone }}
+            - --time-zone={{ .Values.configuration.timeZone | quote }}
+          {{- end }}
           {{- range $key, $value := .Values.extraArgs }}
             {{- if $value }}
             - --{{ $key }}={{ $value }}
