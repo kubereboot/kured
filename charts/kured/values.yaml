@@ -18,12 +18,13 @@ serviceAccount:
 
 updateStrategy: OnDelete
 
+priorityClassName: ""
 
 tolerations:
   - key: node-role.kubernetes.io/master
     effect: NoSchedule
 
-priorityClassName: ""
+affinity: {}
 
 nodeSelector: {}
 

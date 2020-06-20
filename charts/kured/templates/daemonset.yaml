@@ -29,10 +29,6 @@ spec:
       imagePullSecrets:
 {{ toYaml . | indent 8 }}
       {{- end }}
-      {{- with .Values.nodeSelector }}
-      nodeSelector:
-{{ toYaml . | indent 8 }}
-      {{- end }}
       {{- if .Values.priorityClassName }}
       priorityClassName: {{ .Values.priorityClassName }}
       {{- end }}
@@ -66,8 +62,15 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-      restartPolicy: Always
       {{- with .Values.tolerations }}
       tolerations:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
 {{ toYaml . | indent 8 }}
       {{- end }}
