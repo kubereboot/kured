@@ -5,10 +5,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   name: {{ template "kured.fullname" . }}
   labels:
-    app: {{ template "kured.name" . }}
-    chart: {{ template "kured.chart" . }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    {{- include "kured.labels" . | nindent 4 }}
 rules:
   # Allow kured to lock/unlock itself
   - apiGroups:     ["extensions"]

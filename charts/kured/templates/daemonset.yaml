@@ -4,22 +4,17 @@ metadata:
   name: {{ template "kured.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ template "kured.name" . }}
-    chart: {{ template "kured.chart" . }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    {{- include "kured.labels" . | nindent 4 }}
 spec:
   updateStrategy:
     type: {{ .Values.updateStrategy }}
   selector:
     matchLabels:
-      app: {{ template "kured.name" . }}
-      release: {{ .Release.Name }}
+      {{- include "kured.labels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        app: {{ template "kured.name" . }}
-        release: {{ .Release.Name }}
+        {{- include "kured.labels" . | nindent 8 }}
       {{- if .Values.podAnnotations }}
       annotations:
       {{- range $key, $value := .Values.podAnnotations }}

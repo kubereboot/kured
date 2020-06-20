@@ -52,3 +52,13 @@ Return the appropriate apiVersion for podsecuritypolicy.
 {{- print "policy/v1beta1" -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Returns a set of labels applied to each resource.
+*/}}
+{{- define "kured.labels" -}}
+app: {{ template "kured.name" . }}
+chart: {{ template "kured.chart" . }}
+release: {{ .Release.Name }}
+heritage: {{ .Release.Service }}
+{{- end -}}

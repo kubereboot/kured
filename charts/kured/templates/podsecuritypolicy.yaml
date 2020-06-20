@@ -4,10 +4,7 @@ kind: PodSecurityPolicy
 metadata:
   name: {{ template "kured.fullname" . }}
   labels:
-    app: {{ template "kured.name" . }}
-    chart: {{ template "kured.chart" . }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    {{- include "kured.labels" . | nindent 4 }}
 spec:
   privileged: true
   hostPID: true
