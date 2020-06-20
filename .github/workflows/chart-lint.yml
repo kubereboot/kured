@@ -1,0 +1,32 @@
+name: lint-chart
+
+on:
+  pull_request:
+    paths:
+      - "charts/**"
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: "0"
+
+      - name: Run chart-testing (lint)
+        id: lint
+        uses: helm/chart-testing-action@v1.0.0-rc.2
+        with:
+          command: lint
+          config: .github/ct.yaml
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1.0.0-rc.1
+        if: steps.lint.outputs.changed == 'true'
+
+      - name: Run chart-testing (install)
+        uses: helm/chart-testing-action@v1.0.0-rc.2
+        with:
+          command: install
+          config: .github/ct.yaml
