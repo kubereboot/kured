@@ -1,11 +1,37 @@
 # Kured (KUbernetes REboot Daemon)
 
-See https://github.com/weaveworks/kured
+## Introduction
+This chart installs the "Kubernetes Reboot Daemon" using the Helm Package Manager.
 
-## Autolock feature
+## Prerequisites
+- Kubernetes 1.9+
 
-This feature is not natively supported by kured but is added using Kubernetes Cronjob to annotate daemonset when to allow kured to run using the lock configuration annotation https://github.com/weaveworks/kured#overriding-lock-configuration
+## Installing the Chart
+To install the chart with the release name `my-release`:
+```bash
+$ helm repo add kured https://weaveworks.github.io/kured
+$ helm install my-release kured/kured
+```
 
+## Uninstalling the Chart
+To uninstall/delete the `my-release` deployment:
+```bash
+$ helm delete my-release
+```
+
+The command removes all the Kubernetes components associated with the chart and deletes the release.
+
+
+## Migrate from stable Helm-Chart
+The following changes have been made compared to the stable chart:
+- **[BREAKING CHANGE]** The `autolock` feature was removed. Use `configuration.startTime` and `configuration.endTime` instead.
+- Role inconsistencies have been fixed (allowed verbs for modifying the `DaemonSet`, apiGroup of `PodSecurityPolicy`)
+- Added support for affinities.
+- Configuration of cli-flags can be made through a `configuration` object.
+- Added optional `Service` and `ServiceMonitor` support for metrics endpoint.
+
+
+## Configuration
 
 | Config                  | Description                                                                 | Default                    |
 | ------                  | -----------                                                                 | -------                    |
@@ -13,23 +39,40 @@ This feature is not natively supported by kured but is added using Kubernetes Cr
 | `image.tag`             | Image tag                                                                   | `1.4.0`                    |
 | `image.pullPolicy`      | Image pull policy                                                           | `IfNotPresent`             |
 | `image.pullSecrets`     | Image pull secrets                                                          | `[]`                       |
-| `extraArgs`             | Extra arguments to pass to `/usr/bin/kured`. See below.                     | `{}`                       |
-| `rbac.create`           | Create RBAC roles                                                           | `true`                     |
-| `podSecurityPolicy.create` | Create podSecurityPolicy                                                 | `false`                     |
-| `serviceAccount.create` | Create service account roles                                                | `true`                     |
-| `serviceAccount.name`   | Service account name to create (or use if `serviceAccount.create` is false) | (chart fullname)           |
 | `updateStrategy`        | Daemonset update strategy                                                   | `OnDelete`                 |
-| `tolerations`           | Tolerations to apply to the daemonset (eg to allow running on master)       | `[{"key": "node-role.kubernetes.io/master", "effect": "NoSchedule"}]`|
-| `nodeSelector`          | Node Selector for the daemonset (ie, restrict which nodes kured runs on)    | `{}`                       |
-| `priorityClassName`     | Priority Class to be used by the pods                                       | `""`                       |
 | `podAnnotations`        | Annotations to apply to pods (eg to add Prometheus annotations)             | `{}`                       |
-| `autolock.enabled`      | Activate autolock to define when to allow kured to be executed                                                        | `false` |
-| `autolock.image.repository`      | Image repository for kubectl command                                                         | `docker.io/bitnami/kubectl` |
-| `autolock.image.tag`             | Image tag                                                                   | `1.17.5`                    |
-| `autolock.scheduleUnlock`      | CronJob schedule to unlock kured                                                      | `0 4 * * *` |
-| `autolock.schedulelock`      | CronJob schedule to lock kured                                                      | `0 6 * * *` |
+| `extraArgs`             | Extra arguments to pass to `/usr/bin/kured`. See below.                     | `{}`                       |
+| `configuration.annotationTtl` | cli-parameter `--annotation-ttl`                                      | `0`                       |
+| `configuration.alertFilterRegexp` | cli-parameter `--alert-filter-regexp`                             | `""`                       |
+| `configuration.blockingPodSelector` | cli-parameter `--blocking-pod-selector` **Note**: Escape like "foo\\,bar" | `[]`             |
+| `configuration.endTime` | cli-parameter `--end-time`                                                  | `""`                      |
+| `configuration.lockAnnotation` | cli-parameter `--lock-annotation`                                    | `""`                      |
+| `configuration.period` | cli-parameter `--period`                                                     | `""`                      |
+| `configuration.prometheusUrl` | cli-parameter `--prometheus-url`                                      | `""`                      |
+| `configuration.rebootDays` | cli-parameter `--reboot-days` **Note**: Escape like "mo\\,tu"             | `[]`                      |
+| `configuration.rebootSentinel` | cli-parameter `--reboot-sentinel`                                    | `""`                      |
+| `configuration.slackChannel` | cli-parameter `--slack-channel`                                        | `""`                      |
+| `configuration.slackHookUrl` | cli-parameter `--slack-hook-url`                                       | `""`                      |
+| `configuration.slackUsername` | cli-parameter `--slack-username`                                      | `""`                      |
+| `configuration.startTime` | cli-parameter `--start-time`                                              | `""`                      |
+| `configuration.timeZone` | cli-parameter `--time-zone`                                                | `""`                      |
+| `rbac.create`           | Create RBAC roles                                                           | `true`                     |
+| `serviceAccount.create` | Create a service account                                                    | `true`                     |
+| `serviceAccount.name`   | Service account name to create (or use if `serviceAccount.create` is false) | (chart fullname)           |
+| `podSecurityPolicy.create` | Create podSecurityPolicy                                                 | `false`                     |
+| `resources`             | Resources requests and limits.                                              | `{}`                       |
+| `metrics.create`        | Create a Service for the metrics endpoint                                   | `false`                    |
+| `metrics.serviceMonitor.create` | Create a ServiceMonitor for prometheus-operator                     | `true`                    |
+| `metrics.serviceMonitor.namespace` | The namespace to create the ServiceMonitor in                    | `""`                    |
+| `metrics.serviceMonitor.labels` | Additional labels for the ServiceMonitor                            | `{}`                    |
+| `metrics.serviceMonitor.interval` | Interval prometheus should scrape the endpoint                    | `60s`                   |
+| `metrics.serviceMonitor.scrapeTimeout` | A custom scrapeTimeout for prometheus                        | `""`                    |
+| `priorityClassName`     | Priority Class to be used by the pods                                       | `""`                       |
+| `tolerations`           | Tolerations to apply to the daemonset (eg to allow running on master)       | `[{"key": "node-role.kubernetes.io/master", "effect": "NoSchedule"}]`|
+| `affinity`              | Affinity for the daemonset (ie, restrict which nodes kured runs on)         | `{}`                       |
+| `nodeSelector`          | Node Selector for the daemonset (ie, restrict which nodes kured runs on)    | `{}`                       |
 
-See https://github.com/weaveworks/kured#configuration for values for `extraArgs`. Note that
+See https://github.com/weaveworks/kured#configuration for values (not contained in the `configuration` object) for `extraArgs`. Note that
 ```yaml
 extraArgs:
   foo: 1
@@ -37,9 +80,19 @@ extraArgs:
 ```
 becomes `/usr/bin/kured ... --foo=1 --bar-baz=2`.
 
+
 ## Prometheus Metrics
 
-Kured exposes a single prometheus metric indicating whether a reboot is required or not (see [kured docs](https://github.com/weaveworks/kured#prometheus-metrics)) for details. It can be scraped with the following set of annotations:
+Kured exposes a single prometheus metric indicating whether a reboot is required or not (see [kured docs](https://github.com/weaveworks/kured#prometheus-metrics)) for details. 
+
+#### Prometheus-Operator
+
+```yaml
+metrics:
+  create: true
+```
+
+#### Prometheus Annotations
 
 ```yaml
 podAnnotations:
