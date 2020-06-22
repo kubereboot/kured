@@ -44,12 +44,12 @@ The following changes have been made compared to the stable chart:
 | `extraArgs`             | Extra arguments to pass to `/usr/bin/kured`. See below.                     | `{}`                       |
 | `configuration.annotationTtl` | cli-parameter `--annotation-ttl`                                      | `0`                       |
 | `configuration.alertFilterRegexp` | cli-parameter `--alert-filter-regexp`                             | `""`                       |
-| `configuration.blockingPodSelector` | cli-parameter `--blocking-pod-selector` **Note**: Escape like "foo\\,bar" | `[]`             |
+| `configuration.blockingPodSelector` | Array of selectors for multiple cli-parameters `--blocking-pod-selector` | `[]`             |
 | `configuration.endTime` | cli-parameter `--end-time`                                                  | `""`                      |
 | `configuration.lockAnnotation` | cli-parameter `--lock-annotation`                                    | `""`                      |
 | `configuration.period` | cli-parameter `--period`                                                     | `""`                      |
 | `configuration.prometheusUrl` | cli-parameter `--prometheus-url`                                      | `""`                      |
-| `configuration.rebootDays` | cli-parameter `--reboot-days` **Note**: Escape like "mo\\,tu"             | `[]`                      |
+| `configuration.rebootDays` | Array of days for multiple cli-parameters `--reboot-days`                | `[]`                      |
 | `configuration.rebootSentinel` | cli-parameter `--reboot-sentinel`                                    | `""`                      |
 | `configuration.slackChannel` | cli-parameter `--slack-channel`                                        | `""`                      |
 | `configuration.slackHookUrl` | cli-parameter `--slack-hook-url`                                       | `""`                      |

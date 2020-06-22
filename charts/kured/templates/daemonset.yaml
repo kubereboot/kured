@@ -51,8 +51,8 @@ spec:
           {{- if .Values.configuration.alertFilterRegexp }}
             - --alert-filter-regexp={{ .Values.configuration.alertFilterRegexp | quote }}
           {{- end }}
-          {{- if .Values.configuration.blockingPodSelector }}
-            - --blocking-pod-selector={{ .Values.configuration.blockingPodSelector | quote }}
+          {{- range .Values.configuration.blockingPodSelector }}
+            - --blocking-pod-selector={{ . | quote }}
           {{- end }}
           {{- if .Values.configuration.endTime }}
             - --end-time={{ .Values.configuration.endTime | quote }}
@@ -66,8 +66,8 @@ spec:
           {{- if .Values.configuration.prometheusUrl }}
             - --prometheus-url={{ .Values.configuration.prometheusUrl | quote }}
           {{- end }}
-          {{- if .Values.configuration.rebootDays }}
-            - --reboot-days={{ .Values.configuration.rebootDays | quote }}
+          {{- range .Values.configuration.rebootDays }}
+            - --reboot-days={{ . | quote }}
           {{- end }}
           {{- if .Values.configuration.rebootSentinel }}
             - --reboot-sentinel={{ .Values.configuration.rebootSentinel | quote }}
