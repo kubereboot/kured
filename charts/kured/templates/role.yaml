@@ -1,0 +1,30 @@
+{{- if .Values.rbac.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ template "kured.fullname" . }}
+  labels:
+    {{- include "kured.labels" . | nindent 4 }}
+rules:
+  # Allow kured to lock/unlock itself
+  - apiGroups:     ["extensions"]
+    resources:     ["daemonsets"]
+    resourceNames: ["{{ template "kured.fullname" . }}"]
+    verbs:         ["update", "patch"]
+  - apiGroups:     ["apps"]
+    resources:     ["daemonsets"]
+    resourceNames: ["{{ template "kured.fullname" . }}"]
+    verbs:         ["update", "patch"]
+{{- if .Values.podSecurityPolicy.create }}
+  - apiGroups:     ["extensions"]
+    resources:     ["podsecuritypolicies"]
+    resourceNames: ["{{ template "kured.fullname" . }}"]
+    verbs:         ["use"]
+  - apiGroups:     ["policy"]
+    resources:     ["podsecuritypolicies"]
+    resourceNames: ["{{ template "kured.fullname" . }}"]
+    verbs:         ["use"]
+{{- end }}
+
+{{- end -}}

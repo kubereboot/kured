@@ -1,0 +1,15 @@
+{{- if .Values.metrics.create }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "kured.fullname" . }}
+  labels:
+    {{- include "kured.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 8080
+  selector:
+    {{- include "kured.labels" . | nindent 4 }}
+{{- end }}
