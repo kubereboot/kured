@@ -18,5 +18,5 @@ spec:
       port: {{ .Values.service.port }}
       targetPort: 8080
   selector:
-    {{- include "kured.labels" . | nindent 4 }}
+    {{- include "kured.matchLabels" . | nindent 4 }}
 {{- end }}

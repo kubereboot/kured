@@ -10,7 +10,7 @@ spec:
     type: {{ .Values.updateStrategy }}
   selector:
     matchLabels:
-      {{- include "kured.labels" . | nindent 6 }}
+      {{- include "kured.matchLabels" . | nindent 6 }}
   template:
     metadata:
       labels:

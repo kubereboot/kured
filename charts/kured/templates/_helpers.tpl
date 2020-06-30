@@ -62,3 +62,11 @@ chart: {{ template "kured.chart" . }}
 release: {{ .Release.Name }}
 heritage: {{ .Release.Service }}
 {{- end -}}
+
+{{/*
+Returns a set of matchLabels applied.
+*/}}
+{{- define "kured.matchLabels" -}}
+app: {{ template "kured.name" . }}
+release: {{ .Release.Name }}
+{{- end -}}
