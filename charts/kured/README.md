@@ -61,12 +61,14 @@ The following changes have been made compared to the stable chart:
 | `serviceAccount.name`   | Service account name to create (or use if `serviceAccount.create` is false) | (chart fullname)           |
 | `podSecurityPolicy.create` | Create podSecurityPolicy                                                 | `false`                     |
 | `resources`             | Resources requests and limits.                                              | `{}`                       |
-| `metrics.create`        | Create a Service for the metrics endpoint                                   | `false`                    |
-| `metrics.serviceMonitor.create` | Create a ServiceMonitor for prometheus-operator                     | `true`                    |
-| `metrics.serviceMonitor.namespace` | The namespace to create the ServiceMonitor in                    | `""`                    |
-| `metrics.serviceMonitor.labels` | Additional labels for the ServiceMonitor                            | `{}`                    |
-| `metrics.serviceMonitor.interval` | Interval prometheus should scrape the endpoint                    | `60s`                   |
-| `metrics.serviceMonitor.scrapeTimeout` | A custom scrapeTimeout for prometheus                        | `""`                    |
+| `metrics.create`        | Create a ServiceMonitor for prometheus-operator                             | `false`                    |
+| `metrics.namespace`     | The namespace to create the ServiceMonitor in                               | `""`                    |
+| `metrics.labels`        | Additional labels for the ServiceMonitor                                    | `{}`                    |
+| `metrics.interval`      | Interval prometheus should scrape the endpoint                              | `60s`                   |
+| `metrics.scrapeTimeout` | A custom scrapeTimeout for prometheus                                       | `""`                    |
+| `service.create`        | Create a Service for the metrics endpoint                                   | `false`                    |
+| `service.port`          | Port of the service to expose                                               | `8080`                     |
+| `service.annotations`   | Annotations to apply to the service (eg to add Prometheus annotations)      | `{}`                       |
 | `priorityClassName`     | Priority Class to be used by the pods                                       | `""`                       |
 | `tolerations`           | Tolerations to apply to the daemonset (eg to allow running on master)       | `[{"key": "node-role.kubernetes.io/master", "effect": "NoSchedule"}]`|
 | `affinity`              | Affinity for the daemonset (ie, restrict which nodes kured runs on)         | `{}`                       |
@@ -95,8 +97,9 @@ metrics:
 #### Prometheus Annotations
 
 ```yaml
-podAnnotations:
-  prometheus.io/scrape: "true"
-  prometheus.io/path: "/metrics"
-  prometheus.io/port: "8080"
+service:
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "/metrics"
+    prometheus.io/port: "8080"
 ```

@@ -1,21 +1,21 @@
-{{- if and .Values.metrics.create .Values.metrics.serviceMonitor.create }}
+{{- if .Values.metrics.create }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: {{ template "kured.fullname" . }}
-  {{- if .Values.metrics.serviceMonitor.namespace }}
-  namespace: {{ .Values.metrics.serviceMonitor.namespace }}
+  {{- if .Values.metrics.namespace }}
+  namespace: {{ .Values.metrics.namespace }}
   {{- end }}
   labels:
     {{- include "kured.labels" . | nindent 4 }}
-    {{- if .Values.metrics.serviceMonitor.labels }}
-    {{- toYaml .Values.metrics.serviceMonitor.labels | nindent 4 }}
+    {{- if .Values.metrics.labels }}
+    {{- toYaml .Values.metrics.labels | nindent 4 }}
     {{- end }}
 spec:
   endpoints:
-  - interval: {{ .Values.metrics.serviceMonitor.interval }}
-    {{- if .Values.metrics.serviceMonitor.scrapeTimeout }}
-    scrapeTimeout: {{ .Values.metrics.serviceMonitor.scrapeTimeout }}
+  - interval: {{ .Values.metrics.interval }}
+    {{- if .Values.metrics.scrapeTimeout }}
+    scrapeTimeout: {{ .Values.metrics.scrapeTimeout }}
     {{- end }}
     honorLabels: true
     targetPort: 8080
@@ -24,7 +24,7 @@ spec:
   jobLabel: "{{ .Release.Name }}"
   selector:
     matchLabels:
-      {{- include "kured.labels" . | nindent 6 }}
+      {{- include "kured.matchLabels" . | nindent 6 }}
   namespaceSelector:
     matchNames:
       - {{ .Release.Namespace }}
