@@ -1,21 +1,23 @@
 
+# kured - Kubernetes Reboot Daemon
+
 <img src="https://github.com/weaveworks/kured/raw/master/img/logo.png" align="right"/>
 
 * [Introduction](#introduction)
 * [Kubernetes & OS Compatibility](#kubernetes-&-os-compatibility)
 * [Installation](#installation)
 * [Configuration](#configuration)
-	* [Reboot Sentinel File & Period](#reboot-sentinel-file-&-period)
-	* [Setting a schedule](#setting-a-schedule)
-	* [Blocking Reboots via Alerts](#blocking-reboots-via-alerts)
-	* [Blocking Reboots via Pods](#blocking-reboots-via-pods)
-	* [Prometheus Metrics](#prometheus-metrics)
-	* [Slack Notifications](#slack-notifications)
-	* [Overriding Lock Configuration](#overriding-lock-configuration)
+  * [Reboot Sentinel File & Period](#reboot-sentinel-file-&-period)
+  * [Setting a schedule](#setting-a-schedule)
+  * [Blocking Reboots via Alerts](#blocking-reboots-via-alerts)
+  * [Blocking Reboots via Pods](#blocking-reboots-via-pods)
+  * [Prometheus Metrics](#prometheus-metrics)
+  * [Slack Notifications](#slack-notifications)
+  * [Overriding Lock Configuration](#overriding-lock-configuration)
 * [Operation](#operation)
-	* [Testing](#testing)
-	* [Disabling Reboots](#disabling-reboots)
-	* [Manual Unlock](#manual-unlock)
+  * [Testing](#testing)
+  * [Disabling Reboots](#disabling-reboots)
+  * [Manual Unlock](#manual-unlock)
   * [Automatic Unlock](#automatic-unlock)
 * [Building](#building)
 * [Frequently Asked/Anticipated Questions](#frequently-askedanticipated-questions)
@@ -47,7 +49,7 @@ compatibility of one minor version between client and server:
 | 1.3.0  | 1.15.10 | v12.0.0          | release-1.15        | 1.15.x, 1.16.x, 1.17.x            |
 | 1.2.0  | 1.13.6  | v10.0.0          | release-1.13        | 1.12.x, 1.13.x, 1.14.x            |
 | 1.1.0  | 1.12.1  | v9.0.0           | release-1.12        | 1.11.x, 1.12.x, 1.13.x            |
-| 1.0.0  | 1.7.6   | v4.0.0           | release-1.7         | 1.6.x, 1.7.x, 1.8.x               | 
+| 1.0.0  | 1.7.6   | v4.0.0           | release-1.7         | 1.6.x, 1.7.x, 1.8.x               |
 
 See the [release notes](https://github.com/weaveworks/kured/releases)
 for specific version compatibility information, including which
@@ -61,7 +63,7 @@ Versions >=1.1.0 enter the host mount namespace to invoke
 To obtain a default installation without Prometheus alerting interlock
 or Slack notifications:
 
-```
+```console
 kubectl apply -f https://github.com/weaveworks/kured/releases/download/1.3.0/kured-1.3.0-dockerhub.yaml
 ```
 
@@ -72,7 +74,7 @@ edit it in accordance with the following section before application.
 
 The following arguments can be passed to kured via the daemonset pod template:
 
-```
+```console
 Flags:
       --annotation-ttl time                  force clean annotation after this ammount of time (default 0, disabled)
       --alert-filter-regexp regexp.Regexp   alert names to ignore when checking for active alerts
@@ -110,11 +112,11 @@ reboots to predictable schedules.  Use `--reboot-days`, `--start-time`,
 `--end-time`, and `--time-zone` to set a schedule.  For example, business
 hours on the west coast USA can be specified with:
 
-```
-	--reboot-days mon,tue,wed,thu,fri
-	--start-time 9am
-	--end-time 5pm
-	--time-zone America/Los_Angeles
+```console
+  --reboot-days mon,tue,wed,thu,fri
+  --start-time 9am
+  --end-time 5pm
+  --time-zone America/Los_Angeles
 ```
 
 Times can be formatted in numerous ways, including `5pm`, `5:00pm` `17:00`,
@@ -130,14 +132,14 @@ You may find it desirable to block automatic node reboots when there
 are active alerts - you can do so by providing the URL of your
 Prometheus server:
 
-```
+```console
 --prometheus-url=http://prometheus.monitoring.svc.cluster.local
 ```
 
 By default the presence of *any* active (pending or firing) alerts
 will block reboots, however you can ignore specific alerts:
 
-```
+```console
 --alert-filter-regexp=^(RebootRequired|AnotherBenignAlert|...$
 ```
 
@@ -149,14 +151,14 @@ filter.
 You can also block reboots of an _individual node_ when specific pods
 are scheduled on it:
 
-```
+```console
 --blocking-pod-selector=runtime=long,cost=expensive
 ```
 
 Since label selector strings use commas to express logical 'and', you can
 specify this parameter multiple times for 'or':
 
-```
+```console
 --blocking-pod-selector=runtime=long,cost=expensive
 --blocking-pod-selector=name=temperamental
 ```
@@ -174,7 +176,7 @@ running job or a known temperamental pod on a node will stop it rebooting.
 Each kured pod exposes a single gauge metric (`:8080/metrics`) that
 indicates the presence of the sentinel file:
 
-```
+```console
 # HELP kured_reboot_required OS requires reboot due to software updates.
 # TYPE kured_reboot_required gauge
 kured_reboot_required{node="ip-xxx-xxx-xxx-xxx.ec2.internal"} 0
@@ -184,7 +186,7 @@ The purpose of this metric is to power an alert which will summon an
 operator if the cluster cannot reboot itself automatically for a
 prolonged period:
 
-```
+```console
 # Alert if a reboot is required for any machines. Acts as a failsafe for the
 # reboot daemon, which will not reboot nodes if there are pending alerts save
 # this one.
@@ -208,7 +210,7 @@ probe for active alerts before rebooting, be sure to specify
 If you specify a Slack hook via `--slack-hook-url`, kured will notify
 you immediately prior to rebooting a node:
 
-<img src="https://github.com/weaveworks/kured/raw/master/img/slack-notification.png"/>
+![Notification](img/slack-notification.png)
 
 We recommend setting `--slack-username` to be the name of the
 environment, e.g. `dev` or `prod`.
@@ -234,7 +236,7 @@ if you have, you will have to adjust the commands accordingly.
 
 You can test your configuration by provoking a reboot on a node:
 
-```
+```console
 sudo touch /var/run/reboot-required
 ```
 
@@ -243,7 +245,7 @@ sudo touch /var/run/reboot-required
 If you need to temporarily stop kured from rebooting any nodes, you
 can take the lock manually:
 
-```
+```console
 kubectl -n kube-system annotate ds kured weave.works/kured-node-lock='{"nodeID":"manual"}'
 ```
 
@@ -255,9 +257,10 @@ In exceptional circumstances, such as a node experiencing a permanent
 failure whilst rebooting, manual intervention may be required to
 remove the cluster lock:
 
-```
+```console
 kubectl -n kube-system annotate ds kured weave.works/kured-node-lock-
 ```
+
 > NB the `-` at the end of the command is important - it instructs
 > `kubectl` to remove that annotation entirely.
 
@@ -278,13 +281,13 @@ repository:
 
 **Building outside $GOPATH:**
 
-```
+```console
 make
 ```
 
 **Building inside $GOPATH:**
 
-```
+```console
 GO111MODULE=on make
 ```
 
@@ -307,10 +310,10 @@ versioned manifest from the [release page](https://github.com/weaveworks/kured/r
 
 If you have any questions about, feedback for or problems with `kured`:
 
-- Invite yourself to the <a href="https://slack.weave.works/" target="_blank">Weave Users Slack</a>.
-- Ask a question on the [#kured](https://weave-community.slack.com/messages/kured/) slack channel.
-- [File an issue](https://github.com/weaveworks/kured/issues/new).
-- Join us in [our monthly meeting](https://docs.google.com/document/d/1bsHTjHhqaaZ7yJnXF6W8c89UB_yn-OoSZEmDnIP34n8/edit#),
+* Invite yourself to the <a href="https://slack.weave.works/" target="_blank">Weave Users Slack</a>.
+* Ask a question on the [#kured](https://weave-community.slack.com/messages/kured/) slack channel.
+* [File an issue](https://github.com/weaveworks/kured/issues/new).
+* Join us in [our monthly meeting](https://docs.google.com/document/d/1bsHTjHhqaaZ7yJnXF6W8c89UB_yn-OoSZEmDnIP34n8/edit#),
   every fourth Wednesday of the month at 16:00 UTC.
 
 Your feedback is always welcome!
