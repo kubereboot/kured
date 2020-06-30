@@ -40,12 +40,15 @@ resources: {}
 
 metrics:
   create: false
-  serviceMonitor:
-    create: true
-    namespace: ""
-    labels: {}
-    interval: 60s
-    scrapeTimeout: ""
+  namespace: ""
+  labels: {}
+  interval: 60s
+  scrapeTimeout: ""
+
+service:
+  create: false
+  port: 8080
+  annotations: {}
 
 priorityClassName: ""
 
