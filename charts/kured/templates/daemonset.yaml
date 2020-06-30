@@ -52,40 +52,40 @@ spec:
             - --alert-filter-regexp={{ .Values.configuration.alertFilterRegexp | quote }}
           {{- end }}
           {{- range .Values.configuration.blockingPodSelector }}
-            - --blocking-pod-selector={{ . | quote }}
+            - --blocking-pod-selector={{ . }}
           {{- end }}
           {{- if .Values.configuration.endTime }}
-            - --end-time={{ .Values.configuration.endTime | quote }}
+            - --end-time={{ .Values.configuration.endTime }}
           {{- end }}
           {{- if .Values.configuration.lockAnnotation }}
-            - --lock-annotation={{ .Values.configuration.lockAnnotation | quote }}
+            - --lock-annotation={{ .Values.configuration.lockAnnotation }}
           {{- end }}
           {{- if .Values.configuration.period }}
-            - --period={{ .Values.configuration.period | quote }}
+            - --period={{ .Values.configuration.period }}
           {{- end }}
           {{- if .Values.configuration.prometheusUrl }}
-            - --prometheus-url={{ .Values.configuration.prometheusUrl | quote }}
+            - --prometheus-url={{ .Values.configuration.prometheusUrl }}
           {{- end }}
           {{- range .Values.configuration.rebootDays }}
-            - --reboot-days={{ . | quote }}
+            - --reboot-days={{ . }}
           {{- end }}
           {{- if .Values.configuration.rebootSentinel }}
-            - --reboot-sentinel={{ .Values.configuration.rebootSentinel | quote }}
+            - --reboot-sentinel={{ .Values.configuration.rebootSentinel }}
           {{- end }}
           {{- if .Values.configuration.slackChannel }}
-            - --slack-channel={{ .Values.configuration.slackChannel | quote }}
+            - --slack-channel={{ .Values.configuration.slackChannel }}
           {{- end }}
           {{- if .Values.configuration.slackHookUrl }}
-            - --slack-hook-url={{ .Values.configuration.slackHookUrl | quote }}
+            - --slack-hook-url={{ .Values.configuration.slackHookUrl }}
           {{- end }}
           {{- if .Values.configuration.slackUsername }}
-            - --slack-username={{ .Values.configuration.slackUsername | quote }}
+            - --slack-username={{ .Values.configuration.slackUsername }}
           {{- end }}
           {{- if .Values.configuration.startTime }}
-            - --start-time={{ .Values.configuration.startTime | quote }}
+            - --start-time={{ .Values.configuration.startTime }}
           {{- end }}
           {{- if .Values.configuration.timeZone }}
-            - --time-zone={{ .Values.configuration.timeZone | quote }}
+            - --time-zone={{ .Values.configuration.timeZone }}
           {{- end }}
           {{- range $key, $value := .Values.extraArgs }}
             {{- if $value }}
