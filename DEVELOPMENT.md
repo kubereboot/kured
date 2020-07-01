@@ -91,9 +91,6 @@ cat kured-ds.yaml >> "$MANIFEST"
 sed -i "s#docker.io/weaveworks/kured#docker.io/weaveworks/kured:$VERSION#g" "$MANIFEST"
 ```
 
-The last thing you need to do is update the `image:` to point to the release
-tag, e.g. `docker.io/weaveworks/kured:1.3.0`.
-
 Now you can head to the Github UI, use the version number as tag and upload the
 `kured-<release>-dockerhub.yaml` file.
 
