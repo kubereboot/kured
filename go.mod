@@ -10,6 +10,6 @@ require (
 	github.com/prometheus/procfs v0.0.0-20190102135031-14fa7590c24d // indirect
 	github.com/sirupsen/logrus v1.2.0
 	github.com/spf13/cobra v0.0.0-20181127133106-d2d81d9a96e2
-	k8s.io/apimachinery v0.17.0
-	k8s.io/client-go v0.17.0
+	k8s.io/apimachinery v0.18.5
+	k8s.io/client-go v0.18.5
 )
