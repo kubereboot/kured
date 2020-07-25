@@ -64,7 +64,8 @@ To obtain a default installation without Prometheus alerting interlock
 or Slack notifications:
 
 ```console
-kubectl apply -f https://github.com/weaveworks/kured/releases/download/1.3.0/kured-1.3.0-dockerhub.yaml
+latest=$(curl -s https://api.github.com/repos/weaveworks/kured/releases | jq -r .[0].tag_name)
+kubectl apply -f "https://github.com/weaveworks/kured/releases/download/$latest/kured-$latest-dockerhub.yaml
 ```
 
 If you want to customise the installation, download the manifest and
