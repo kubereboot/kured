@@ -106,6 +106,7 @@ spec:
                   fieldPath: spec.nodeName
             {{- if .Values.extraEnvVars }}
               {{ toYaml .Values.extraEnvVars | indent 12 }}
+            {{- end }}
       {{- with .Values.tolerations }}
       tolerations:
 {{ toYaml . | indent 8 }}
