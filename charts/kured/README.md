@@ -42,6 +42,7 @@ The following changes have been made compared to the stable chart:
 | `updateStrategy`        | Daemonset update strategy                                                   | `OnDelete`                 |
 | `podAnnotations`        | Annotations to apply to pods (eg to add Prometheus annotations)             | `{}`                       |
 | `extraArgs`             | Extra arguments to pass to `/usr/bin/kured`. See below.                     | `{}`                       |
+| `extraEnvVars`          | Array of environment variables to pass to the daemonset.                    | `{}`                       |
 | `configuration.annotationTtl` | cli-parameter `--annotation-ttl`                                      | `0`                       |
 | `configuration.alertFilterRegexp` | cli-parameter `--alert-filter-regexp`                             | `""`                       |
 | `configuration.blockingPodSelector` | Array of selectors for multiple cli-parameters `--blocking-pod-selector` | `[]`             |
