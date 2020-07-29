@@ -10,6 +10,15 @@ podAnnotations: {}
 
 extraArgs: {}
 
+extraEnvVars:
+#  - name: slackHookUrl
+#    valueFrom:
+#      secretKeyRef:
+#        name: secret_name
+#        key: secret_key
+#  - name: regularEnvVariable
+#    value: 123
+
 configuration:
   annotationTtl: 0          # force clean annotation after this ammount of time (default 0, disabled)
   alertFilterRegexp: ""     # alert names to ignore when checking for active alerts
