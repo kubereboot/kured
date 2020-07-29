@@ -105,7 +105,7 @@ spec:
                 fieldRef:
                   fieldPath: spec.nodeName
             {{- if .Values.extraEnvVars }}
-              {{ toYaml .Values.extraEnvVars | indent 12 }}
+              {{ toYaml .Values.extraEnvVars | nindent 12 }}
             {{- end }}
       {{- with .Values.tolerations }}
       tolerations:
