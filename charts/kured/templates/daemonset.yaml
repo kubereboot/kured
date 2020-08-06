@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ template "kured.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kured.labels" . | nindent 4 }}
+spec:
+  updateStrategy:
+    type: {{ .Values.updateStrategy }}
+  selector:
+    matchLabels:
+      {{- include "kured.matchLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "kured.labels" . | nindent 8 }}
+      {{- if .Values.podAnnotations }}
+      annotations:
+      {{- range $key, $value := .Values.podAnnotations }}
+        {{ $key }}: {{ $value | quote }}
+      {{- end }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ template "kured.serviceAccountName" . }}
+      hostPID: true
+      restartPolicy: Always
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            privileged: true # Give permission to nsenter /proc/1/ns/mnt
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+          command:
+            - /usr/bin/kured
+          args:
+            - --ds-name={{ template "kured.fullname" . }}
+            - --ds-namespace={{ .Release.Namespace }}
+          {{- if .Values.configuration.annotationTtl }}
+            - --annotation-ttl={{ .Values.configuration.annotationTtl }}
+          {{- end }}
+          {{- if .Values.configuration.alertFilterRegexp }}
+            - --alert-filter-regexp={{ .Values.configuration.alertFilterRegexp | quote }}
+          {{- end }}
+          {{- range .Values.configuration.blockingPodSelector }}
+            - --blocking-pod-selector={{ . }}
+          {{- end }}
+          {{- if .Values.configuration.endTime }}
+            - --end-time={{ .Values.configuration.endTime }}
+          {{- end }}
+          {{- if .Values.configuration.lockAnnotation }}
+            - --lock-annotation={{ .Values.configuration.lockAnnotation }}
+          {{- end }}
+          {{- if .Values.configuration.period }}
+            - --period={{ .Values.configuration.period }}
+          {{- end }}
+          {{- if .Values.configuration.prometheusUrl }}
+            - --prometheus-url={{ .Values.configuration.prometheusUrl }}
+          {{- end }}
+          {{- range .Values.configuration.rebootDays }}
+            - --reboot-days={{ . }}
+          {{- end }}
+          {{- if .Values.configuration.rebootSentinel }}
+            - --reboot-sentinel={{ .Values.configuration.rebootSentinel }}
+          {{- end }}
+          {{- if .Values.configuration.slackChannel }}
+            - --slack-channel={{ .Values.configuration.slackChannel }}
+          {{- end }}
+          {{- if .Values.configuration.slackHookUrl }}
+            - --slack-hook-url={{ .Values.configuration.slackHookUrl }}
+          {{- end }}
+          {{- if .Values.configuration.slackUsername }}
+            - --slack-username={{ .Values.configuration.slackUsername }}
+          {{- end }}
+          {{- if .Values.configuration.startTime }}
+            - --start-time={{ .Values.configuration.startTime }}
+          {{- end }}
+          {{- if .Values.configuration.timeZone }}
+            - --time-zone={{ .Values.configuration.timeZone }}
+          {{- end }}
+          {{- range $key, $value := .Values.extraArgs }}
+            {{- if $value }}
+            - --{{ $key }}={{ $value }}
+            {{- else }}
+            - --{{ $key }}
+            {{- end }}
+          {{- end }}
+          ports:
+            - containerPort: 8080
+              name: metrics          
+          env:
+            # Pass in the name of the node on which this pod is scheduled
+            # for use with drain/uncordon operations and lock acquisition
+            - name: KURED_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            {{- if .Values.extraEnvVars }}
+              {{ toYaml .Values.extraEnvVars | nindent 12 }}
+            {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+      {{- end }}

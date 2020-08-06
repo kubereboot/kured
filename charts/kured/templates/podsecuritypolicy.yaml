@@ -1,0 +1,21 @@
+{{- if .Values.podSecurityPolicy.create}}
+apiVersion: {{ template "kured.psp.apiVersion" . }}
+kind: PodSecurityPolicy
+metadata:
+  name: {{ template "kured.fullname" . }}
+  labels:
+    {{- include "kured.labels" . | nindent 4 }}
+spec:
+  privileged: true
+  hostPID: true
+  allowedCapabilities: ['*']
+  fsGroup:
+    rule: RunAsAny
+  runAsUser:
+    rule: RunAsAny
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+  volumes: ['*']
+{{- end }}
