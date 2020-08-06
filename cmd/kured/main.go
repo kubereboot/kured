@@ -50,6 +50,8 @@ var (
 	rebootEnd   string
 	timezone    string
 
+	annotationTTL time.Duration
+
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Subsystem: "kured",
@@ -75,7 +77,7 @@ func main() {
 	rootCmd.PersistentFlags().Int64Var(&drainGracePeriod, "drain-grace-period", -1,
 		"drain grace period in seconds")
 	rootCmd.PersistentFlags().DurationVar(&forceTimeout, "force-timeout", time.Minute*60,
-		"total drain timeout which only applies when force-reboot is set to true")
+		"total timeout which only applies when force-reboot is set to true")
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
 		"reboot check period")
 	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-namespace", "kube-system",
@@ -109,6 +111,9 @@ func main() {
 		"schedule reboot only before this time of day")
 	rootCmd.PersistentFlags().StringVar(&timezone, "time-zone", "UTC",
 		"use this timezone for schedule inputs")
+
+	rootCmd.PersistentFlags().DurationVar(&annotationTTL, "annotation-ttl", 0,
+		"force clean annotation after this ammount of time (default 0, disabled)")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
@@ -217,8 +222,8 @@ func holding(lock *daemonsetlock.DaemonSetLock, metadata interface{}) bool {
 	return holding
 }
 
-func acquire(lock *daemonsetlock.DaemonSetLock, metadata interface{}) bool {
-	holding, holder, err := lock.Acquire(metadata)
+func acquire(lock *daemonsetlock.DaemonSetLock, metadata interface{}, TTL time.Duration) bool {
+	holding, holder, err := lock.Acquire(metadata, TTL)
 	switch {
 	case err != nil:
 		log.Fatalf("Error acquiring lock: %v", err)
@@ -255,22 +260,28 @@ func drain(nodeID string) {
 		log.Fatalf("Error invoking drain command: %v", err)
 	}
 
-    done := make(chan error)
-
 	if forceReboot == true {
-	    go func() { done <- drainCmd.Wait() }()
-	    select {
+        done := make(chan error)
+        go func() {
+        	done <- drainCmd.Wait()
+        }()
+
+        select {
 	    case err := <-done:
-		    if err != nil {
-			    log.Fatalf("Error invoking drain command: %v", err)
-		    }
+	        if err != nil {
+	        	log.Fatalf("Error invoking drain command: %v", err)
+	        }
 	    case <-time.After(forceTimeout):
 	    	// The drain command did not finish within the given time so we kill it,
 	    	// and force a reboot
-	    	    drainCmd.Process.Kill()
+	    	drainCmd.Process.Kill()
 
-	    	    log.Errorf("Drain command took longer than specified timeout (%s) so it was killed", forceTimeout)
+	    	log.Errorf("Drain command took longer than specified timeout (%s) so it was killed", forceTimeout)
 		}
+	} else {
+	    if err := drainCmd.Wait(); err != nil {
+	    	log.Fatalf("Error invoking drain command: %v", err)
+	    }
 	}
 }
 
@@ -314,7 +325,7 @@ type nodeMeta struct {
 	Unschedulable bool `json:"unschedulable"`
 }
 
-func rebootAsRequired(nodeID string, window *timewindow.TimeWindow) {
+func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Duration) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Fatal(err)
@@ -345,7 +356,7 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow) {
 			}
 			nodeMeta.Unschedulable = node.Spec.Unschedulable
 
-			if acquire(lock, &nodeMeta) {
+			if acquire(lock, &nodeMeta, TTL) {
 				if !nodeMeta.Unschedulable {
 					drain(nodeID)
 				}
@@ -377,8 +388,13 @@ func root(cmd *cobra.Command, args []string) {
 	log.Infof("Reboot Sentinel: %s every %v", rebootSentinel, period)
 	log.Infof("Blocking Pod Selectors: %v", podSelectors)
 	log.Infof("Reboot on: %v", window)
+	if annotationTTL > 0 {
+		log.Infof("Force annotation cleanup after: %v", annotationTTL)
+	} else {
+		log.Info("Force annotation cleanup disabled.")
+	}
 
-	go rebootAsRequired(nodeID, window)
+	go rebootAsRequired(nodeID, window, annotationTTL)
 	go maintainRebootRequiredMetric(nodeID)
 
 	http.Handle("/metrics", promhttp.Handler())
