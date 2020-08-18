@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
 	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -125,9 +129,43 @@ func newCommand(name string, arg ...string) *exec.Cmd {
 	return cmd
 }
 
-func sentinelExists() bool {
+func getPIDtoRunCmds() (int, error) {
+	// find the pid to enter host mount space
+	statPath := "/proc/1/stat"
+	dataBytes, err := ioutil.ReadFile(statPath)
+	if err != nil {
+		log.Fatalf("nil on /proc/1/stat: %v", err)
+		return 1, err
+	}
+	data := string(dataBytes)
+	if strings.Contains(strings.Split(data, " ")[1], "systemd") {
+		return 1, nil // is systemd
+	}
+	tstPidCmd := exec.Command("ps", "-e", "-o", "pid,comm")
+	var out bytes.Buffer
+	tstPidCmd.Stdout = &out
+	if err := tstPidCmd.Run(); err != nil {
+		return 1, err
+	}
+	pss := strings.Split(out.String(), "\n")
+	for _, n := range pss {
+		ns := strings.Split(strings.Trim(n, " "), " ")
+		if len(ns) > 1 {
+			if strings.Contains(ns[1], "acpid") {
+				i, err := strconv.Atoi(strings.Trim(ns[0], " "))
+				if err != nil {
+					return 1, err
+				}
+				return i, nil
+			}
+		}
+	}
+	return 1, nil
+}
+
+func sentinelExists(pid int) bool {
 	// Relies on hostPID:true and privileged:true to enter host mount space
-	sentinelCmd := newCommand("/usr/bin/nsenter", "-m/proc/1/ns/mnt", "--", "/usr/bin/test", "-f", rebootSentinel)
+	sentinelCmd := newCommand("/usr/bin/nsenter", fmt.Sprintf("-m/proc/%d/ns/mnt", pid), "--", "/usr/bin/test", "-f", rebootSentinel)
 	if err := sentinelCmd.Run(); err != nil {
 		switch err := err.(type) {
 		case *exec.ExitError:
@@ -145,8 +183,8 @@ func sentinelExists() bool {
 	return true
 }
 
-func rebootRequired() bool {
-	if sentinelExists() {
+func rebootRequired(pid int) bool {
+	if sentinelExists(pid) {
 		log.Infof("Reboot required")
 		return true
 	} else {
@@ -257,7 +295,7 @@ func uncordon(nodeID string) {
 	}
 }
 
-func commandReboot(nodeID string) {
+func commandReboot(nodeID string, rebootCmd *exec.Cmd) {
 	log.Infof("Commanding reboot for node: %s", nodeID)
 
 	if slackHookURL != "" {
@@ -265,17 +303,14 @@ func commandReboot(nodeID string) {
 			log.Warnf("Error notifying slack: %v", err)
 		}
 	}
-
-	// Relies on hostPID:true and privileged:true to enter host mount space
-	rebootCmd := newCommand("/usr/bin/nsenter", "-m/proc/1/ns/mnt", "/bin/systemctl", "reboot")
 	if err := rebootCmd.Run(); err != nil {
 		log.Fatalf("Error invoking reboot command: %v", err)
 	}
 }
 
-func maintainRebootRequiredMetric(nodeID string) {
+func maintainRebootRequiredMetric(nodeID string, pid int) {
 	for {
-		if sentinelExists() {
+		if sentinelExists(pid) {
 			rebootRequiredGauge.WithLabelValues(nodeID).Set(1)
 		} else {
 			rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
@@ -289,7 +324,7 @@ type nodeMeta struct {
 	Unschedulable bool `json:"unschedulable"`
 }
 
-func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Duration) {
+func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Duration, pid int) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Fatal(err)
@@ -310,10 +345,20 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Dur
 		release(lock)
 	}
 
+	var rebootCmd *exec.Cmd
+	if pid == 1 {
+		// Relies on hostPID:true and privileged:true to enter host mount space
+		rebootCmd = newCommand("/usr/bin/nsenter", fmt.Sprintf("-m/proc/%d/ns/mnt", pid), "/bin/systemctl", "reboot") // systemd
+	} else {
+		rebootCmd = newCommand("/sbin/reboot")
+		rebootCmd.Env = os.Environ()
+		rebootCmd.Env = append(rebootCmd.Env, "IN_DOCKER=true")
+	}
+
 	source := rand.NewSource(time.Now().UnixNano())
 	tick := delaytick.New(source, period)
 	for _ = range tick {
-		if window.Contains(time.Now()) && rebootRequired() && !rebootBlocked(client, nodeID) {
+		if window.Contains(time.Now()) && rebootRequired(pid) && !rebootBlocked(client, nodeID) {
 			node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 			if err != nil {
 				log.Fatal(err)
@@ -324,7 +369,7 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Dur
 				if !nodeMeta.Unschedulable {
 					drain(nodeID)
 				}
-				commandReboot(nodeID)
+				commandReboot(nodeID, rebootCmd)
 				for {
 					log.Infof("Waiting for reboot")
 					time.Sleep(time.Minute)
@@ -358,8 +403,13 @@ func root(cmd *cobra.Command, args []string) {
 		log.Info("Force annotation cleanup disabled.")
 	}
 
-	go rebootAsRequired(nodeID, window, annotationTTL)
-	go maintainRebootRequiredMetric(nodeID)
+	pid, err := getPIDtoRunCmds()
+	if err != nil {
+		log.Fatalf("Error getting the pid os proc 1: %v", err)
+	}
+
+	go rebootAsRequired(nodeID, window, annotationTTL, pid)
+	go maintainRebootRequiredMetric(nodeID, pid)
 
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(":8080", nil))
