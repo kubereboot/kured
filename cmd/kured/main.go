@@ -133,16 +133,19 @@ func getPIDtoRunCmds() int {
 	statPath := fmt.Sprintf("/proc/1/stat")
 	dataBytes, err := ioutil.ReadFile(statPath)
 	if err != nil {
+		log.Infof("nil on /proc/1/stat")
 		return 1 // default to pid = 1 but will ocours error in next exec command
 	}
 	data := string(dataBytes)
 	if strings.Contains(strings.Split(data, " ")[1], "systemd") {
+		log.Infof("is systemd")
 		return 1 // is systemd
 	}
 	tstPidCmd := exec.Command("ps", "-e", "-o", "pid,cmd")
 	var out bytes.Buffer
 	tstPidCmd.Stdout = &out
 	if err := tstPidCmd.Run(); err != nil {
+		log.Infof("error on run ps -e -o pid,cmd")
 		return 1 // default to 1 by will ocours error in next exec command
 	}
 	pss := strings.Split(out.String(), "\n")
@@ -152,12 +155,15 @@ func getPIDtoRunCmds() int {
 			if strings.Contains(ns[1], "acpid") {
 				i, err := strconv.Atoi(ns[0])
 				if err != nil {
+					log.Infof("error on convert pid to int")
 					return 1
 				}
+				log.Infof(fmt.Sprintf("error on convert pid to int (%v)", ns[0]))
 				return i
 			}
 		}
 	}
+	log.Info("pid = 1")
 	return 1
 }
 
