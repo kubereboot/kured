@@ -153,12 +153,12 @@ func getPIDtoRunCmds() int {
 		ns := strings.Split(strings.Trim(n, " "), " ")
 		if len(ns) > 1 {
 			if strings.Contains(ns[1], "acpid") {
-				i, err := strconv.Atoi(ns[0])
+				i, err := strconv.Atoi(strings.Trim(ns[0], " "))
 				if err != nil {
 					log.Infof("error on convert pid to int")
 					return 1
 				}
-				log.Infof(fmt.Sprintf("error on convert pid to int (%v)", ns[0]))
+				log.Infof(fmt.Sprintf("Ok pid  (%d)", ns[0]))
 				return i
 			}
 		}
