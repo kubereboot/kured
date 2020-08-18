@@ -141,7 +141,7 @@ func getPIDtoRunCmds() int {
 		log.Infof("is systemd")
 		return 1 // is systemd
 	}
-	tstPidCmd := exec.Command("ps", "-e", "-o", "pid,cmd")
+	tstPidCmd := exec.Command("ps", "-e", "-o", "pid,comm")
 	var out bytes.Buffer
 	tstPidCmd.Stdout = &out
 	if err := tstPidCmd.Run(); err != nil {
