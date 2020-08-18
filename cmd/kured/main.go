@@ -149,11 +149,13 @@ func getPIDtoRunCmds() int {
 	for _, n := range pss {
 		ns := strings.Split(strings.Trim(n, " "), " ")
 		if len(ns) > 1 {
-			i, err := strconv.Atoi(s)
-			if err != nil {
-				return 1
+			if strings.Contains(ns[1], "acpid") {
+				i, err := strconv.Atoi(ns[0])
+				if err != nil {
+					return 1
+				}
+				return i
 			}
-			return i
 		}
 	}
 	return 1
