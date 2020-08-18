@@ -158,7 +158,7 @@ func getPIDtoRunCmds() int {
 					log.Infof("error on convert pid to int")
 					return 1
 				}
-				log.Infof(fmt.Sprintf("Ok pid  (%d)", ns[0]))
+				// log.Info(fmt.Sprintf("Ok pid  (%d)", ns[0]))
 				return i
 			}
 		}
