@@ -1,16 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
 	"regexp"
-	"strconv"
-	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -128,43 +124,9 @@ func newCommand(name string, arg ...string) *exec.Cmd {
 	return cmd
 }
 
-func getPIDtoRunCmds() int {
-	// find the pid to enter host mount space
-	statPath := fmt.Sprintf("/proc/1/stat")
-	dataBytes, err := ioutil.ReadFile(statPath)
-	if err != nil {
-		return 1 // default to pid = 1 but will ocours error in next exec command
-	}
-	data := string(dataBytes)
-	if strings.Contains(strings.Split(data, " ")[1], "systemd") {
-		return 1 // is systemd
-	}
-	tstPidCmd := exec.Command("ps", "-e", "-o", "pid,cmd")
-	var out bytes.Buffer
-	tstPidCmd.Stdout = &out
-	if err := tstPidCmd.Run(); err != nil {
-		return 1 // default to 1 by will ocours error in next exec command
-	}
-	pss := strings.Split(out.String(), "\n")
-	for _, n := range pss {
-		ns := strings.Split(strings.Trim(n, " "), " ")
-		if len(ns) > 1 {
-			if strings.Contains(ns[1], "acpid") {
-				i, err := strconv.Atoi(ns[0])
-				if err != nil {
-					return 1
-				}
-				return i
-			}
-		}
-	}
-	return 1
-}
-
 func sentinelExists() bool {
-	pid := getPIDtoRunCmds()
 	// Relies on hostPID:true and privileged:true to enter host mount space
-	sentinelCmd := newCommand("/usr/bin/nsenter", fmt.Sprintf("-m/proc/%d/ns/mnt", pid), "--", "/usr/bin/test", "-f", rebootSentinel)
+	sentinelCmd := newCommand("/usr/bin/nsenter", "-m/proc/1/ns/mnt", "--", "/usr/bin/test", "-f", rebootSentinel)
 	if err := sentinelCmd.Run(); err != nil {
 		switch err := err.(type) {
 		case *exec.ExitError:
@@ -304,12 +266,7 @@ func commandReboot(nodeID string) {
 	}
 
 	// Relies on hostPID:true and privileged:true to enter host mount space
-	pid := getPIDtoRunCmds()
-	// Relies on hostPID:true and privileged:true to enter host mount space
-	rebootCmd := newCommand("/usr/bin/nsenter", fmt.Sprintf("-m/proc/%d/ns/mnt", pid), "/bin/systemctl", "reboot")
-	if pid != 1 {
-		rebootCmd = newCommand("/usr/bin/nsenter", fmt.Sprintf("-m/proc/%d/ns/mnt", pid), "/sbin/reboot")
-	}
+	rebootCmd := newCommand("/usr/bin/nsenter", "-m/proc/1/ns/mnt", "/bin/systemctl", "reboot")
 	if err := rebootCmd.Run(); err != nil {
 		log.Fatalf("Error invoking reboot command: %v", err)
 	}
