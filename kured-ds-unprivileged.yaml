@@ -1,0 +1,140 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kured
+  namespace: kube-system
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kured            # Must match `--ds-name`
+  namespace: kube-system # Must match `--ds-namespace`
+spec:
+  selector:
+    matchLabels:
+      name: kured
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: kured
+    spec:
+      serviceAccountName: kured
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+      hostPID: true # Required to execute reboot syscall
+      restartPolicy: Always
+      volumes:
+        - name: host-opt-kured
+          hostPath:
+            path: /opt/kured
+            type: DirectoryOrCreate
+      containers:
+        - name: kured
+          image: docker.io/weaveworks/kured
+                  # If you find yourself here wondering why there is no
+                  # :latest tag on Docker Hub,see the FAQ in the README
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: host-opt-kured
+              mountPath: /opt/kured
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              add: ["SYS_BOOT"]
+              drop: ["ALL"]
+          env:
+            - name: UNPRIVILEGED
+              value: "true"
+            # Pass in the name of the node on which this pod is scheduled
+            # for use with drain/uncordon operations and lock acquisition
+            - name: KURED_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          command:
+            - /usr/bin/kured
+            - --reboot-sentinel=/opt/kured/reboot-required
+#            - --alert-filter-regexp=^RebootRequired$
+#            - --blocking-pod-selector=runtime=long,cost=expensive
+#            - --blocking-pod-selector=name=temperamental
+#            - --blocking-pod-selector=...
+#            - --ds-name=kured
+#            - --ds-namespace=kube-system
+#            - --end-time=23:59:59
+#            - --lock-annotation=weave.works/kured-node-lock
+#            - --period=1h
+#            - --prometheus-url=http://prometheus.monitoring.svc.cluster.local
+#            - --reboot-days=sun,mon,tue,wed,thu,fri,sat
+#            - --slack-hook-url=https://hooks.slack.com/...
+#            - --slack-username=prod
+#            - --slack-channel=alerting
+#            - --start-time=0:00
+#            - --time-zone=UTC
+---
+# kured-sentinel-sync places the sentinel into /opt/kured
+# which is a safer place for kured to mount. This can be 
+# safely replaced by a similar process happening at the host.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kured-sentinel-sync # Must match `--ds-name`
+  namespace: kube-system # Must match `--ds-namespace`
+spec:
+  selector:
+    matchLabels:
+      name: kured-sentinel-sync
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: kured-sentinel-sync
+    spec:
+      automountServiceAccountToken: false
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+      restartPolicy: Always
+      volumes:
+        - name: host-opt-kured
+          hostPath:
+            path: /opt/kured
+            type: DirectoryOrCreate
+        - name: host-var-run
+          hostPath:
+            path: /var/run
+            type: Directory
+      containers:
+        - name: sentinel-sync
+          image: bash:5.0
+          command: [bash, -c]
+          args:
+            - |+
+              while true
+              do
+                  if [ -f $REBOOT_SENTINEL ]; then
+                    /bin/touch /opt/kured/reboot-required
+                  else
+                    /bin/rm /opt/kured/reboot-required
+                  fi
+                  /bin/sleep 60
+              done
+          env:
+            - name: REBOOT_SENTINEL
+              value: /var/run/reboot-required
+          volumeMounts:
+            - name: host-opt-kured
+              mountPath: /opt/kured
+            - name: host-var-run
+              mountPath: /var/run
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
+	"syscall"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -127,6 +129,16 @@ func newCommand(name string, arg ...string) *exec.Cmd {
 func sentinelExists() bool {
 	// Relies on hostPID:true and privileged:true to enter host mount space
 	sentinelCmd := newCommand("/usr/bin/nsenter", "-m/proc/1/ns/mnt", "--", "/usr/bin/test", "-f", rebootSentinel)
+
+	if strings.EqualFold(os.Getenv("UNPRIVILEGED"), "true") {
+		// Relies on the sentinel existing inside the same container mount namespace.
+		// Note that by default the host sentinel tends to be placed in a sensitive folder (/var/run/),
+		// mounting that as a volume is not recommended - but probably still safer than running the container as privileged.
+
+		// Other approaches could involve an external process to check the existance of the sentinel and safely place a file
+		// in a location that is safe to be mounted into this container.
+		sentinelCmd = newCommand("/usr/bin/test", "-f", rebootSentinel)
+	}
 	if err := sentinelCmd.Run(); err != nil {
 		switch err := err.(type) {
 		case *exec.ExitError:
@@ -265,9 +277,32 @@ func commandReboot(nodeID string) {
 		}
 	}
 
-	// Relies on hostPID:true and privileged:true to enter host mount space
-	rebootCmd := newCommand("/usr/bin/nsenter", "-m/proc/1/ns/mnt", "/bin/systemctl", "reboot")
-	if err := rebootCmd.Run(); err != nil {
+	var err error
+	if strings.EqualFold(os.Getenv("UNPRIVILEGED"), "true") {
+		ch := make(chan bool, 1)
+		defer close(ch)
+
+		go func() {
+			// Commits filesystem caches to disk in order to avoid data loss.
+			syscall.Sync()
+		}()
+
+		select {
+		case <-ch:
+			log.Info("sync successful")
+		case <-time.After(30 * time.Second):
+			log.Error("sync timed out")
+		}
+
+		// Relies on hostPID:true and SYS_BOOT to restart machine
+		err = syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
+	} else {
+		// Relies on hostPID:true and privileged:true to enter host mount space
+		rebootCmd := newCommand("/usr/bin/nsenter", "-m/proc/1/ns/mnt", "/bin/systemctl", "reboot")
+		err = rebootCmd.Run()
+	}
+
+	if err != nil {
 		log.Fatalf("Error invoking reboot command: %v", err)
 	}
 }
