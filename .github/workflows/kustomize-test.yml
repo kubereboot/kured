@@ -1,0 +1,53 @@
+#This tests if our kustomize manifests still work with an update
+#of kustomize or with an update of our manifests (keeping the image
+# the same).
+
+name: Kustomize deploy
+
+on:
+  pull_request:
+    paths:
+      - "**/kured-*.yaml"
+  schedule:
+    - cron: '0 0 1 * *'
+
+jobs:
+  deploy-with-kustomize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: "0"
+
+      # We need to unpin kind-action so we can test is new versions of kind
+      # and therefore kubernetes will break with our manifests
+      # This creates a 1 node cluster.
+      - name: Create a default kind cluster
+        uses: helm/kind-action@master
+
+      # Kustomize won't work with symlinks to resources outside its folder
+      # kind-action already installed kind and kubectl.
+      - name: Deploy with kubectl using kustomization
+        run: |
+          cp kured-{ds,rbac}.yaml .github/kustomize/
+          VERSION=$(curl -s https://api.github.com/repos/weaveworks/kured/releases | jq -r .[0].tag_name)
+          sed -i "s#docker.io/weaveworks/kured#docker.io/weaveworks/kured:$VERSION#g" .github/kustomize/kured-dev.yaml
+          kubectl apply -k .github/kustomize/
+
+      - name: Show kured is deploying
+        run: |
+          sleep 10; kubectl describe ds kured -n kube-system
+
+      - name: Ensure kured is up
+        uses: nick-invision/retry@v1
+        with:
+          timeout_minutes: 10
+          max_attempts: 10
+          retry_wait_seconds: 60
+          # DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE should all be =1
+          command: "kubectl get ds -n kube-system | grep -E 'kured.*1.*1.*1.*1.*1' "
+
+      - name: Show kured is successfully deployed
+        run: |
+          kubectl get ds -n kube-system
