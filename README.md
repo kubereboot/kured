@@ -45,6 +45,7 @@ compatibility of one minor version between client and server:
 | kured  | kubectl | k8s.io/client-go | k8s.io/apimachinery | expected kubernetes compatibility |
 |--------|---------|------------------|---------------------|-----------------------------------|
 | master | 1.18.8  | v0.18.8          | v0.18.8             | 1.17.x, 1.18.x, 1.19.x            |
+| 1.5.0  | 1.18.8  | v0.18.8          | v0.18.8             | 1.17.x, 1.18.x, 1.19.x            |
 | 1.4.4  | 1.17.7  | v0.17.0          | v0.17.0             | 1.16.x, 1.17.x, 1.18.x            |
 | 1.3.0  | 1.15.10 | v12.0.0          | release-1.15        | 1.15.x, 1.16.x, 1.17.x            |
 | 1.2.0  | 1.13.6  | v10.0.0          | release-1.13        | 1.12.x, 1.13.x, 1.14.x            |

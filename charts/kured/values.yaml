@@ -1,6 +1,6 @@
 image:
   repository: weaveworks/kured
-  tag: 1.4.5
+  tag: 1.5.0
   pullPolicy: IfNotPresent
   pullSecrets: []
 
