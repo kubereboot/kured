@@ -94,8 +94,9 @@ sed -i "s#docker.io/weaveworks/kured#docker.io/weaveworks/kured:$VERSION#g" "$MA
 To make this available for our Helm users, please make sure you update the
 image version in
 
-- `charts/kured/values.yaml` (`tag`) and
-- `charts/kured/Chart.yaml` (`appVersion`) as well.
+- `charts/kured/values.yaml` (`tag`),
+- `charts/kured/Chart.yaml` (`appVersion`) and
+- `charts/kured/README.md` (`image.tag`) as well.
 
 Finally bump the `version` in `charts/kured/Chart.yaml` and you should be
 all set.
