@@ -66,7 +66,7 @@ or Slack notifications:
 
 ```console
 latest=$(curl -s https://api.github.com/repos/weaveworks/kured/releases | jq -r .[0].tag_name)
-kubectl apply -f "https://github.com/weaveworks/kured/releases/download/$latest/kured-$latest-dockerhub.yaml
+kubectl apply -f "https://github.com/weaveworks/kured/releases/download/$latest/kured-$latest-dockerhub.yaml"
 ```
 
 If you want to customise the installation, download the manifest and
