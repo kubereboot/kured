@@ -1,0 +1,7 @@
+general:
+  bestPracticeViolations:
+    # We violate this rule because we add kubectl from a remote location
+    # Instead of building it from source/copying it.
+    # Until we change our practices (e.g. have Dockerfile build kubectl
+    # in a multi-staged manner), we should skip this check
+    - CIS-DI-0009
