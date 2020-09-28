@@ -47,6 +47,19 @@ func (tw *TimeWindow) Contains(t time.Time) bool {
 	start := time.Date(loctime.Year(), loctime.Month(), loctime.Day(), tw.startTime.Hour(), tw.startTime.Minute(), tw.startTime.Second(), 0, tw.location)
 	end := time.Date(loctime.Year(), loctime.Month(), loctime.Day(), tw.endTime.Hour(), tw.endTime.Minute(), tw.endTime.Second(), 1e9-1, tw.location)
 
+	// Time Wrap validation
+	// First we check for start and end time, if start is after end time
+	// Next we need to validate if we want to wrap to the day before or to the day after
+	// For that we check the loctime value to see if it is before end time, we wrap with the day before
+	// Otherwise we wrap to the next day.
+	if tw.startTime.After(tw.endTime) {
+		if loctime.Before(end) {
+			start = start.Add(-24 * time.Hour)
+		} else {
+			end = end.Add(24 * time.Hour)
+		}
+	}
+
 	return (loctime.After(start) || loctime.Equal(start)) && (loctime.Before(end) || loctime.Equal(end))
 }
 
