@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/api"
-	"github.com/prometheus/client_golang/api/prometheus/v1"
+	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 )
 
@@ -22,7 +22,7 @@ func PrometheusActiveAlerts(prometheusURL string, filter *regexp.Regexp) ([]stri
 
 	queryAPI := v1.NewAPI(client)
 
-	value, err := queryAPI.Query(context.Background(), "ALERTS", time.Now())
+	value, _, err := queryAPI.Query(context.Background(), "ALERTS", time.Now())
 	if err != nil {
 		return nil, err
 	}
