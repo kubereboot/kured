@@ -12,4 +12,5 @@ require (
 	github.com/spf13/cobra v0.0.0-20181127133106-d2d81d9a96e2
 	k8s.io/apimachinery v0.18.8
 	k8s.io/client-go v0.18.8
+	k8s.io/kubectl v0.18.8
 )
