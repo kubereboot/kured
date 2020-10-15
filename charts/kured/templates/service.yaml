@@ -3,6 +3,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ template "kured.fullname" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "kured.labels" . | nindent 4 }}
   {{- if .Values.service.annotations }}
