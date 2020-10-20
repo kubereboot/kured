@@ -47,7 +47,11 @@ sudo touch /var/run/reboot-required
 A test-run with `minikube` could look like this:
 
 ```console
+# start minikube
 minikube start --vm-driver kvm2 --kubernetes-version <k8s-release>
+
+# build kured image and publish to registry accessible by minikube
+make image minikube-publish
 
 # edit kured-ds.yaml to
 #   - point to new image
@@ -56,6 +60,10 @@ minikube start --vm-driver kvm2 --kubernetes-version <k8s-release>
 minikube kubectl -- apply -f kured-rbac.yaml
 minikube kubectl -- apply -f kured-ds.yaml
 minikube kubectl -- logs daemonset.apps/kured -n kube-system -f
+
+# Alternatively use helm to install the chart
+# edit values-local.yaml to change any chart parameters
+helm install kured ./charts/kured --namespace kube-system -f ./charts/kured/values.minikube.yaml
 
 # In separate terminal
 minikube ssh

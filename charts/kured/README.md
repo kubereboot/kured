@@ -55,6 +55,8 @@ The following changes have been made compared to the stable chart:
 | `configuration.slackChannel` | cli-parameter `--slack-channel`                                        | `""`                      |
 | `configuration.slackHookUrl` | cli-parameter `--slack-hook-url`                                       | `""`                      |
 | `configuration.slackUsername` | cli-parameter `--slack-username`                                      | `""`                      |
+| `configuration.slackMessageDrain` | cli-parameter `--slack-message-drain`                                      | `""`                      |
+| `configuration.slackMessageReboot` | cli-parameter `--slack-message-reboot`                                      | `""`                      |
 | `configuration.startTime` | cli-parameter `--start-time`                                              | `""`                      |
 | `configuration.timeZone` | cli-parameter `--time-zone`                                                | `""`                      |
 | `rbac.create`           | Create RBAC roles                                                           | `true`                     |
@@ -86,7 +88,7 @@ becomes `/usr/bin/kured ... --foo=1 --bar-baz=2`.
 
 ## Prometheus Metrics
 
-Kured exposes a single prometheus metric indicating whether a reboot is required or not (see [kured docs](https://github.com/weaveworks/kured#prometheus-metrics)) for details. 
+Kured exposes a single prometheus metric indicating whether a reboot is required or not (see [kured docs](https://github.com/weaveworks/kured#prometheus-metrics)) for details.
 
 #### Prometheus-Operator
 

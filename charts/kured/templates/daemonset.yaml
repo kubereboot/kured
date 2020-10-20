@@ -81,6 +81,12 @@ spec:
           {{- if .Values.configuration.slackUsername }}
             - --slack-username={{ .Values.configuration.slackUsername }}
           {{- end }}
+          {{- if .Values.configuration.slackMessageDrain }}
+            - --slack-message-drain={{ .Values.configuration.slackMessageDrain }}
+          {{- end }}
+          {{- if .Values.configuration.slackMessageReboot }}
+            - --slack-message-reboot={{ .Values.configuration.slackMessageReboot }}
+          {{- end }}
           {{- if .Values.configuration.startTime }}
             - --start-time={{ .Values.configuration.startTime }}
           {{- end }}
@@ -96,7 +102,7 @@ spec:
           {{- end }}
           ports:
             - containerPort: 8080
-              name: metrics          
+              name: metrics
           env:
             # Pass in the name of the node on which this pod is scheduled
             # for use with drain/uncordon operations and lock acquisition

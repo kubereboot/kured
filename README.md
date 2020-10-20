@@ -94,6 +94,8 @@ Flags:
       --slack-channel string                slack channel for reboot notfications
       --slack-hook-url string               slack hook URL for reboot notfications
       --slack-username string               slack username for reboot notfications (default "kured")
+      --slack-message-drain string          slack message template when notifying about a node being drained (default "Draining node %s")
+      --slack-message-reboot string         slack message template when notifying about a node being rebooted (default "Rebooting node %s")
       --start-time string                   only reboot after this time of day (default "0:00")
       --time-zone string                    use this timezone to calculate allowed reboot time (default "UTC")
 ```
@@ -217,6 +219,8 @@ you immediately prior to rebooting a node:
 
 We recommend setting `--slack-username` to be the name of the
 environment, e.g. `dev` or `prod`.
+
+Alternatively you can use the `--slack-message-reboot` and `--slack-message-reboot` to customize the text of the message, e.g. `"Draining node %s part of my-cluster in region xyz"`
 
 ### Overriding Lock Configuration
 
