@@ -33,6 +33,7 @@ var (
 	dsNamespace    string
 	dsName         string
 	lockAnnotation string
+	lockTTL        time.Duration
 	prometheusURL  string
 	alertFilter    *regexp.Regexp
 	rebootSentinel string
@@ -45,8 +46,6 @@ var (
 	rebootStart string
 	rebootEnd   string
 	timezone    string
-
-	annotationTTL time.Duration
 
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -74,6 +73,8 @@ func main() {
 		"name of daemonset on which to place lock")
 	rootCmd.PersistentFlags().StringVar(&lockAnnotation, "lock-annotation", "weave.works/kured-node-lock",
 		"annotation in which to record locking node")
+	rootCmd.PersistentFlags().DurationVar(&lockTTL, "lock-ttl", 0,
+		"expire lock annotation after this duration (default: 0, disabled)")
 	rootCmd.PersistentFlags().StringVar(&prometheusURL, "prometheus-url", "",
 		"Prometheus instance to probe for active alerts")
 	rootCmd.PersistentFlags().Var(&regexpValue{&alertFilter}, "alert-filter-regexp",
@@ -99,9 +100,6 @@ func main() {
 		"schedule reboot only before this time of day")
 	rootCmd.PersistentFlags().StringVar(&timezone, "time-zone", "UTC",
 		"use this timezone for schedule inputs")
-
-	rootCmd.PersistentFlags().DurationVar(&annotationTTL, "annotation-ttl", 0,
-		"force clean annotation after this ammount of time (default 0, disabled)")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
@@ -349,16 +347,16 @@ func root(cmd *cobra.Command, args []string) {
 
 	log.Infof("Node ID: %s", nodeID)
 	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
+	if lockTTL > 0 {
+		log.Infof("Lock TTL set, lock will expire after: %v", lockTTL)
+	} else {
+		log.Info("Lock TTL not set, lock will remain until being released")
+	}
 	log.Infof("Reboot Sentinel: %s every %v", rebootSentinel, period)
 	log.Infof("Blocking Pod Selectors: %v", podSelectors)
 	log.Infof("Reboot on: %v", window)
-	if annotationTTL > 0 {
-		log.Infof("Force annotation cleanup after: %v", annotationTTL)
-	} else {
-		log.Info("Force annotation cleanup disabled.")
-	}
 
-	go rebootAsRequired(nodeID, window, annotationTTL)
+	go rebootAsRequired(nodeID, window, lockTTL)
 	go maintainRebootRequiredMetric(nodeID)
 
 	http.Handle("/metrics", promhttp.Handler())
