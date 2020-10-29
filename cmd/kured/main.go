@@ -234,7 +234,7 @@ func release(lock *daemonsetlock.DaemonSetLock) {
 	}
 }
 
-func drain(drainer *kubectldrain.Helper, node *v1.Node) {
+func drain(client *kubernetes.Clientset, node *v1.Node) {
 	nodename := node.GetName()
 
 	log.Infof("Draining node %s", nodename)
@@ -245,8 +245,14 @@ func drain(drainer *kubectldrain.Helper, node *v1.Node) {
 		}
 	}
 
-	// The drainer helper already has DeleteLocalData,
-	// IgnoreAllDaemonSets, and Force flags set to true.
+	drainer := &kubectldrain.Helper{
+		Client:              client,
+		Force:               true,
+		DeleteLocalData:     true,
+		IgnoreAllDaemonSets: true,
+		ErrOut:              os.Stderr,
+		Out:                 os.Stdout,
+	}
 	if err := kubectldrain.RunCordonOrUncordon(drainer, node, true); err != nil {
 		log.Fatal("Error cordonning %s: %v", nodename, err)
 	}
@@ -256,9 +262,14 @@ func drain(drainer *kubectldrain.Helper, node *v1.Node) {
 	}
 }
 
-func uncordon(drainer *kubectldrain.Helper, node *v1.Node) {
+func uncordon(client *kubernetes.Clientset, node *v1.Node) {
 	nodename := node.GetName()
 	log.Infof("Uncordoning node %s", nodename)
+	drainer := &kubectldrain.Helper{
+		Client: client,
+		ErrOut: os.Stderr,
+		Out:    os.Stdout,
+	}
 	if err := kubectldrain.RunCordonOrUncordon(drainer, node, false); err != nil {
 		log.Fatal("Error uncordonning %s: %v", nodename, err)
 	}
@@ -307,15 +318,6 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Dur
 		log.Fatal(err)
 	}
 
-	drainer := &kubectldrain.Helper{
-		Client:              client,
-		Force:               true,
-		DeleteLocalData:     true,
-		IgnoreAllDaemonSets: true,
-		ErrOut:              os.Stderr,
-		Out:                 os.Stdout,
-	}
-
 	lock := daemonsetlock.New(client, nodeID, dsNamespace, dsName, lockAnnotation)
 
 	nodeMeta := nodeMeta{}
@@ -325,7 +327,7 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Dur
 			if err != nil {
 				log.Fatal(err)
 			}
-			uncordon(drainer, node)
+			uncordon(client, node)
 		}
 		release(lock)
 	}
@@ -342,7 +344,7 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Dur
 
 			if acquire(lock, &nodeMeta, TTL) {
 				if !nodeMeta.Unschedulable {
-					drain(drainer, node)
+					drain(client, node)
 				}
 				commandReboot(nodeID)
 				for {
