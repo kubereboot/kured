@@ -37,10 +37,11 @@ indicated by the package management system of the underlying OS.
 
 ## Kubernetes & OS Compatibility
 
-The daemon image contains versions of `k8s.io/client-go` and the
-`kubectl` binary for the purposes of maintaining the lock and draining
-worker nodes. Kubernetes aims to provide forwards & backwards
-compatibility of one minor version between client and server:
+The daemon image contains versions of `k8s.io/client-go` and
+`k8s.io/kubectl` (the binary of `kubectl` in older releases) for the purposes of
+maintaining the lock and draining worker nodes. Kubernetes aims to provide
+forwards and backwards compatibility of one minor version between client and
+server:
 
 | kured  | kubectl | k8s.io/client-go | k8s.io/apimachinery | expected kubernetes compatibility |
 |--------|---------|------------------|---------------------|-----------------------------------|
