@@ -12,9 +12,11 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	kubectldrain "k8s.io/kubectl/pkg/drain"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -232,28 +234,44 @@ func release(lock *daemonsetlock.DaemonSetLock) {
 	}
 }
 
-func drain(nodeID string) {
-	log.Infof("Draining node %s", nodeID)
+func drain(client *kubernetes.Clientset, node *v1.Node) {
+	nodename := node.GetName()
+
+	log.Infof("Draining node %s", nodename)
 
 	if slackHookURL != "" {
-		if err := slack.NotifyDrain(slackHookURL, slackUsername, slackChannel, nodeID); err != nil {
+		if err := slack.NotifyDrain(slackHookURL, slackUsername, slackChannel, nodename); err != nil {
 			log.Warnf("Error notifying slack: %v", err)
 		}
 	}
 
-	drainCmd := newCommand("/usr/bin/kubectl", "drain",
-		"--ignore-daemonsets", "--delete-local-data", "--force", nodeID)
+	drainer := &kubectldrain.Helper{
+		Client:              client,
+		Force:               true,
+		DeleteLocalData:     true,
+		IgnoreAllDaemonSets: true,
+		ErrOut:              os.Stderr,
+		Out:                 os.Stdout,
+	}
+	if err := kubectldrain.RunCordonOrUncordon(drainer, node, true); err != nil {
+		log.Fatal("Error cordonning %s: %v", nodename, err)
+	}
 
-	if err := drainCmd.Run(); err != nil {
-		log.Fatalf("Error invoking drain command: %v", err)
+	if err := kubectldrain.RunNodeDrain(drainer, nodename); err != nil {
+		log.Fatal("Error draining %s: %v", nodename, err)
 	}
 }
 
-func uncordon(nodeID string) {
-	log.Infof("Uncordoning node %s", nodeID)
-	uncordonCmd := newCommand("/usr/bin/kubectl", "uncordon", nodeID)
-	if err := uncordonCmd.Run(); err != nil {
-		log.Fatalf("Error invoking uncordon command: %v", err)
+func uncordon(client *kubernetes.Clientset, node *v1.Node) {
+	nodename := node.GetName()
+	log.Infof("Uncordoning node %s", nodename)
+	drainer := &kubectldrain.Helper{
+		Client: client,
+		ErrOut: os.Stderr,
+		Out:    os.Stdout,
+	}
+	if err := kubectldrain.RunCordonOrUncordon(drainer, node, false); err != nil {
+		log.Fatal("Error uncordonning %s: %v", nodename, err)
 	}
 }
 
@@ -305,7 +323,11 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Dur
 	nodeMeta := nodeMeta{}
 	if holding(lock, &nodeMeta) {
 		if !nodeMeta.Unschedulable {
-			uncordon(nodeID)
+			node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
+			if err != nil {
+				log.Fatal(err)
+			}
+			uncordon(client, node)
 		}
 		release(lock)
 	}
@@ -322,7 +344,7 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Dur
 
 			if acquire(lock, &nodeMeta, TTL) {
 				if !nodeMeta.Unschedulable {
-					drain(nodeID)
+					drain(client, node)
 				}
 				commandReboot(nodeID)
 				for {
