@@ -151,10 +151,9 @@ func rebootRequired() bool {
 	if sentinelExists() {
 		log.Infof("Reboot required")
 		return true
-	} else {
-		log.Infof("Reboot not required")
-		return false
 	}
+	log.Infof("Reboot not required")
+	return false
 }
 
 func rebootBlocked(client *kubernetes.Clientset, nodeID string) bool {
@@ -334,7 +333,7 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Dur
 
 	source := rand.NewSource(time.Now().UnixNano())
 	tick := delaytick.New(source, period)
-	for _ = range tick {
+	for range tick {
 		if window.Contains(time.Now()) && rebootRequired() && !rebootBlocked(client, nodeID) {
 			node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 			if err != nil {
