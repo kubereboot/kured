@@ -1,0 +1,16 @@
+name: "Go lint"
+on: [pull_request, push]
+
+jobs:
+  code-lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Lint cmd folder
+      uses: Jerome1337/golint-action@v1.0.2
+      with:
+        golint-path: './cmd/...'
+    - name: Lint pkg folder
+      uses: Jerome1337/golint-action@v1.0.2
+      with:
+        golint-path: './pkg/...'
