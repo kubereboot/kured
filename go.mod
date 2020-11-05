@@ -4,7 +4,6 @@ go 1.13
 
 require (
 	github.com/googleapis/gnostic v0.2.0 // indirect
-	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.0.0
 	github.com/prometheus/common v0.4.1
 	github.com/sirupsen/logrus v1.4.2

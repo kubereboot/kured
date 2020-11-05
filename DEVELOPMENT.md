@@ -15,9 +15,8 @@ you are planning to contribute code.
 
 ## Updating k8s support
 
-Whenever we want to update e.g. [`kubectl` in the
-image](cmd/kured/Dockerfile), we need to consider if we update `client-go`
-as well, some RBAC changes might be necessary too.
+Whenever we want to update e.g. the `kubectl` or `client-go` dependencies,
+some RBAC changes might be necessary too.
 
 This is what it took to support Kubernetes 1.14:
 <https://github.com/weaveworks/kured/pull/75>
