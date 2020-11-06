@@ -44,11 +44,9 @@ func (dsl *DaemonSetLock) Acquire(metadata interface{}, TTL time.Duration) (acqu
 				return false, "", err
 			}
 
-			if ttlExpired(value.Created, value.TTL) {
-				return true, value.NodeID, nil
+			if !ttlExpired(value.Created, value.TTL) {
+				return value.NodeID == dsl.nodeID, value.NodeID, nil
 			}
-
-			return value.NodeID == dsl.nodeID, value.NodeID, nil
 		}
 
 		if ds.ObjectMeta.Annotations == nil {
@@ -88,11 +86,9 @@ func (dsl *DaemonSetLock) Test(metadata interface{}) (holding bool, err error) {
 			return false, err
 		}
 
-		if ttlExpired(value.Created, value.TTL) {
-			return true, nil
+		if !ttlExpired(value.Created, value.TTL) {
+			return value.NodeID == dsl.nodeID, nil
 		}
-
-		return value.NodeID == dsl.nodeID, nil
 	}
 
 	return false, nil
@@ -111,7 +107,8 @@ func (dsl *DaemonSetLock) Release() error {
 			if err := json.Unmarshal([]byte(valueString), &value); err != nil {
 				return err
 			}
-			if value.NodeID != dsl.nodeID && !ttlExpired(value.Created, value.TTL) {
+
+			if value.NodeID != dsl.nodeID {
 				return fmt.Errorf("Not lock holder: %v", value.NodeID)
 			}
 		} else {
