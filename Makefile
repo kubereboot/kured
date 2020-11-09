@@ -1,5 +1,5 @@
 .DEFAULT: all
-.PHONY: all clean image publish-image minikube-publish
+.PHONY: all clean image publish-image minikube-publish manifest helm-chart
 
 DH_ORG=weaveworks
 VERSION=$(shell git symbolic-ref --short HEAD)-$(shell git rev-parse --short HEAD)
@@ -33,3 +33,13 @@ publish-image: image
 
 minikube-publish: image
 	$(SUDO) docker save docker.io/$(DH_ORG)/kured | (eval $$(minikube docker-env) && docker load)
+
+manifest:
+	sed -i "s#image: docker.io/.*kured.*#image: docker.io/$(DH_ORG)/kured:$(VERSION)#g" kured-ds.yaml
+	echo "Please generate combined manifest if necessary"
+
+helm-chart:
+	sed -i "s#repository:.*/kured#repository: $(DH_ORG)/kured#g" charts/kured/values.yaml
+	sed -i "s#tag:.*#tag: $(VERSION)#g" charts/kured/values.yaml
+	sed -i "s#appVersion:.*#appVersion: \"$(VERSION)\"#g" charts/kured/Chart.yaml
+	echo "Please bump version in charts/kured/Chart.yaml"
