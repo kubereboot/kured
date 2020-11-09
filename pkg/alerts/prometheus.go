@@ -12,7 +12,7 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-// Returns a list of names of active (e.g. pending or firing) alerts, filtered
+// PrometheusActiveAlerts returns a list of names of active (e.g. pending or firing) alerts, filtered
 // by the supplied regexp.
 func PrometheusActiveAlerts(prometheusURL string, filter *regexp.Regexp) ([]string, error) {
 	client, err := api.NewClient(api.Config{Address: prometheusURL})
@@ -39,7 +39,7 @@ func PrometheusActiveAlerts(prometheusURL string, filter *regexp.Regexp) ([]stri
 			}
 
 			var activeAlerts []string
-			for activeAlert, _ := range activeAlertSet {
+			for activeAlert := range activeAlertSet {
 				activeAlerts = append(activeAlerts, activeAlert)
 			}
 			sort.Sort(sort.StringSlice(activeAlerts))
