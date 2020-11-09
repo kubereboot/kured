@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Tick regularly after an initial delay randomly distributed between d/2 and d + d/2
+// New ticks regularly after an initial delay randomly distributed between d/2 and d + d/2
 func New(s rand.Source, d time.Duration) <-chan time.Time {
 	c := make(chan time.Time)
 

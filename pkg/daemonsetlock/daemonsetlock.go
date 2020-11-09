@@ -11,6 +11,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// DaemonSetLock holds all necessary information to do actions
+// on the kured ds which holds lock info through annotations.
 type DaemonSetLock struct {
 	client     *kubernetes.Clientset
 	nodeID     string
@@ -26,10 +28,12 @@ type lockAnnotationValue struct {
 	TTL      time.Duration `json:"TTL"`
 }
 
+// New creates a daemonsetLock object containing the necessary data for follow up k8s requests
 func New(client *kubernetes.Clientset, nodeID, namespace, name, annotation string) *DaemonSetLock {
 	return &DaemonSetLock{client, nodeID, namespace, name, annotation}
 }
 
+// Acquire attempts to annotate the kured daemonset with lock info from instantiated DaemonSetLock using client-go
 func (dsl *DaemonSetLock) Acquire(metadata interface{}, TTL time.Duration) (acquired bool, owner string, err error) {
 	for {
 		ds, err := dsl.client.AppsV1().DaemonSets(dsl.namespace).Get(context.TODO(), dsl.name, metav1.GetOptions{})
@@ -73,6 +77,7 @@ func (dsl *DaemonSetLock) Acquire(metadata interface{}, TTL time.Duration) (acqu
 	}
 }
 
+// Test attempts to check the kured daemonset lock status (existence, expiry) from instantiated DaemonSetLock using client-go
 func (dsl *DaemonSetLock) Test(metadata interface{}) (holding bool, err error) {
 	ds, err := dsl.client.AppsV1().DaemonSets(dsl.namespace).Get(context.TODO(), dsl.name, metav1.GetOptions{})
 	if err != nil {
@@ -94,6 +99,7 @@ func (dsl *DaemonSetLock) Test(metadata interface{}) (holding bool, err error) {
 	return false, nil
 }
 
+// Release attempts to remove the lock data from the kured ds annotations using client-go
 func (dsl *DaemonSetLock) Release() error {
 	for {
 		ds, err := dsl.client.AppsV1().DaemonSets(dsl.namespace).Get(context.TODO(), dsl.name, metav1.GetOptions{})
