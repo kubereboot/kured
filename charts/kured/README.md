@@ -55,8 +55,8 @@ The following changes have been made compared to the stable chart:
 | `configuration.slackChannel` | cli-parameter `--slack-channel`                                        | `""`                      |
 | `configuration.slackHookUrl` | cli-parameter `--slack-hook-url`                                       | `""`                      |
 | `configuration.slackUsername` | cli-parameter `--slack-username`                                      | `""`                      |
-| `configuration.slackMessageDrain` | cli-parameter `--slack-message-drain`                                      | `""`                      |
-| `configuration.slackMessageReboot` | cli-parameter `--slack-message-reboot`                                      | `""`                      |
+| `configuration.messageTemplateDrain` | cli-parameter `--message-template-drain`                       | `""`                      |
+| `configuration.messageTemplateReboot` | cli-parameter `--message-template-reboot`                     | `""`                      |
 | `configuration.startTime` | cli-parameter `--start-time`                                              | `""`                      |
 | `configuration.timeZone` | cli-parameter `--time-zone`                                                | `""`                      |
 | `rbac.create`           | Create RBAC roles                                                           | `true`                     |

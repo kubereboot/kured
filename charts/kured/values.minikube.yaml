@@ -15,7 +15,7 @@ configuration:
   # slackChannel: ""          # slack channel for reboot notfications
   # slackHookUrl: ""          # slack hook URL for reboot notfications
   # slackUsername: ""         # slack username for reboot notfications (default "kured")
-  # slackMessageDrain: ""     # slack message template when notifying about a node being drained (default "Draining node %s")
-  # slackMessageReboot: ""    # slack message template when notifying about a node being rebooted (default "Rebooted node %s")
+  # messageTemplateDrain: ""  # slack message template when notifying about a node being drained (default "Draining node %s")
+  # messageTemplateReboot: "" # slack message template when notifying about a node being rebooted (default "Rebooted node %s")
   # startTime: ""             # only reboot after this time of day (default "0:00")
   # timeZone: ""              # time-zone to use (valid zones from "time" golang package)
