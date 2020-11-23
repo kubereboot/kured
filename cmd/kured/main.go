@@ -244,6 +244,7 @@ func drain(client *kubernetes.Clientset, node *v1.Node) {
 
 	drainer := &kubectldrain.Helper{
 		Client:              client,
+		GracePeriodSeconds:  -1,
 		Force:               true,
 		DeleteLocalData:     true,
 		IgnoreAllDaemonSets: true,
