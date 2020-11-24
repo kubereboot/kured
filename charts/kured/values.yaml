@@ -20,7 +20,7 @@ extraEnvVars:
 #    value: 123
 
 configuration:
-  annotationTtl: 0          # force clean annotation after this ammount of time (default 0, disabled)
+  lockTtl: 0                # force clean annotation after this ammount of time (default 0, disabled)
   alertFilterRegexp: ""     # alert names to ignore when checking for active alerts
   blockingPodSelector: []   # label selector identifying pods whose presence should prevent reboots
   endTime: ""               # only reboot before this time of day (default "23:59")
