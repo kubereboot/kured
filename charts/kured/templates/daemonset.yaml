@@ -45,8 +45,8 @@ spec:
           args:
             - --ds-name={{ template "kured.fullname" . }}
             - --ds-namespace={{ .Release.Namespace }}
-          {{- if .Values.configuration.annotationTtl }}
-            - --annotation-ttl={{ .Values.configuration.annotationTtl }}
+          {{- if .Values.configuration.lockTtl }}
+            - --lock-ttl={{ .Values.configuration.lockTtl }}
           {{- end }}
           {{- if .Values.configuration.alertFilterRegexp }}
             - --alert-filter-regexp={{ .Values.configuration.alertFilterRegexp }}
