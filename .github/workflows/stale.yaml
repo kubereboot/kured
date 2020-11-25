@@ -1,0 +1,20 @@
+name: Mark stale issues and pull requests
+
+on:
+  schedule:
+  - cron: "30 1 * * *"
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+    # Stale by default waits for 60 days before marking PR/issues as stale, and closes them after 7 days.
+    # Do not expire the first issues that would allow the community to grow.
+    - uses: actions/stale@v1
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        stale-issue-message: 'This issue was automatically considered stale due to lack of activity. Please update it and/or join our slack channels to promote it, before it automatically closes (in 7 days).'
+        stale-pr-message: 'This PR was automatically considered stale due to lack of activity. Please refresh it and/or join our slack channels to highlight it, before it automatically closes (in 7 days).'
+        stale-issue-label: 'no-issue-activity'
+        stale-pr-label: 'no-pr-activity'
+        exempt-issue-labels: 'good-first-issue'
