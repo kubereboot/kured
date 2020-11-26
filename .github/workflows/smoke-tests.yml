@@ -39,9 +39,11 @@ jobs:
 
       - name: Deploy kured on default namespace with its helm chart
         run: |
-          curl -o helm3.tgz https://get.helm.sh/helm-v3.3.0-linux-amd64.tar.gz
-          tar xf helm3.tgz
-          ./linux-amd64/helm install kured ./charts/kured/ --set configuration.period=1m
+          # Documented in official helm doc to live on the edge
+          curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+          # Refresh bins
+          hash -r
+          helm install kured ./charts/kured/ --set configuration.period=1m
           kubectl config set-context kind-chart-testing
           kubectl get ds --all-namespaces
           kubectl describe ds kured
