@@ -1,0 +1,165 @@
+name: PR
+on:
+  pull_request:
+  push:
+
+jobs:
+  pr-shellcheck:
+    name: Lint bash code with shellcheck
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Run ShellCheck
+      uses: bewuethr/shellcheck-action@v2
+
+  pr-lint-code:
+    name: Lint golang code
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Lint cmd folder
+      uses: Jerome1337/golint-action@v1.0.2
+      with:
+        golint-path: './cmd/...'
+    - name: Lint pkg folder
+      uses: Jerome1337/golint-action@v1.0.2
+      with:
+        golint-path: './pkg/...'
+
+  pr-check-docs-links:
+    name: Check docs for incorrect links
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Link Checker
+      id: lc
+      uses: peter-evans/link-checker@v1
+      with:
+        args: -r *.md *.yaml */*/*.go -x .cluster.local
+    - name: Fail if there were link errors
+      run: exit ${{ steps.lc.outputs.exit_code }}
+
+  # This should not be made a mandatory test
+  # It is only used to make us aware of any potential security failure, that
+  # should trigger a bump of the image in build/.
+  pr-vuln-scan:
+    name: Build image and scan it against known vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" image
+      - uses: Azure/container-scan@v0
+        with:
+          image-name: docker.io/${{ github.repository_owner }}/kured:${{ github.sha }}
+
+  # If the PRs don't break the behaviour in the helm chart, we can simply publish the helm chart at the time of the release.
+  e2e-helm:
+    name: "Functional test of helm chart, e2e testing"
+    runs-on: ubuntu-latest
+    # only build with oldest and newest supported, it should be good enough.
+    strategy:
+      matrix:
+        kubernetes:
+          - 1.17
+          - 1.19
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: "0"
+      - name: Build artifacts
+        run: |
+          make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" image
+          make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" helm-chart
+
+      - name: "Workaround 'Failed to attach 1 to compat systemd cgroup /actions_job/...' on gh actions"
+        run: |
+          sudo bash << EOF
+              cp /etc/docker/daemon.json /etc/docker/daemon.json.old
+              echo '{}' > /etc/docker/daemon.json
+              systemctl restart docker || journalctl --no-pager -n 500
+              systemctl status docker
+          EOF
+
+      # Default name for helm/kind-action kind clusters is "chart-testing"
+      - name: Create 5 node kind cluster
+        uses: helm/kind-action@master
+        with:
+          config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
+
+      - name: Preload previously built images onto kind cluster
+        run: kind load docker-image docker.io/${{ github.repository_owner }}/kured:${{ github.sha }} --name chart-testing
+
+      - name: Deploy kured on default namespace with its helm chart
+        run: |
+          # Documented in official helm doc to live on the edge
+          curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+          # Refresh bins
+          hash -r
+          helm install kured ./charts/kured/ --set configuration.period=1m
+          kubectl config set-context kind-chart-testing
+          kubectl get ds --all-namespaces
+          kubectl describe ds kured
+
+      - name: Ensure kured is ready
+        uses: nick-invision/retry@v1
+        with:
+          timeout_minutes: 10
+          max_attempts: 10
+          retry_wait_seconds: 60
+          # DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE should all be = 5
+          command: "kubectl get ds kured | grep -E 'kured.*5.*5.*5.*5.*5' "
+
+      - name: Create reboot sentinel files
+        run: |
+          ./tests/kind/create-reboot-sentinels.sh
+
+      - name: Follow reboot until success
+        env:
+          DEBUG: true
+        run: |
+          ./tests/kind/follow-coordinated-reboot.sh
+
+  # This workflow is useful when introducing new versions, to ensure our manifests
+  # still work (even if there might be no manifest 'code' change).
+  # The version used here is what hasn't been tested with the helm chart
+  deploy-manifests:
+    name: Deploy kured with current manifests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        kubernetes:
+          - 1.18
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: "0"
+      - name: Build artifacts
+        run: |
+          make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" image
+          make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" manifest
+      - name: Workaround "Failed to attach 1 to compat systemd cgroup /actions_job/..." on gh actions
+        run: |
+          sudo bash << EOF
+              cp /etc/docker/daemon.json /etc/docker/daemon.json.old
+              echo '{}' > /etc/docker/daemon.json
+              systemctl restart docker || journalctl --no-pager -n 500
+              systemctl status docker
+          EOF
+      # Default name for helm/kind-action kind clusters is "chart-testing"
+      - name: Create kind cluster
+        uses: helm/kind-action@master
+        with:
+          config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
+      - name: Preload previously built images onto kind cluster
+        run: kind load docker-image docker.io/${{ github.repository_owner }}/kured:${{ github.sha }} --name chart-testing
+      - name: Install kured with kubectl
+        run: |
+          kubectl apply -f kured-rbac.yaml && kubectl apply -f kured-ds.yaml
+      - name: Ensure kured is ready
+        uses: nick-invision/retry@v1
+        with:
+          timeout_minutes: 10
+          max_attempts: 10
+          retry_wait_seconds: 60
+          # DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE should all be = to cluster_size
+          command: "kubectl get ds -n kube-system kured | grep -E 'kured.*5.*5.*5.*5.*5'"

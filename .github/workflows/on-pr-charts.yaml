@@ -1,0 +1,41 @@
+#This is just extra testing, for lint check, and basic installation
+#If those fail, no need to test the rest of the PR (github will cancel the rest of the builds)
+name: PR - charts
+on:
+  pull_request:
+    paths:
+      - "charts/**"
+
+jobs:
+  lint-chart:
+    name: Lint helm chart
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: "0"
+
+      - name: Lint charts
+        uses: helm/chart-testing-action@v2.0.1
+        with:
+          command: lint
+          config: .github/ct.yaml
+
+  test-chart:
+    name: Install helm chart
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: "0"
+
+      - name: Create default kind cluster
+        uses: helm/kind-action@v1.1.0
+
+      - name: Install chart with chart-testing-action
+        uses: helm/chart-testing-action@v2.0.1
+        with:
+          command: install
+          config: .github/ct.yaml

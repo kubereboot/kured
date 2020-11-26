@@ -1,14 +1,17 @@
-name: release-chart
+name: Publish release
 on:
-  push:
-    tags:
-      - "*"
+  release:
+    types: published
 
 jobs:
-  publish:
+  publish-helm-chart:
+    name: Publish our chart
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: "0"
+
       - name: Publish Helm chart
         uses: stefanprodan/helm-gh-pages@master
         with:
