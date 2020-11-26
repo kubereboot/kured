@@ -31,18 +31,20 @@ var (
 	version = "unreleased"
 
 	// Command line flags
-	period         time.Duration
-	dsNamespace    string
-	dsName         string
-	lockAnnotation string
-	lockTTL        time.Duration
-	prometheusURL  string
-	alertFilter    *regexp.Regexp
-	rebootSentinel string
-	slackHookURL   string
-	slackUsername  string
-	slackChannel   string
-	podSelectors   []string
+	period                 time.Duration
+	dsNamespace            string
+	dsName                 string
+	lockAnnotation         string
+	lockTTL                time.Duration
+	prometheusURL          string
+	alertFilter            *regexp.Regexp
+	rebootSentinel         string
+	slackHookURL           string
+	slackUsername          string
+	slackChannel           string
+	messageTemplateDrain   string
+	messageTemplateReboot  string
+	podSelectors           []string
 
 	rebootDays  []string
 	rebootStart string
@@ -90,6 +92,10 @@ func main() {
 		"slack username for reboot notfications")
 	rootCmd.PersistentFlags().StringVar(&slackChannel, "slack-channel", "",
 		"slack channel for reboot notfications")
+	rootCmd.PersistentFlags().StringVar(&messageTemplateDrain, "message-template-drain", "Draining node %s",
+		"message template used to notify about a node being drained")
+	rootCmd.PersistentFlags().StringVar(&messageTemplateReboot, "message-template-reboot", "Rebooting node %s",
+		"message template used to notify about a node being rebooted")
 
 	rootCmd.PersistentFlags().StringArrayVar(&podSelectors, "blocking-pod-selector", nil,
 		"label selector identifying pods whose presence should prevent reboots")
@@ -237,7 +243,7 @@ func drain(client *kubernetes.Clientset, node *v1.Node) {
 	log.Infof("Draining node %s", nodename)
 
 	if slackHookURL != "" {
-		if err := slack.NotifyDrain(slackHookURL, slackUsername, slackChannel, nodename); err != nil {
+		if err := slack.NotifyDrain(slackHookURL, slackUsername, slackChannel, messageTemplateDrain, nodename); err != nil {
 			log.Warnf("Error notifying slack: %v", err)
 		}
 	}
@@ -277,7 +283,7 @@ func commandReboot(nodeID string) {
 	log.Infof("Commanding reboot for node: %s", nodeID)
 
 	if slackHookURL != "" {
-		if err := slack.NotifyReboot(slackHookURL, slackUsername, slackChannel, nodeID); err != nil {
+		if err := slack.NotifyReboot(slackHookURL, slackUsername, slackChannel, messageTemplateReboot, nodeID); err != nil {
 			log.Warnf("Error notifying slack: %v", err)
 		}
 	}

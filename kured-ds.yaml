@@ -59,5 +59,7 @@ spec:
 #            - --slack-hook-url=https://hooks.slack.com/...
 #            - --slack-username=prod
 #            - --slack-channel=alerting
+#            - --message-template-drain=Draining node %s
+#            - --message-template-drain=Rebooting node %s
 #            - --start-time=0:00
 #            - --time-zone=UTC
