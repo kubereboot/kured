@@ -1,8 +1,10 @@
-#This tests if our kustomize manifests still work with an update
-#of kustomize or with an update of our manifests (keeping the image
-# the same).
+#This:
+#- Periodically ensures our latest releases manifest deploy correctly
+#- Ensures that a PR changing any of the manifests (later used for
+#  producing a release) will not break a deployment of an existing release
+#  (so we can assume it will not break a new release either)
 
-name: Kustomize deploy
+name: Manifest deploy
 
 on:
   pull_request:
@@ -12,7 +14,7 @@ on:
     - cron: '0 0 1 * *'
 
 jobs:
-  deploy-with-kustomize:
+  use-manifests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -26,14 +28,14 @@ jobs:
       - name: Create a default kind cluster
         uses: helm/kind-action@master
 
-      # Kustomize won't work with symlinks to resources outside its folder
       # kind-action already installed kind and kubectl.
-      - name: Deploy with kubectl using kustomization
+      # Hard code DH_ORG weaveworks so that all forks point to latest image
+      # from weaveworks.
+      - name: Deploy with kubectl
         run: |
-          cp kured-{ds,rbac}.yaml .github/kustomize/
           VERSION=$(curl -s https://api.github.com/repos/weaveworks/kured/releases | jq -r .[0].tag_name)
-          sed -i "s#docker.io/weaveworks/kured#docker.io/weaveworks/kured:$VERSION#g" .github/kustomize/kured-dev.yaml
-          kubectl apply -k .github/kustomize/
+          make DH_ORG=weaveworks VERSION=$VERSION manifest
+          kubectl apply -f kured-{rbac,ds}.yaml
 
       - name: Show kured is deploying
         run: |
