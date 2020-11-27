@@ -3,12 +3,34 @@
 NODECOUNT=${NODECOUNT:-5}
 KUBECTL_CMD="${KUBECTL_CMD:-kubectl}"
 DEBUG="${DEBUG:-false}"
+CONTAINER_NAME_FORMAT=${CONTAINER_NAME_FORMAT:-"chart-testing-*"}
 
 tmp_dir=$(mktemp -d -t kured-XXXX)
+function gather_logs_and_cleanup {
+    if [[ -f "$tmp_dir"/node_output ]]; then
+        rm "$tmp_dir"/node_output
+    fi
+    rmdir "$tmp_dir"
+
+    # The next commands are useful regardless of success or failures.
+    if [[ "$DEBUG" == "true" ]]; then
+        # This is useful to see if containers have crashed.
+        echo "docker ps:"
+        docker ps
+
+        # This is useful to see if the nodes have _properly_ rebooted.
+        # It should show the reboot/two container starts per node.
+        for name in `docker ps -a -f "name=${CONTAINER_NAME_FORMAT}" -q`; do
+            echo "############################################################"
+            echo "docker logs for container $name:"
+            docker logs $name
+        done
+    fi
+}
+trap gather_logs_and_cleanup EXIT
 
 declare -A was_unschedulable
 declare -A has_recovered
-
 max_attempts="60"
 sleep_time=60
 attempt_num=1
@@ -55,22 +77,5 @@ do
     fi
     (( attempt_num++ ))
 done
-if [[ "$DEBUG" == "true" ]]; then
-    # This is useful to see if containers have crashed
-    echo "Debug logs"
-    echo "docker ps:"
-    docker ps
-    # This is useful to see if the nodes have _properly_ rebooted.
-    # It should show the reboot/two container starts per node.
-    for name in chart-testing-control-plane chart-testing-control-plane2 chart-testing-control-plane3  chart-testing-worker  chart-testing-worker2; do
-        echo "############################################################"
-        echo "docker logs for node $name:"
-        docker logs $name
-    done
-fi
 
-set -o errexit
 echo "Test successful"
-
-rm "$tmp_dir"/node_output
-rmdir "$tmp_dir"
