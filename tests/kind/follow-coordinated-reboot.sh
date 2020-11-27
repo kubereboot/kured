@@ -14,9 +14,12 @@ function gather_logs_and_cleanup {
 
     # The next commands are useful regardless of success or failures.
     if [[ "$DEBUG" == "true" ]]; then
+        echo "############################################################"
         # This is useful to see if containers have crashed.
-        echo "docker ps:"
-        docker ps
+        echo "docker ps -a:"
+        docker ps -a
+	echo "docker journal logs"
+	journalctl -u docker --no-pager
 
         # This is useful to see if the nodes have _properly_ rebooted.
         # It should show the reboot/two container starts per node.
@@ -25,6 +28,7 @@ function gather_logs_and_cleanup {
             echo "docker logs for container $name:"
             docker logs "$name"
         done
+
     fi
 }
 trap gather_logs_and_cleanup EXIT
