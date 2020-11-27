@@ -1,0 +1,111 @@
+name: Daily jobs
+
+on:
+  schedule:
+  - cron: "30 1 * * *"
+
+jobs:
+  periodics-mark-stale:
+    name: Mark stale issues and PRs
+    runs-on: ubuntu-latest
+    steps:
+    # Stale by default waits for 60 days before marking PR/issues as stale, and closes them after 7 days.
+    # Do not expire the first issues that would allow the community to grow.
+    - uses: actions/stale@v3.0.14
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        stale-issue-message: 'This issue was automatically considered stale due to lack of activity. Please update it and/or join our slack channels to promote it, before it automatically closes (in 7 days).'
+        stale-pr-message: 'This PR was automatically considered stale due to lack of activity. Please refresh it and/or join our slack channels to highlight it, before it automatically closes (in 7 days).'
+        stale-issue-label: 'no-issue-activity'
+        stale-pr-label: 'no-pr-activity'
+        exempt-issue-labels: 'good-first-issue'
+
+  check-docs-links:
+    name: Check docs for incorrect links
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Link Checker
+      id: lc
+      uses: peter-evans/link-checker@v1
+      with:
+        args: -r *.md *.yaml */*/*.go -x .cluster.local
+    - name: Fail if there were link errors
+      run: exit ${{ steps.lc.outputs.exit_code }}
+
+  vuln-scan:
+    name: Build image and scan it against known vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" image
+      - uses: Azure/container-scan@v0
+        with:
+          image-name: docker.io/${{ github.repository_owner }}/kured:${{ github.sha }}
+
+  deploy-helm:
+    name: Ensure a kubernetes change didn't break our code
+    runs-on: ubuntu-latest
+    # only build with oldest and newest supported, it should be good enough.
+    strategy:
+      matrix:
+        kubernetes:
+          - 1.17
+          - 1.18
+          - 1.19
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: "0"
+      - name: Build artifacts
+        run: |
+          make DH_ORG="${{ github.repository_owner }}" VERSION="master" image
+          make DH_ORG="${{ github.repository_owner }}" VERSION="master" helm-chart
+
+      - name: "Workaround 'Failed to attach 1 to compat systemd cgroup /actions_job/...' on gh actions"
+        run: |
+          sudo bash << EOF
+              cp /etc/docker/daemon.json /etc/docker/daemon.json.old
+              echo '{}' > /etc/docker/daemon.json
+              systemctl restart docker || journalctl --no-pager -n 500
+              systemctl status docker
+          EOF
+
+      # Default name for helm/kind-action kind clusters is "chart-testing"
+      - name: Create 5 node kind cluster
+        uses: helm/kind-action@master
+        with:
+          config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
+
+      - name: Preload previously built images onto kind cluster
+        run: kind load docker-image docker.io/${{ github.repository_owner }}/kured:master --name chart-testing
+
+      - name: Deploy kured on default namespace with its helm chart
+        run: |
+          # Documented in official helm doc to live on the edge
+          curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+          # Refresh bins
+          hash -r
+          helm install kured ./charts/kured/ --set configuration.period=1m
+          kubectl config set-context kind-chart-testing
+          kubectl get ds --all-namespaces
+          kubectl describe ds kured
+
+      - name: Ensure kured is ready
+        uses: nick-invision/retry@v1
+        with:
+          timeout_minutes: 10
+          max_attempts: 10
+          retry_wait_seconds: 60
+          # DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE should all be = 5
+          command: "kubectl get ds kured | grep -E 'kured.*5.*5.*5.*5.*5' "
+
+      - name: Create reboot sentinel files
+        run: |
+          ./tests/kind/create-reboot-sentinels.sh
+
+      - name: Follow reboot until success
+        env:
+          DEBUG: true
+        run: |
+          ./tests/kind/follow-coordinated-reboot.sh
