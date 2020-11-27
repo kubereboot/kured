@@ -20,10 +20,10 @@ function gather_logs_and_cleanup {
 
         # This is useful to see if the nodes have _properly_ rebooted.
         # It should show the reboot/two container starts per node.
-        for name in `docker ps -a -f "name=${CONTAINER_NAME_FORMAT}" -q`; do
+        for name in $(docker ps -a -f "name=${CONTAINER_NAME_FORMAT}" -q); do
             echo "############################################################"
             echo "docker logs for container $name:"
-            docker logs $name
+            docker logs "$name"
         done
     fi
 }
