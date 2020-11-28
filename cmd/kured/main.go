@@ -31,20 +31,20 @@ var (
 	version = "unreleased"
 
 	// Command line flags
-	period                 time.Duration
-	dsNamespace            string
-	dsName                 string
-	lockAnnotation         string
-	lockTTL                time.Duration
-	prometheusURL          string
-	alertFilter            *regexp.Regexp
-	rebootSentinel         string
-	slackHookURL           string
-	slackUsername          string
-	slackChannel           string
-	messageTemplateDrain   string
-	messageTemplateReboot  string
-	podSelectors           []string
+	period                time.Duration
+	dsNamespace           string
+	dsName                string
+	lockAnnotation        string
+	lockTTL               time.Duration
+	prometheusURL         string
+	alertFilter           *regexp.Regexp
+	rebootSentinel        string
+	slackHookURL          string
+	slackUsername         string
+	slackChannel          string
+	messageTemplateDrain  string
+	messageTemplateReboot string
+	podSelectors          []string
 
 	rebootDays  []string
 	rebootStart string
@@ -339,23 +339,35 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Dur
 	source := rand.NewSource(time.Now().UnixNano())
 	tick := delaytick.New(source, period)
 	for range tick {
-		if window.Contains(time.Now()) && rebootRequired() && !rebootBlocked(client, nodeID) {
-			node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
-			if err != nil {
-				log.Fatal(err)
-			}
-			nodeMeta.Unschedulable = node.Spec.Unschedulable
+		if !window.Contains(time.Now()) {
+			continue
+		}
 
-			if acquire(lock, &nodeMeta, TTL) {
-				if !nodeMeta.Unschedulable {
-					drain(client, node)
-				}
-				commandReboot(nodeID)
-				for {
-					log.Infof("Waiting for reboot")
-					time.Sleep(time.Minute)
-				}
-			}
+		if !rebootRequired() {
+			continue
+		}
+
+		if rebootBlocked(client, nodeID) {
+			continue
+		}
+
+		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
+		if err != nil {
+			log.Fatal(err)
+		}
+		nodeMeta.Unschedulable = node.Spec.Unschedulable
+
+		if !acquire(lock, &nodeMeta, TTL) {
+			continue
+		}
+
+		if !nodeMeta.Unschedulable {
+			drain(client, node)
+		}
+		commandReboot(nodeID)
+		for {
+			log.Infof("Waiting for reboot")
+			time.Sleep(time.Minute)
 		}
 	}
 }
