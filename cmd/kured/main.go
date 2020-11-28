@@ -24,6 +24,7 @@ import (
 	"github.com/weaveworks/kured/pkg/daemonsetlock"
 	"github.com/weaveworks/kured/pkg/delaytick"
 	"github.com/weaveworks/kured/pkg/notifications/slack"
+	"github.com/weaveworks/kured/pkg/taints"
 	"github.com/weaveworks/kured/pkg/timewindow"
 )
 
@@ -31,20 +32,21 @@ var (
 	version = "unreleased"
 
 	// Command line flags
-	period                time.Duration
-	dsNamespace           string
-	dsName                string
-	lockAnnotation        string
-	lockTTL               time.Duration
-	prometheusURL         string
-	alertFilter           *regexp.Regexp
-	rebootSentinel        string
-	slackHookURL          string
-	slackUsername         string
-	slackChannel          string
-	messageTemplateDrain  string
-	messageTemplateReboot string
-	podSelectors          []string
+	period                    time.Duration
+	dsNamespace               string
+	dsName                    string
+	lockAnnotation            string
+	lockTTL                   time.Duration
+	prometheusURL             string
+	alertFilter               *regexp.Regexp
+	rebootSentinel            string
+	preferNoScheduleTaintName string
+	slackHookURL              string
+	slackUsername             string
+	slackChannel              string
+	messageTemplateDrain      string
+	messageTemplateReboot     string
+	podSelectors              []string
 
 	rebootDays  []string
 	rebootStart string
@@ -85,6 +87,8 @@ func main() {
 		"alert names to ignore when checking for active alerts")
 	rootCmd.PersistentFlags().StringVar(&rebootSentinel, "reboot-sentinel", "/var/run/reboot-required",
 		"path to file whose existence signals need to reboot")
+	rootCmd.PersistentFlags().StringVar(&preferNoScheduleTaintName, "prefer-no-schedule-taint", "weave.works/kured-node-reboot",
+		"taint name applied during pending node reboot (to prevent receiving additional pods from other rebooting nodes)")
 
 	rootCmd.PersistentFlags().StringVar(&slackHookURL, "slack-hook-url", "",
 		"slack hook URL for reboot notfications")
@@ -336,10 +340,19 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Dur
 		release(lock)
 	}
 
+	preferNoScheduleTaint := taints.New(client, nodeID, preferNoScheduleTaintName, v1.TaintEffectPreferNoSchedule)
+
+	// Remove taint immediately during startup to quickly allow scheduling again.
+	if !rebootRequired() {
+		preferNoScheduleTaint.Disable()
+	}
+
 	source := rand.NewSource(time.Now().UnixNano())
 	tick := delaytick.New(source, period)
 	for range tick {
 		if !window.Contains(time.Now()) {
+			// Remove taint outside the reboot time window to allow for normal operation.
+			preferNoScheduleTaint.Disable()
 			continue
 		}
 
@@ -358,6 +371,8 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Dur
 		nodeMeta.Unschedulable = node.Spec.Unschedulable
 
 		if !acquire(lock, &nodeMeta, TTL) {
+			// Prefer to not schedule pods onto this node to avoid draing the same pod multiple times.
+			preferNoScheduleTaint.Enable()
 			continue
 		}
 
@@ -392,6 +407,7 @@ func root(cmd *cobra.Command, args []string) {
 	} else {
 		log.Info("Lock TTL not set, lock will remain until being released")
 	}
+	log.Infof("PreferNoSchedule taint: %s", preferNoScheduleTaintName)
 	log.Infof("Reboot Sentinel: %s every %v", rebootSentinel, period)
 	log.Infof("Blocking Pod Selectors: %v", podSelectors)
 	log.Infof("Reboot on: %v", window)
