@@ -258,11 +258,11 @@ func drain(client *kubernetes.Clientset, node *v1.Node) {
 		Out:                 os.Stdout,
 	}
 	if err := kubectldrain.RunCordonOrUncordon(drainer, node, true); err != nil {
-		log.Fatal("Error cordonning %s: %v", nodename, err)
+		log.Fatalf("Error cordonning %s: %v", nodename, err)
 	}
 
 	if err := kubectldrain.RunNodeDrain(drainer, nodename); err != nil {
-		log.Fatal("Error draining %s: %v", nodename, err)
+		log.Fatalf("Error draining %s: %v", nodename, err)
 	}
 }
 
@@ -275,7 +275,7 @@ func uncordon(client *kubernetes.Clientset, node *v1.Node) {
 		Out:    os.Stdout,
 	}
 	if err := kubectldrain.RunCordonOrUncordon(drainer, node, false); err != nil {
-		log.Fatal("Error uncordonning %s: %v", nodename, err)
+		log.Fatalf("Error uncordonning %s: %v", nodename, err)
 	}
 }
 
