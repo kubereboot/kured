@@ -10,7 +10,7 @@ rules:
 # Allow kubectl to drain/uncordon
 #
 # NB: These permissions are tightly coupled to the bundled version of kubectl; the ones below
-# match https://github.com/kubernetes/kubernetes/blob/v1.18.8/staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go
+# match https://github.com/kubernetes/kubernetes/blob/v1.19.4/staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go
 #
 - apiGroups: [""]
   resources: ["nodes"]
