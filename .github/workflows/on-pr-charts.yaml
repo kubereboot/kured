@@ -16,12 +16,19 @@ jobs:
         with:
           fetch-depth: "0"
 
-      - name: Lint charts
-        uses: helm/chart-testing-action@v2.0.1
+      - uses: actions/setup-python@v2
         with:
-          command: lint
-          config: .github/ct.yaml
+          python-version: 3.7
 
+      # Helm is already present in github actions, so do not re-install it
+      - name: Setup chart testing
+        uses: helm/chart-testing-action@v2.0.1
+
+      - name: Run chart testing 
+        run: ct lint --config .github/ct.yaml
+
+  # We create two jobs instead of one to make those parallel.
+  # GH should cancel the rest of the workflow if lint is failing.
   test-chart:
     name: Install helm chart
     runs-on: ubuntu-latest
@@ -31,11 +38,16 @@ jobs:
         with:
           fetch-depth: "0"
 
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.7
+
+      # Helm is already present in github actions, so do not re-install it
+      - name: Setup chart testing
+        uses: helm/chart-testing-action@v2.0.1
+
       - name: Create default kind cluster
         uses: helm/kind-action@v1.1.0
 
-      - name: Install chart with chart-testing-action
-        uses: helm/chart-testing-action@v2.0.1
-        with:
-          command: install
-          config: .github/ct.yaml
+      - name: Install chart with chart-testing
+        run: ct install
