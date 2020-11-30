@@ -7,13 +7,21 @@ on:
   push:
     tags:
       - "*"
-
 jobs:
   tag-scan-and-push-final-image:
     name: "Build, scan, and publish tagged image"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
+      - name: Find go version
+        run: |
+          GO_VERSION=$(awk '/^go/ {print $2};' go.mod)
+          echo "::set-output name=version::${GO_VERSION}"
+        id: awk_gomod
+      - name: Ensure go version
+        uses: actions/setup-go@v2
+        with:
+          go-version: "${{ steps.awk_gomod.outputs.version }}"
       - run: |
           make DH_ORG="${{ github.repository_owner }}" VERSION="${GITHUB_REF#refs/tags/}" image
       - uses: Azure/container-scan@v0
