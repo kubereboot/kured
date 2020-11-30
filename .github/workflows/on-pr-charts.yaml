@@ -5,37 +5,37 @@ on:
   pull_request:
     paths:
       - "charts/**"
-
 jobs:
-  lint-chart:
-    name: Lint helm chart
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: "0"
-
-      - name: Lint charts
-        uses: helm/chart-testing-action@v2.0.1
-        with:
-          command: lint
-          config: .github/ct.yaml
-
+  # We create two jobs (with a matrix) instead of one to make those parallel.
+  # We don't need to conditionally check if something has changed, due to github actions
+  # tackling that for us.
+  # Fail-fast ensures that if one of those matrix job fail, the other one gets cancelled.
   test-chart:
-    name: Install helm chart
+    name: Test helm chart
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        test-action:
+          - lint
+          - install
     steps:
       - name: Checkout
         uses: actions/checkout@v2
         with:
           fetch-depth: "0"
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.7
+
+      # Helm is already present in github actions, so do not re-install it
+      - name: Setup chart testing
+        uses: helm/chart-testing-action@v2.0.1
 
       - name: Create default kind cluster
         uses: helm/kind-action@v1.1.0
+        if: ${{ matrix.test-action == 'install' }}
 
-      - name: Install chart with chart-testing-action
-        uses: helm/chart-testing-action@v2.0.1
-        with:
-          command: install
-          config: .github/ct.yaml
+      - name: Run chart tests 
+        run: ct ${{ matrix.test-action }} --config .github/ct.yaml
