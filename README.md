@@ -283,8 +283,7 @@ Using `--lock-ttl=30m` will allow other nodes to take over if TTL has expired (i
 
 ## Building
 
-See the [CircleCI config](.circleci/config.yml) for the preferred
-version of Golang. Kured now uses [Go
+Kured now uses [Go
 Modules](https://github.com/golang/go/wiki/Modules), so build
 instructions vary depending on where you have checked out the
 repository:
