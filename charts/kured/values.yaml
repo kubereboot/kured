@@ -36,6 +36,7 @@ configuration:
   messageTemplateReboot: "" # slack message template when notifying about a node being rebooted (default "Rebooted node %s")
   startTime: ""             # only reboot after this time of day (default "0:00")
   timeZone: ""              # time-zone to use (valid zones from "time" golang package)
+  timeZone:               # time-zone to use (valid zones from "time" golang package)
 
 rbac:
   create: true
