@@ -10,3 +10,6 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    ignore:
+      - dependency-name: "k8s.io/kubectl"
+      - dependency-name: "k8s.io/apimachinery"
