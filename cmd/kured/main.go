@@ -180,26 +180,52 @@ func rebootRequired() bool {
 	return false
 }
 
-func rebootBlocked(client *kubernetes.Clientset, nodeID string) bool {
-	if prometheusURL != "" {
-		alertNames, err := alerts.PrometheusActiveAlerts(prometheusURL, alertFilter)
-		if err != nil {
-			log.Warnf("Reboot blocked: prometheus query error: %v", err)
-			return true
-		}
-		count := len(alertNames)
-		if count > 10 {
-			alertNames = append(alertNames[:10], "...")
-		}
-		if count > 0 {
-			log.Warnf("Reboot blocked: %d active alerts: %v", count, alertNames)
-			return true
-		}
-	}
+// RebootBlocker interface should be implemented by types
+// to know if their instantiations should block a reboot
+type RebootBlocker interface {
+	isBlocked() bool
+}
 
-	fieldSelector := fmt.Sprintf("spec.nodeName=%s", nodeID)
-	for _, labelSelector := range podSelectors {
-		podList, err := client.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{
+// PrometheusBlockingChecker contains info for connecting
+// to prometheus, and can give info about whether a reboot should be blocked
+type PrometheusBlockingChecker struct {
+	// URL to contact prometheus API for checking alerts
+	promURL string
+	// regexp used to get alerts
+	filter *regexp.Regexp
+}
+
+// KubernetesBlockingChecker contains info for connecting
+// to k8s, and can give info about whether a reboot should be blocked
+type KubernetesBlockingChecker struct {
+	// client used to contact kubernetes API
+	client   *kubernetes.Clientset
+	nodename string
+	// lised used to filter pods (podSelector)
+	filter []string
+}
+
+func (pb PrometheusBlockingChecker) isBlocked() bool {
+	alertNames, err := alerts.PrometheusActiveAlerts(pb.promURL, pb.filter)
+	if err != nil {
+		log.Warnf("Reboot blocked: prometheus query error: %v", err)
+		return true
+	}
+	count := len(alertNames)
+	if count > 10 {
+		alertNames = append(alertNames[:10], "...")
+	}
+	if count > 0 {
+		log.Warnf("Reboot blocked: %d active alerts: %v", count, alertNames)
+		return true
+	}
+	return false
+}
+
+func (kb KubernetesBlockingChecker) isBlocked() bool {
+	fieldSelector := fmt.Sprintf("spec.nodeName=%s", kb.nodename)
+	for _, labelSelector := range kb.filter {
+		podList, err := kb.client.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{
 			LabelSelector: labelSelector,
 			FieldSelector: fieldSelector,
 			Limit:         10})
@@ -220,7 +246,15 @@ func rebootBlocked(client *kubernetes.Clientset, nodeID string) bool {
 			return true
 		}
 	}
+	return false
+}
 
+func rebootBlocked(blockers ...RebootBlocker) bool {
+	for _, blocker := range blockers {
+		if blocker.isBlocked() {
+			return true
+		}
+	}
 	return false
 }
 
@@ -425,7 +459,15 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Dur
 			continue
 		}
 
-		if rebootBlocked(client, nodeID) {
+		var blockCheckers []RebootBlocker
+		if prometheusURL != "" {
+			blockCheckers = append(blockCheckers, PrometheusBlockingChecker{promURL: prometheusURL, filter: alertFilter})
+		}
+		if podSelectors != nil {
+			blockCheckers = append(blockCheckers, KubernetesBlockingChecker{client: client, nodename: nodeID, filter: podSelectors})
+		}
+
+		if rebootBlocked(blockCheckers...) {
 			continue
 		}
 
