@@ -1,33 +1,27 @@
-# when we add a tag to the repo, we should publish the kured image to a public repository
-# if it's safe.
-# It doesn't mean it's ready for release, but at least it's getting us started.
-# The next step is to have a PR with the helm chart, to bump the version of the image used
-name: Tag repo
+# We publish every merged commit in the form of an image
+# named kured:<branch>-<short tag>
+name: Push image of latest master
 on:
   push:
-    tags:
-      - "*"
+    branches:
+      - master
 jobs:
   tag-scan-and-push-final-image:
     name: "Build, scan, and publish tagged image"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
+
       - name: Find go version
         run: |
           GO_VERSION=$(awk '/^go/ {print $2};' go.mod)
           echo "::set-output name=version::${GO_VERSION}"
         id: awk_gomod
+
       - name: Ensure go version
         uses: actions/setup-go@v2
         with:
           go-version: "${{ steps.awk_gomod.outputs.version }}"
-      - run: |
-          make DH_ORG="${{ github.repository_owner }}" VERSION="${GITHUB_REF#refs/tags/}" image
-
-      - uses: Azure/container-scan@v0
-        with:
-          image-name: docker.io/${{ github.repository_owner }}/kured:${GITHUB_REF#refs/tags/}
 
       - name: Login to DockerHub
         uses: docker/login-action@v1
@@ -35,6 +29,10 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME_WEAVEWORKSKUREDCI }}
           password: ${{ secrets.DOCKERHUB_TOKEN_WEAVEWORKSKUREDCI }}
 
+      - name: Build image
+        run: |
+          make DH_ORG="${{ github.repository_owner }}" image
+
       - name: Publish image
         run: |
-          make DH_ORG="${{ github.repository_owner }}" VERSION="${GITHUB_REF#refs/tags/}" publish-image
+          make DH_ORG="${{ github.repository_owner }}" publish-image
