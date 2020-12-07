@@ -300,6 +300,8 @@ make
 GO111MODULE=on make
 ```
 
+You can find the current preferred version of Golang in the [go.mod file](go.mod).
+
 If you are interested in contributing code to kured, please take a look at
 our [development][development] docs.
 
