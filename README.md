@@ -225,6 +225,22 @@ Alternatively you can use the `--message-template-drain` and `--message-template
 --message-template-drain="Draining node %s part of *my-cluster* in region *xyz*"
 ```
 
+### Notifications 
+
+When you specify a formatted URL using `--notify-url`, kured will notify
+about draining and rebooting nodes across a list of technologies. Here is 
+the syntax:
+
+slack:           `slack://tokenA/tokenB/tokenC`
+
+rocketchat:      `rocketchat://[username@]rocketchat-host/token[/channel|@recipient]`
+
+teams:           `teams://token-a/token-b/token-c`
+
+Email:           `smtp://username:password@host:port/?fromAddress=fromAddress&toAddresses=recipient1[,recipient2,...]`
+
+More details here: https://github.com/containrrr/shoutrrr/blob/master/docs/services/overview.md
+
 ### Overriding Lock Configuration
 
 The `--ds-name` and `--ds-namespace` arguments should match the name and
