@@ -50,6 +50,7 @@ The following changes have been made compared to the stable chart:
 | `configuration.endTime` | cli-parameter `--end-time`                                                  | `""`                      |
 | `configuration.lockAnnotation` | cli-parameter `--lock-annotation`                                    | `""`                      |
 | `configuration.period` | cli-parameter `--period`                                                     | `""`                      |
+| `configuration.drainGracePeriod` | cli-parameter `--drain-grace-period`                               | `""`                      |
 | `configuration.prometheusUrl` | cli-parameter `--prometheus-url`                                      | `""`                      |
 | `configuration.rebootDays` | Array of days for multiple cli-parameters `--reboot-days`                | `[]`                      |
 | `configuration.rebootSentinel` | cli-parameter `--reboot-sentinel`                                    | `""`                      |
@@ -61,6 +62,8 @@ The following changes have been made compared to the stable chart:
 | `configuration.startTime` | cli-parameter `--start-time`                                              | `""`                      |
 | `configuration.timeZone` | cli-parameter `--time-zone`                                                | `""`                      |
 | `configuration.annotateNodes` | cli-parameter `--annotate-nodes`                                      | `false`                   |
+| `configuration.forceReboot` | cli-parameter `--force-reboot`                                          | `false`                   |
+| `configuration.forceTimeout` | cli-parameter `--force-timeout`                                        | `""`                      |
 | `rbac.create`           | Create RBAC roles                                                           | `true`                     |
 | `serviceAccount.create` | Create a service account                                                    | `true`                     |
 | `serviceAccount.name`   | Service account name to create (or use if `serviceAccount.create` is false) | (chart fullname)           |

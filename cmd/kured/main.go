@@ -38,7 +38,11 @@ var (
 	version = "unreleased"
 
 	// Command line flags
+	forceDrain                bool
+	forceReboot               bool
+	forceTimeout              time.Duration
 	period                    time.Duration
+	drainGracePeriod          int
 	dsNamespace               string
 	dsName                    string
 	lockAnnotation            string
@@ -91,6 +95,12 @@ func main() {
 		PreRun: flagCheck,
 		Run:    root}
 
+	rootCmd.PersistentFlags().BoolVar(&forceReboot, "force-reboot", false,
+		"enable/disable force reboot")
+	rootCmd.PersistentFlags().IntVar(&drainGracePeriod, "drain-grace-period", -1,
+		"drain grace period in seconds")
+	rootCmd.PersistentFlags().DurationVar(&forceTimeout, "force-timeout", time.Minute*30,
+		"total timeout which only applies when force-reboot is set to true")
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
 		"sentinel check period")
 	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-namespace", "kube-system",
@@ -333,19 +343,27 @@ func drain(client *kubernetes.Clientset, node *v1.Node) {
 
 	drainer := &kubectldrain.Helper{
 		Client:              client,
-		GracePeriodSeconds:  -1,
+		Ctx:                 context.Background(),
+		GracePeriodSeconds:  drainGracePeriod,
 		Force:               true,
 		DeleteEmptyDirData:  true,
 		IgnoreAllDaemonSets: true,
 		ErrOut:              os.Stderr,
 		Out:                 os.Stdout,
 	}
+	if forceReboot {
+		drainer.Timeout = forceTimeout
+	}
+
 	if err := kubectldrain.RunCordonOrUncordon(drainer, node, true); err != nil {
 		log.Fatalf("Error cordonning %s: %v", nodename, err)
 	}
 
 	if err := kubectldrain.RunNodeDrain(drainer, nodename); err != nil {
-		log.Fatalf("Error draining %s: %v", nodename, err)
+		if !forceReboot {
+			log.Fatalf("Error draining %s: %v", nodename, err)
+		}
+		log.Errorf("Error draining %s: %v, continuing with reboot anyway", nodename, err)
 	}
 }
 

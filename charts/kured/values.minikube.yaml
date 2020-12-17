@@ -9,6 +9,7 @@ configuration:
   # endTime: ""               # only reboot before this time of day (default "23:59")
   # lockAnnotation: ""        # annotation in which to record locking node (default "weave.works/kured-node-lock")
   period: "1m"                # reboot check period (default 1h0m0s)
+  # drainGracePeriod: ""      # period of time to wait for node drain in seconds (default -1)
   # prometheusUrl: ""         # Prometheus instance to probe for active alerts
   # rebootDays: []            # only reboot on these days (default [su,mo,tu,we,th,fr,sa])
   # rebootSentinel: ""        # path to file whose existence signals need to reboot (default "/var/run/reboot-required")
@@ -20,3 +21,5 @@ configuration:
   # startTime: ""             # only reboot after this time of day (default "0:00")
   # timeZone: ""              # time-zone to use (valid zones from "time" golang package)
   # annotateNodes: false       # enable 'weave.works/kured-reboot-in-progress' and 'weave.works/kured-most-recent-reboot-needed' node annotations to signify kured reboot operations
+  # forceReboot: false        # force a reboot even if the drain is still running (default false)
+  # forceTimeout: ""          # total drain timeout, only applies when force-reboot is enabled (default 30m)
