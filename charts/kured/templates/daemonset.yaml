@@ -67,6 +67,9 @@ spec:
           {{- if .Values.configuration.period }}
             - --period={{ .Values.configuration.period }}
           {{- end }}
+          {{- if .Values.configuration.drainGracePeriod }}
+            - --drain-grace-period={{ .Values.configuration.drainGracePeriod }}
+          {{- end }}
           {{- if .Values.configuration.prometheusUrl }}
             - --prometheus-url={{ .Values.configuration.prometheusUrl }}
           {{- end }}
@@ -96,6 +99,12 @@ spec:
           {{- end }}
           {{- if .Values.configuration.timeZone }}
             - --time-zone={{ .Values.configuration.timeZone }}
+          {{- end }}
+          {{- if .Values.configuration.forceReboot }}
+            - --force-reboot
+          {{- end }}
+          {{- if .Values.configuration.forceTimeout }}
+            - --force-timeout={{ .Values.configuration.forceTimeout }}
           {{- end }}
           {{- range $key, $value := .Values.extraArgs }}
             {{- if $value }}
