@@ -40,6 +40,7 @@ The following changes have been made compared to the stable chart:
 | `image.pullPolicy`      | Image pull policy                                                           | `IfNotPresent`             |
 | `image.pullSecrets`     | Image pull secrets                                                          | `[]`                       |
 | `updateStrategy`        | Daemonset update strategy                                                   | `OnDelete`                 |
+| `maxUnavailable`        | The max pods unavailable during a rolling update                            | `1`                        |
 | `podAnnotations`        | Annotations to apply to pods (eg to add Prometheus annotations)             | `{}`                       |
 | `extraArgs`             | Extra arguments to pass to `/usr/bin/kured`. See below.                     | `{}`                       |
 | `extraEnvVars`          | Array of environment variables to pass to the daemonset.                    | `{}`                       |
@@ -70,6 +71,7 @@ The following changes have been made compared to the stable chart:
 | `metrics.interval`      | Interval prometheus should scrape the endpoint                              | `60s`                   |
 | `metrics.scrapeTimeout` | A custom scrapeTimeout for prometheus                                       | `""`                    |
 | `service.create`        | Create a Service for the metrics endpoint                                   | `false`                    |
+| `service.name  `        | Service name for the metrics endpoint                                       | `""`                       |
 | `service.port`          | Port of the service to expose                                               | `8080`                     |
 | `service.annotations`   | Annotations to apply to the service (eg to add Prometheus annotations)      | `{}`                       |
 | `priorityClassName`     | Priority Class to be used by the pods                                       | `""`                       |

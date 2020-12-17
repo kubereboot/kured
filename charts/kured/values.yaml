@@ -5,6 +5,8 @@ image:
   pullSecrets: []
 
 updateStrategy: OnDelete
+#  requires RollingUpdate updateStrategy
+maxUnavailable: 1
 
 podAnnotations: {}
 
@@ -60,6 +62,7 @@ service:
   create: false
   port: 8080
   annotations: {}
+  name: ""
 
 priorityClassName: ""
 
