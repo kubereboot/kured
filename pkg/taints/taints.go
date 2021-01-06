@@ -32,11 +32,19 @@ func New(client *kubernetes.Clientset, nodeID, taintName string, effect v1.Taint
 
 // Enable creates the taint for a node. Creating an existing taint is a noop.
 func (t *Taint) Enable() {
+	if t.taintName == "" {
+		return
+	}
+
 	preferNoSchedule(t.client, t.nodeID, t.taintName, t.effect, true)
 }
 
 // Disable removes the taint for a node. Removing a missing taint is a noop.
 func (t *Taint) Disable() {
+	if t.taintName == "" {
+		return
+	}
+
 	preferNoSchedule(t.client, t.nodeID, t.taintName, t.effect, false)
 }
 

@@ -88,7 +88,7 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&rebootSentinel, "reboot-sentinel", "/var/run/reboot-required",
 		"path to file whose existence signals need to reboot")
 	rootCmd.PersistentFlags().StringVar(&preferNoScheduleTaintName, "prefer-no-schedule-taint", "weave.works/kured-node-reboot",
-		"taint name applied during pending node reboot (to prevent receiving additional pods from other rebooting nodes)")
+		"Taint name applied during pending node reboot (to prevent receiving additional pods from other rebooting nodes). Set to \"\" to disable tainting.")
 
 	rootCmd.PersistentFlags().StringVar(&slackHookURL, "slack-hook-url", "",
 		"slack hook URL for reboot notfications")
