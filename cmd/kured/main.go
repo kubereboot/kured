@@ -357,6 +357,7 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Dur
 		}
 
 		if !rebootRequired() {
+			preferNoScheduleTaint.Disable()
 			continue
 		}
 
