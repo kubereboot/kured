@@ -40,7 +40,7 @@ func (t *Taint) Disable() {
 	preferNoSchedule(t.client, t.nodeID, t.taintName, t.effect, false)
 }
 
-func preferNoSchedule(client *kubernetes.Clientset, nodeID, taintName string, effect v1.TaintEffect, taintShouldExists bool) {
+func preferNoSchedule(client *kubernetes.Clientset, nodeID, taintName string, effect v1.TaintEffect, shouldExists bool) {
 	updatedNode, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 	if err != nil || updatedNode == nil {
 		log.Fatalf("Error reading node %s: %v", nodeID, err)
@@ -56,12 +56,12 @@ func preferNoSchedule(client *kubernetes.Clientset, nodeID, taintName string, ef
 		}
 	}
 
-	if taintExists && taintShouldExists {
+	if taintExists && shouldExists {
 		log.Debugf("Taint %v exists already for node %v.", taintName, nodeID)
 		return
 	}
 
-	if !taintExists && !taintShouldExists {
+	if !taintExists && !shouldExists {
 		log.Debugf("Taint %v already missing for node %v.", taintName, nodeID)
 		return
 	}
@@ -124,7 +124,7 @@ func preferNoSchedule(client *kubernetes.Clientset, nodeID, taintName string, ef
 
 	patchBytes, err := json.Marshal(patches)
 	if err != nil {
-		log.Fatalf("Error encoding taint patcht for node %s: %v", nodeID, err)
+		log.Fatalf("Error encoding taint patch for node %s: %v", nodeID, err)
 	}
 
 	_, err = client.CoreV1().Nodes().Patch(context.TODO(), nodeID, types.JSONPatchType, patchBytes, metav1.PatchOptions{})
@@ -132,7 +132,7 @@ func preferNoSchedule(client *kubernetes.Clientset, nodeID, taintName string, ef
 		log.Fatalf("Error patching taint for node %s: %v", nodeID, err)
 	}
 
-	if taintShouldExists {
+	if shouldExists {
 		log.Info("Node taint added")
 	} else {
 		log.Info("Node taint removed")
