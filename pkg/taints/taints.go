@@ -18,15 +18,19 @@ type Taint struct {
 	nodeID    string
 	taintName string
 	effect    v1.TaintEffect
+	exists    bool
 }
 
 // New provides a new taint.
 func New(client *kubernetes.Clientset, nodeID, taintName string, effect v1.TaintEffect) *Taint {
+	exists, _, _ := taintExists(client, nodeID, taintName)
+
 	return &Taint{
 		client:    client,
 		nodeID:    nodeID,
 		taintName: taintName,
 		effect:    effect,
+		exists:    exists,
 	}
 }
 
@@ -36,7 +40,13 @@ func (t *Taint) Enable() {
 		return
 	}
 
+	if t.exists {
+		return
+	}
+
 	preferNoSchedule(t.client, t.nodeID, t.taintName, t.effect, true)
+
+	t.exists = true
 }
 
 // Disable removes the taint for a node. Removing a missing taint is a noop.
@@ -45,24 +55,32 @@ func (t *Taint) Disable() {
 		return
 	}
 
+	if !t.exists {
+		return
+	}
+
 	preferNoSchedule(t.client, t.nodeID, t.taintName, t.effect, false)
+
+	t.exists = false
 }
 
-func preferNoSchedule(client *kubernetes.Clientset, nodeID, taintName string, effect v1.TaintEffect, shouldExists bool) {
+func taintExists(client *kubernetes.Clientset, nodeID, taintName string) (bool, int, *v1.Node) {
 	updatedNode, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 	if err != nil || updatedNode == nil {
 		log.Fatalf("Error reading node %s: %v", nodeID, err)
 	}
 
-	taintExists := false
-	offset := 0
 	for i, taint := range updatedNode.Spec.Taints {
 		if taint.Key == taintName {
-			taintExists = true
-			offset = i
-			break
+			return true, i, updatedNode
 		}
 	}
+
+	return false, 0, updatedNode
+}
+
+func preferNoSchedule(client *kubernetes.Clientset, nodeID, taintName string, effect v1.TaintEffect, shouldExists bool) {
+	taintExists, offset, updatedNode := taintExists(client, nodeID, taintName)
 
 	if taintExists && shouldExists {
 		log.Debugf("Taint %v exists already for node %v.", taintName, nodeID)
