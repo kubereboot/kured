@@ -11,5 +11,7 @@ updates:
     schedule:
       interval: "daily"
     ignore:
-      - dependency-name: "k8s.io/kubectl"
+      - dependency-name: "k8s.io/api"
       - dependency-name: "k8s.io/apimachinery"
+      - dependency-name: "k8s.io/client-go"
+      - dependency-name: "k8s.io/kubectl"
