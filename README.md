@@ -118,10 +118,10 @@ reboots to predictable schedules.  Use `--reboot-days`, `--start-time`,
 hours on the west coast USA can be specified with:
 
 ```console
-  --reboot-days mon,tue,wed,thu,fri
-  --start-time 9am
-  --end-time 5pm
-  --time-zone America/Los_Angeles
+  --reboot-days=mon,tue,wed,thu,fri
+  --start-time=9am
+  --end-time=5pm
+  --time-zone=America/Los_Angeles
 ```
 
 Times can be formatted in numerous ways, including `5pm`, `5:00pm` `17:00`,
