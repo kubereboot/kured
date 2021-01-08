@@ -36,6 +36,7 @@ var (
 
 	// Command line flags
 	period                    time.Duration
+	drainTimeout              time.Duration
 	dsNamespace               string
 	dsName                    string
 	lockAnnotation            string
@@ -50,6 +51,7 @@ var (
 	messageTemplateDrain      string
 	messageTemplateReboot     string
 	podSelectors              []string
+	isDrained                 bool
 
 	rebootDays    []string
 	rebootStart   string
@@ -86,6 +88,8 @@ func main() {
 
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
 		"reboot check period")
+	rootCmd.PersistentFlags().DurationVar(&drainTimeout, "drain-timeout", 0,
+		"drain timeout")
 	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-namespace", "kube-system",
 		"namespace containing daemonset on which to place lock")
 	rootCmd.PersistentFlags().StringVar(&dsName, "ds-name", "kured",
@@ -257,7 +261,7 @@ func release(lock *daemonsetlock.DaemonSetLock) {
 	}
 }
 
-func drain(client *kubernetes.Clientset, node *v1.Node) {
+func drain(client *kubernetes.Clientset, node *v1.Node) bool {
 	nodename := node.GetName()
 
 	log.Infof("Draining node %s", nodename)
@@ -276,14 +280,17 @@ func drain(client *kubernetes.Clientset, node *v1.Node) {
 		IgnoreAllDaemonSets: true,
 		ErrOut:              os.Stderr,
 		Out:                 os.Stdout,
+		Timeout:             drainTimeout,
 	}
 	if err := kubectldrain.RunCordonOrUncordon(drainer, node, true); err != nil {
 		log.Fatalf("Error cordonning %s: %v", nodename, err)
 	}
 
 	if err := kubectldrain.RunNodeDrain(drainer, nodename); err != nil {
-		log.Fatalf("Error draining %s: %v", nodename, err)
+		log.Error("Error draining %s: %v", nodename, err)
+		return false
 	}
+	return true
 }
 
 func uncordon(client *kubernetes.Clientset, node *v1.Node) {
@@ -454,11 +461,21 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Dur
 			continue
 		}
 
-		drain(client, node)
-		commandReboot(nodeID)
-		for {
-			log.Infof("Waiting for reboot")
-			time.Sleep(time.Minute)
+		isDrained = drain(client, node)
+		if isDrained {
+			commandReboot(nodeID)
+			for {
+				log.Infof("Waiting for reboot")
+				time.Sleep(time.Minute)
+			}
+		} else {
+			log.Infof("Uncordon %s", node.GetName())
+			uncordon(client, node)
+			deleteFlag := newCommand("/usr/bin/nsenter", "-m/proc/1/ns/mnt", "/bin/rm", rebootSentinel)
+			log.Infof("Delete flag : %s", rebootSentinel)
+			if err := deleteFlag.Run(); err != nil {
+				log.Fatalf("Error invoking reboot command: %v", err)
+			}
 		}
 	}
 }
@@ -484,6 +501,11 @@ func root(cmd *cobra.Command, args []string) {
 		log.Info("Lock TTL not set, lock will remain until being released")
 	}
 	log.Infof("PreferNoSchedule taint: %s", preferNoScheduleTaintName)
+	if drainTimeout > 0 {
+		log.Infof("Drain timeout set, node will uncordon after: %v", drainTimeout)
+	} else {
+		log.Info("Drain timeout not set, node will try to drain until it's drained")
+	}
 	log.Infof("Reboot Sentinel: %s every %v", rebootSentinel, period)
 	log.Infof("Blocking Pod Selectors: %v", podSelectors)
 	log.Infof("Reboot on: %v", window)
