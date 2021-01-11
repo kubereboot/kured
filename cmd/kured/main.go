@@ -272,7 +272,7 @@ func drain(client *kubernetes.Clientset, node *v1.Node) {
 		Client:              client,
 		GracePeriodSeconds:  -1,
 		Force:               true,
-		DeleteLocalData:     true,
+		DeleteEmptyDirData:  true,
 		IgnoreAllDaemonSets: true,
 		ErrOut:              os.Stderr,
 		Out:                 os.Stdout,
