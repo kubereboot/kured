@@ -2,12 +2,12 @@ kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
 - role: control-plane
-  image: kindest/node:v1.19.0
+  image: kindest/node:v1.19.4
 - role: control-plane
-  image: kindest/node:v1.19.0
+  image: kindest/node:v1.19.4
 - role: control-plane
-  image: kindest/node:v1.19.0
+  image: kindest/node:v1.19.4
 - role: worker
-  image: kindest/node:v1.19.0
+  image: kindest/node:v1.19.4
 - role: worker
-  image: kindest/node:v1.19.0
+  image: kindest/node:v1.19.4
