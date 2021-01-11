@@ -119,19 +119,6 @@ Then docker push the image. In the future, that might be automatically
 done when creating a tag on the repository, with the help of github
 actions.
 
-### Prepare Helm chart
-
-You should also check that the helm chart has been updated before issuing
-a release.  You can bump the helm chart with the latest image
-tag by running:
-
-```sh
-make DH_ORG="weaveworks" VERSION="1.3.0" helm-chart
-```
-
-Finally bump the `version` in `charts/kured/Chart.yaml` (following
-the versioning rules) and you should be all set.
-
 ### Create the combined manifest
 
 
@@ -149,10 +136,22 @@ cat kured-ds.yaml >> "$MANIFEST"
 Now you can head to the Github UI, use the version number as tag and upload the
 `kured-<release>-dockerhub.yaml` file.
 
-The creation of the release will publish the helm chart (thanks to github actions).
-
 Please describe what's new and noteworthy in the release notes, list the PRs
 that landed and give a shout-out to everyone who contributed.
 
 Please also note down on which releases the upcoming `kured` release was
 tested on. (Check old release notes if you're unsure.)
+
+### Update the Helm chart
+
+You can automatically bump the helm chart's application version
+with the latest image tag by running:
+
+```sh
+make DH_ORG="weaveworks" VERSION="1.3.0" helm-chart
+```
+
+A change in the helm chart requires a bump of the `version`
+in `charts/kured/Chart.yaml` (following the versioning rules).
+Update it, and issue a PR. Upon merge, that PR will automatically
+publish the chart to the gh-pages branch.

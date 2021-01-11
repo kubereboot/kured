@@ -1,11 +1,14 @@
-name: Publish release
+name: Publish helm chart
 on:
-  release:
-    types: published
+  push:
+    branches:
+      - "master"
+    paths:
+      - "charts/**"
 
 jobs:
   publish-helm-chart:
-    name: Publish our chart
+    name: Publish latest chart
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
