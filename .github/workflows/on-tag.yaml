@@ -22,12 +22,14 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: "${{ steps.awk_gomod.outputs.version }}"
+      - name: Find current tag version
+        run: echo "::set-output name=version::${GITHUB_REF#refs/tags/}"
+        id: tags
       - run: |
-          make DH_ORG="${{ github.repository_owner }}" VERSION="${GITHUB_REF#refs/tags/}" image
-
+          make DH_ORG="${{ github.repository_owner }}" VERSION="${{ steps.tags.outputs.version }}" image
       - uses: Azure/container-scan@v0
         with:
-          image-name: docker.io/${{ github.repository_owner }}/kured:${GITHUB_REF#refs/tags/}
+          image-name: docker.io/${{ github.repository_owner }}/kured:${{ steps.tags.outputs.version }}
 
       - name: Login to DockerHub
         uses: docker/login-action@v1
@@ -37,4 +39,4 @@ jobs:
 
       - name: Publish image
         run: |
-          make DH_ORG="${{ github.repository_owner }}" VERSION="${GITHUB_REF#refs/tags/}" publish-image
+          make DH_ORG="${{ github.repository_owner }}" VERSION="${{ steps.tags.outputs.version }}" publish-image
