@@ -8,6 +8,10 @@ metadata:
 spec:
   updateStrategy:
     type: {{ .Values.updateStrategy }}
+{{- if eq .Values.updateStrategy "RollingUpdate"}}
+    rollingUpdate:
+      maxUnavailable: {{ .Values.maxUnavailable }}
+{{- end}}
   selector:
     matchLabels:
       {{- include "kured.matchLabels" . | nindent 6 }}
