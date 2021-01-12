@@ -21,6 +21,8 @@ import (
 	"k8s.io/client-go/rest"
 	kubectldrain "k8s.io/kubectl/pkg/drain"
 
+	"github.com/google/shlex"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/weaveworks/kured/pkg/alerts"
@@ -41,15 +43,17 @@ var (
 	lockAnnotation            string
 	lockTTL                   time.Duration
 	prometheusURL             string
-	alertFilter               *regexp.Regexp
-	rebootSentinel            string
 	preferNoScheduleTaintName string
+	alertFilter               *regexp.Regexp
+	rebootSentinelFile        string
+	rebootSentinelCommand     string
 	slackHookURL              string
 	slackUsername             string
 	slackChannel              string
 	messageTemplateDrain      string
 	messageTemplateReboot     string
 	podSelectors              []string
+	rebootCommand             string
 
 	rebootDays    []string
 	rebootStart   string
@@ -85,7 +89,7 @@ func main() {
 		Run:   root}
 
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
-		"reboot check period")
+		"sentinel check period")
 	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-namespace", "kube-system",
 		"namespace containing daemonset on which to place lock")
 	rootCmd.PersistentFlags().StringVar(&dsName, "ds-name", "kured",
@@ -98,17 +102,21 @@ func main() {
 		"Prometheus instance to probe for active alerts")
 	rootCmd.PersistentFlags().Var(&regexpValue{&alertFilter}, "alert-filter-regexp",
 		"alert names to ignore when checking for active alerts")
-	rootCmd.PersistentFlags().StringVar(&rebootSentinel, "reboot-sentinel", "/var/run/reboot-required",
-		"path to file whose existence signals need to reboot")
+	rootCmd.PersistentFlags().StringVar(&rebootSentinelFile, "reboot-sentinel", "/var/run/reboot-required",
+		"path to file whose existence triggers the reboot command")
 	rootCmd.PersistentFlags().StringVar(&preferNoScheduleTaintName, "prefer-no-schedule-taint", "",
 		"Taint name applied during pending node reboot (to prevent receiving additional pods from other rebooting nodes). Disabled by default. Set e.g. to \"weave.works/kured-node-reboot\" to enable tainting.")
+	rootCmd.PersistentFlags().StringVar(&rebootSentinelCommand, "reboot-sentinel-command", "",
+		"command for which a zero return code will trigger a reboot command")
+	rootCmd.PersistentFlags().StringVar(&rebootCommand, "reboot-command", "/bin/systemctl reboot",
+		"command to run when a reboot is required")
 
 	rootCmd.PersistentFlags().StringVar(&slackHookURL, "slack-hook-url", "",
-		"slack hook URL for reboot notfications")
+		"slack hook URL for notifications")
 	rootCmd.PersistentFlags().StringVar(&slackUsername, "slack-username", "kured",
-		"slack username for reboot notfications")
+		"slack username for notifications")
 	rootCmd.PersistentFlags().StringVar(&slackChannel, "slack-channel", "",
-		"slack channel for reboot notfications")
+		"slack channel for notifications")
 	rootCmd.PersistentFlags().StringVar(&messageTemplateDrain, "message-template-drain", "Draining node %s",
 		"message template used to notify about a node being drained")
 	rootCmd.PersistentFlags().StringVar(&messageTemplateReboot, "message-template-reboot", "Rebooting node %s",
@@ -134,10 +142,9 @@ func main() {
 	}
 }
 
-// newCommand creates a new Command with stdout/stderr wired to our standard logger
+// newCommand wires a Command with stdout/stderr to our standard loggers
 func newCommand(name string, arg ...string) *exec.Cmd {
 	cmd := exec.Command(name, arg...)
-
 	cmd.Stdout = log.NewEntry(log.StandardLogger()).
 		WithField("cmd", cmd.Args[0]).
 		WithField("std", "out").
@@ -151,10 +158,19 @@ func newCommand(name string, arg ...string) *exec.Cmd {
 	return cmd
 }
 
-func sentinelExists() bool {
-	// Relies on hostPID:true and privileged:true to enter host mount space
-	sentinelCmd := newCommand("/usr/bin/nsenter", "-m/proc/1/ns/mnt", "--", "/usr/bin/test", "-f", rebootSentinel)
-	if err := sentinelCmd.Run(); err != nil {
+// buildHostCommand writes a new command to run in the host namespace
+// Rancher based need different pid
+func buildHostCommand(pid int, command []string) []string {
+
+	// From the container, we nsenter into the proper PID to run the hostCommand.
+	// For this, kured daemonset need to be configured with hostPID:true and privileged:true
+	cmd := []string{"/usr/bin/nsenter", fmt.Sprintf("-m/proc/%d/ns/mnt", pid), "--"}
+	cmd = append(cmd, command...)
+	return cmd
+}
+
+func rebootRequired(sentinelCommand []string) bool {
+	if err := newCommand(sentinelCommand[0], sentinelCommand[1:]...).Run(); err != nil {
 		switch err := err.(type) {
 		case *exec.ExitError:
 			// We assume a non-zero exit code means 'reboot not required', but of course
@@ -169,15 +185,6 @@ func sentinelExists() bool {
 		}
 	}
 	return true
-}
-
-func rebootRequired() bool {
-	if sentinelExists() {
-		log.Infof("Reboot required")
-		return true
-	}
-	log.Infof("Reboot not required")
-	return false
 }
 
 // RebootBlocker interface should be implemented by types
@@ -333,8 +340,8 @@ func uncordon(client *kubernetes.Clientset, node *v1.Node) {
 	}
 }
 
-func commandReboot(nodeID string) {
-	log.Infof("Commanding reboot for node: %s", nodeID)
+func invokeReboot(nodeID string, rebootCommand []string) {
+	log.Infof("Running command: %s for node: %s", rebootCommand, nodeID)
 
 	if slackHookURL != "" {
 		if err := slack.NotifyReboot(slackHookURL, slackUsername, slackChannel, messageTemplateReboot, nodeID); err != nil {
@@ -342,16 +349,14 @@ func commandReboot(nodeID string) {
 		}
 	}
 
-	// Relies on hostPID:true and privileged:true to enter host mount space
-	rebootCmd := newCommand("/usr/bin/nsenter", "-m/proc/1/ns/mnt", "/bin/systemctl", "reboot")
-	if err := rebootCmd.Run(); err != nil {
-		log.Fatalf("Error invoking reboot command: %v", err)
+	if err := newCommand(rebootCommand[0], rebootCommand[1:]...).Run(); err != nil {
+		log.Fatalf("Error invoking %s command: %v", rebootCommand, err)
 	}
 }
 
-func maintainRebootRequiredMetric(nodeID string) {
+func maintainRebootRequiredMetric(nodeID string, sentinelCommand []string) {
 	for {
-		if sentinelExists() {
+		if rebootRequired(sentinelCommand) {
 			rebootRequiredGauge.WithLabelValues(nodeID).Set(1)
 		} else {
 			rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
@@ -403,7 +408,7 @@ func deleteNodeAnnotation(client *kubernetes.Clientset, nodeID, key string) {
 	}
 }
 
-func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Duration) {
+func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []string, window *timewindow.TimeWindow, TTL time.Duration) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Fatal(err)
@@ -430,7 +435,7 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Dur
 		// And (2) check if we previously annotated the node that it was in the process of being rebooted,
 		// And finally (3) if it has that annotation, to delete it.
 		// This indicates to other node tools running on the cluster that this node may be a candidate for maintenance
-		if annotateNodes && !rebootRequired() {
+		if annotateNodes && !rebootRequired(sentinelCommand) {
 			if _, ok := node.Annotations[KuredRebootInProgressAnnotation]; ok {
 				deleteNodeAnnotation(client, nodeID, KuredRebootInProgressAnnotation)
 			}
@@ -441,7 +446,7 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Dur
 	preferNoScheduleTaint := taints.New(client, nodeID, preferNoScheduleTaintName, v1.TaintEffectPreferNoSchedule)
 
 	// Remove taint immediately during startup to quickly allow scheduling again.
-	if !rebootRequired() {
+	if !rebootRequired(sentinelCommand) {
 		preferNoScheduleTaint.Disable()
 	}
 
@@ -454,10 +459,12 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Dur
 			continue
 		}
 
-		if !rebootRequired() {
+		if !rebootRequired(sentinelCommand) {
+			log.Infof("Reboot not required")
 			preferNoScheduleTaint.Disable()
 			continue
 		}
+		log.Infof("Reboot required")
 
 		var blockCheckers []RebootBlocker
 		if prometheusURL != "" {
@@ -497,12 +504,35 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Dur
 		}
 
 		drain(client, node)
-		commandReboot(nodeID)
+		invokeReboot(nodeID, rebootCommand)
 		for {
 			log.Infof("Waiting for reboot")
 			time.Sleep(time.Minute)
 		}
 	}
+}
+
+// buildSentinelCommand creates the shell command line which will need wrapping to escape
+// the container boundaries
+func buildSentinelCommand(rebootSentinelFile string, rebootSentinelCommand string) []string {
+	if rebootSentinelCommand != "" {
+		cmd, err := shlex.Split(rebootSentinelCommand)
+		if err != nil {
+			log.Fatalf("Error parsing provided sentinel command: %v", err)
+		}
+		return cmd
+	}
+	return []string{"test", "-f", rebootSentinelFile}
+}
+
+// parseRebootCommand creates the shell command line which will need wrapping to escape
+// the container boundaries
+func parseRebootCommand(rebootCommand string) []string {
+	command, err := shlex.Split(rebootCommand)
+	if err != nil {
+		log.Fatalf("Error parsing provided reboot command: %v", err)
+	}
+	return command
 }
 
 func root(cmd *cobra.Command, args []string) {
@@ -518,6 +548,9 @@ func root(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to build time window: %v", err)
 	}
 
+	sentinelCommand := buildSentinelCommand(rebootSentinelFile, rebootSentinelCommand)
+	restartCommand := parseRebootCommand(rebootCommand)
+
 	log.Infof("Node ID: %s", nodeID)
 	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
 	if lockTTL > 0 {
@@ -526,15 +559,22 @@ func root(cmd *cobra.Command, args []string) {
 		log.Info("Lock TTL not set, lock will remain until being released")
 	}
 	log.Infof("PreferNoSchedule taint: %s", preferNoScheduleTaintName)
-	log.Infof("Reboot Sentinel: %s every %v", rebootSentinel, period)
 	log.Infof("Blocking Pod Selectors: %v", podSelectors)
-	log.Infof("Reboot on: %v", window)
+	log.Infof("Reboot schedule: %v", window)
+	log.Infof("Reboot check command: %s every %v", sentinelCommand, period)
+	log.Infof("Reboot command: %s", restartCommand)
 	if annotateNodes {
 		log.Infof("Will annotate nodes during kured reboot operations")
 	}
 
-	go rebootAsRequired(nodeID, window, lockTTL)
-	go maintainRebootRequiredMetric(nodeID)
+	// To run those commands as it was the host, we'll use nsenter
+	// Relies on hostPID:true and privileged:true to enter host mount space
+	// PID set to 1, until we have a better discovery mechanism.
+	hostSentinelCommand := buildHostCommand(1, sentinelCommand)
+	hostRestartCommand := buildHostCommand(1, restartCommand)
+
+	go rebootAsRequired(nodeID, hostRestartCommand, hostSentinelCommand, window, lockTTL)
+	go maintainRebootRequiredMetric(nodeID, hostSentinelCommand)
 
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(":8080", nil))
