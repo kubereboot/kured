@@ -63,3 +63,4 @@ spec:
 #            - --message-template-drain=Rebooting node %s
 #            - --start-time=0:00
 #            - --time-zone=UTC
+#            - --annotate-nodes=false
