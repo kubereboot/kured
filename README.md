@@ -29,7 +29,8 @@ Kured (KUbernetes REboot Daemon) is a Kubernetes daemonset that
 performs safe automatic node reboots when the need to do so is
 indicated by the package management system of the underlying OS.
 
-* Watches for the presence of a reboot sentinel e.g. `/var/run/reboot-required`
+* Watches for the presence of a reboot sentinel file e.g. `/var/run/reboot-required`
+  or the successful run of a sentinel command.
 * Utilises a lock in the API server to ensure only one node reboots at
   a time
 * Optionally defers reboots in the presence of active Prometheus alerts or selected pods
@@ -93,8 +94,10 @@ Flags:
       --period duration                     reboot check period (default 1h0m0s)
       --prefer-no-schedule-taint string     Taint name applied during pending node reboot (to prevent receiving additional pods from other rebooting nodes). Disabled by default. Set e.g. to "weave.works/kured-node-reboot" to enable tainting.
       --prometheus-url string               Prometheus instance to probe for active alerts
+      --reboot-command string               command to run when a reboot is required by the sentinel (default "/sbin/systemctl reboot")
       --reboot-days strings                 schedule reboot on these days (default [su,mo,tu,we,th,fr,sa])
       --reboot-sentinel string              path to file whose existence signals need to reboot (default "/var/run/reboot-required")
+      --reboot-sentinel-command string      command for which a successful run signals need to reboot (default ""). If non-empty, sentinel file will be ignored.
       --slack-channel string                slack channel for reboot notfications
       --slack-hook-url string               slack hook URL for reboot notfications
       --slack-username string               slack username for reboot notfications (default "kured")
@@ -109,6 +112,10 @@ By default kured checks for the existence of
 values with `--reboot-sentinel` and `--period`. Each replica of the
 daemon uses a random offset derived from the period on startup so that
 nodes don't all contend for the lock simultaneously.
+
+Alternatively, a reboot sentinel command can be used. If a reboot
+sentinel command is used, the reboot sentinel file presence will be
+ignored.
 
 ### Setting a schedule
 
