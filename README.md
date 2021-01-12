@@ -80,25 +80,26 @@ The following arguments can be passed to kured via the daemonset pod template:
 
 ```console
 Flags:
-      --lock-ttl time                       force clean annotation after this ammount of time (default 0, disabled)
       --alert-filter-regexp regexp.Regexp   alert names to ignore when checking for active alerts
       --blocking-pod-selector stringArray   label selector identifying pods whose presence should prevent reboots
       --ds-name string                      name of daemonset on which to place lock (default "kured")
       --ds-namespace string                 namespace containing daemonset on which to place lock (default "kube-system")
-      --end-time string                     only reboot before this time of day (default "23:59")
+      --end-time string                     schedule reboot only before this time of day (default "23:59:59")
   -h, --help                                help for kured
       --lock-annotation string              annotation in which to record locking node (default "weave.works/kured-node-lock")
+      --lock-ttl duration                   expire lock annotation after this duration (default: 0, disabled)
+      --message-template-drain string       message template used to notify about a node being drained (default "Draining node %s")
+      --message-template-reboot string      message template used to notify about a node being rebooted (default "Rebooting node %s")
       --period duration                     reboot check period (default 1h0m0s)
+      --prefer-no-schedule-taint string     Taint name applied during pending node reboot (to prevent receiving additional pods from other rebooting nodes). Disabled by default. Set e.g. to "weave.works/kured-node-reboot" to enable tainting.
       --prometheus-url string               Prometheus instance to probe for active alerts
-      --reboot-days strings                 only reboot on these days (default [su,mo,tu,we,th,fr,sa])
+      --reboot-days strings                 schedule reboot on these days (default [su,mo,tu,we,th,fr,sa])
       --reboot-sentinel string              path to file whose existence signals need to reboot (default "/var/run/reboot-required")
       --slack-channel string                slack channel for reboot notfications
       --slack-hook-url string               slack hook URL for reboot notfications
       --slack-username string               slack username for reboot notfications (default "kured")
-      --message-template-drain string       message template used to notify about a node being drained (default "Draining node %s")
-      --message-template-reboot string      message template used to notify about a node being rebooted (default "Rebooting node %s")
-      --start-time string                   only reboot after this time of day (default "0:00")
-      --time-zone string                    use this timezone to calculate allowed reboot time (default "UTC")
+      --start-time string                   schedule reboot only after this time of day (default "0:00")
+      --time-zone string                    use this timezone for schedule inputs (default "UTC")
 ```
 
 ### Reboot Sentinel File & Period
