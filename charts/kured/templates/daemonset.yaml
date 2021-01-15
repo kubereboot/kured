@@ -100,6 +100,9 @@ spec:
           {{- if .Values.configuration.timeZone }}
             - --time-zone={{ .Values.configuration.timeZone }}
           {{- end }}
+          {{- if .Values.configuration.annotateNodes }}
+            - --annotate-nodes={{ .Values.configuration.annotateNodes }}
+          {{- end }}
           {{- range $key, $value := .Values.extraArgs }}
             {{- if $value }}
             - --{{ $key }}={{ $value }}

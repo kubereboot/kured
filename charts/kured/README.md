@@ -60,6 +60,7 @@ The following changes have been made compared to the stable chart:
 | `configuration.messageTemplateReboot` | cli-parameter `--message-template-reboot`                     | `""`                      |
 | `configuration.startTime` | cli-parameter `--start-time`                                              | `""`                      |
 | `configuration.timeZone` | cli-parameter `--time-zone`                                                | `""`                      |
+| `configuration.annotateNodes` | cli-parameter `--annotate-nodes`                                      | `false`                   |
 | `rbac.create`           | Create RBAC roles                                                           | `true`                     |
 | `serviceAccount.create` | Create a service account                                                    | `true`                     |
 | `serviceAccount.name`   | Service account name to create (or use if `serviceAccount.create` is false) | (chart fullname)           |
