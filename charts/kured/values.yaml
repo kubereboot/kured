@@ -64,6 +64,8 @@ service:
   annotations: {}
   name: ""
 
+podLabels: {}
+
 priorityClassName: ""
 
 tolerations:
