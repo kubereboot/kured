@@ -329,4 +329,6 @@ If you have any questions about, feedback for or problems with `kured`:
 * Join us in [our monthly meeting](https://docs.google.com/document/d/1bsHTjHhqaaZ7yJnXF6W8c89UB_yn-OoSZEmDnIP34n8/edit#),
   every fourth Wednesday of the month at 16:00 UTC.
 
+We follow the [CNCF Code of Conduct](https://github.com/cncf/foundation/blob/master/code-of-conduct.md).
+
 Your feedback is always welcome!
