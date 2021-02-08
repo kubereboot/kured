@@ -19,6 +19,9 @@ spec:
     metadata:
       labels:
         {{- include "kured.labels" . | nindent 8 }}
+        {{- if .Values.podLabels }}
+        {{- toYaml .Values.podLabels | nindent 8 }}
+        {{- end }}
       {{- if .Values.podAnnotations }}
       annotations:
       {{- range $key, $value := .Values.podAnnotations }}
