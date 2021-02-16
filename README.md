@@ -98,6 +98,7 @@ Flags:
       --slack-channel string                slack channel for reboot notfications
       --slack-hook-url string               slack hook URL for reboot notfications
       --slack-username string               slack username for reboot notfications (default "kured")
+      --teams-hook-url string               teams hook URL for reboot notfications
       --start-time string                   schedule reboot only after this time of day (default "0:00")
       --time-zone string                    use this timezone for schedule inputs (default "UTC")
 ```
@@ -221,6 +222,18 @@ you immediately prior to rebooting a node:
 
 We recommend setting `--slack-username` to be the name of the
 environment, e.g. `dev` or `prod`.
+
+Alternatively you can use the `--message-template-drain` and `--message-template-reboot` to customize the text of the message, e.g.
+```
+--message-template-drain="Draining node %s part of *my-cluster* in region *xyz*"
+```
+
+### Teams Notifications
+
+If you specify a Teams hook via `--teams-hook-url`, kured will notify
+you immediately prior to rebooting a node:
+
+![Notification](img/teams-notification.png)
 
 Alternatively you can use the `--message-template-drain` and `--message-template-reboot` to customize the text of the message, e.g.
 ```

@@ -24,6 +24,7 @@ import (
 	"github.com/weaveworks/kured/pkg/daemonsetlock"
 	"github.com/weaveworks/kured/pkg/delaytick"
 	"github.com/weaveworks/kured/pkg/notifications/slack"
+	"github.com/weaveworks/kured/pkg/notifications/teams"
 	"github.com/weaveworks/kured/pkg/taints"
 	"github.com/weaveworks/kured/pkg/timewindow"
 )
@@ -44,6 +45,7 @@ var (
 	slackHookURL              string
 	slackUsername             string
 	slackChannel              string
+	teamsHookURL              string
 	messageTemplateDrain      string
 	messageTemplateReboot     string
 	podSelectors              []string
@@ -96,6 +98,8 @@ func main() {
 		"slack username for reboot notfications")
 	rootCmd.PersistentFlags().StringVar(&slackChannel, "slack-channel", "",
 		"slack channel for reboot notfications")
+	rootCmd.PersistentFlags().StringVar(&teamsHookURL, "teams-hook-url", "",
+		"teams hook URL for reboot notfications")
 	rootCmd.PersistentFlags().StringVar(&messageTemplateDrain, "message-template-drain", "Draining node %s",
 		"message template used to notify about a node being drained")
 	rootCmd.PersistentFlags().StringVar(&messageTemplateReboot, "message-template-reboot", "Rebooting node %s",
@@ -252,6 +256,12 @@ func drain(client *kubernetes.Clientset, node *v1.Node) {
 		}
 	}
 
+	if teamsHookURL != "" {
+		if err := teams.NotifyDrain(teamsHookURL, messageTemplateDrain, nodename); err != nil {
+			log.Warnf("Error notifying teams: %v", err)
+		}
+	}
+
 	drainer := &kubectldrain.Helper{
 		Client:              client,
 		GracePeriodSeconds:  -1,
@@ -289,6 +299,12 @@ func commandReboot(nodeID string) {
 	if slackHookURL != "" {
 		if err := slack.NotifyReboot(slackHookURL, slackUsername, slackChannel, messageTemplateReboot, nodeID); err != nil {
 			log.Warnf("Error notifying slack: %v", err)
+		}
+	}
+
+	if teamsHookURL != "" {
+		if err := teams.NotifyReboot(teamsHookURL, messageTemplateReboot, nodeID); err != nil {
+			log.Warnf("Error notifying teams: %v", err)
 		}
 	}
 
