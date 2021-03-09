@@ -6,9 +6,16 @@ import (
 	"fmt"
 	"time"
 
+	v1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+)
+
+const (
+	k8sAPICallRetrySleep   = 5 * time.Second // How much time to wait in between retrying a k8s API call
+	k8sAPICallRetryTimeout = 5 * time.Minute // How long to wait until we determine that the k8s API is definitively unavailable
 )
 
 // DaemonSetLock holds all necessary information to do actions
@@ -36,9 +43,18 @@ func New(client *kubernetes.Clientset, nodeID, namespace, name, annotation strin
 // Acquire attempts to annotate the kured daemonset with lock info from instantiated DaemonSetLock using client-go
 func (dsl *DaemonSetLock) Acquire(metadata interface{}, TTL time.Duration) (acquired bool, owner string, err error) {
 	for {
-		ds, err := dsl.client.AppsV1().DaemonSets(dsl.namespace).Get(context.TODO(), dsl.name, metav1.GetOptions{})
+		var ds *v1.DaemonSet
+		var lastError error
+		err := wait.PollImmediate(k8sAPICallRetrySleep, k8sAPICallRetryTimeout, func() (bool, error) {
+			ctx, cancel := context.WithTimeout(context.Background(), k8sAPICallRetryTimeout)
+			defer cancel()
+			if ds, lastError = dsl.client.AppsV1().DaemonSets(dsl.namespace).Get(ctx, dsl.name, metav1.GetOptions{}); lastError != nil {
+				return false, nil
+			}
+			return true, nil
+		})
 		if err != nil {
-			return false, "", err
+			return false, "", fmt.Errorf("Timed out trying to get daemonset %s in namespace %s: %v", dsl.name, dsl.namespace, lastError)
 		}
 
 		valueString, exists := ds.ObjectMeta.Annotations[dsl.annotation]
@@ -79,9 +95,18 @@ func (dsl *DaemonSetLock) Acquire(metadata interface{}, TTL time.Duration) (acqu
 
 // Test attempts to check the kured daemonset lock status (existence, expiry) from instantiated DaemonSetLock using client-go
 func (dsl *DaemonSetLock) Test(metadata interface{}) (holding bool, err error) {
-	ds, err := dsl.client.AppsV1().DaemonSets(dsl.namespace).Get(context.TODO(), dsl.name, metav1.GetOptions{})
+	var ds *v1.DaemonSet
+	var lastError error
+	err = wait.PollImmediate(k8sAPICallRetrySleep, k8sAPICallRetryTimeout, func() (bool, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), k8sAPICallRetryTimeout)
+		defer cancel()
+		if ds, lastError = dsl.client.AppsV1().DaemonSets(dsl.namespace).Get(ctx, dsl.name, metav1.GetOptions{}); lastError != nil {
+			return false, nil
+		}
+		return true, nil
+	})
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("Timed out trying to get daemonset %s in namespace %s: %v", dsl.name, dsl.namespace, lastError)
 	}
 
 	valueString, exists := ds.ObjectMeta.Annotations[dsl.annotation]
@@ -102,9 +127,18 @@ func (dsl *DaemonSetLock) Test(metadata interface{}) (holding bool, err error) {
 // Release attempts to remove the lock data from the kured ds annotations using client-go
 func (dsl *DaemonSetLock) Release() error {
 	for {
-		ds, err := dsl.client.AppsV1().DaemonSets(dsl.namespace).Get(context.TODO(), dsl.name, metav1.GetOptions{})
+		var ds *v1.DaemonSet
+		var lastError error
+		err := wait.PollImmediate(k8sAPICallRetrySleep, k8sAPICallRetryTimeout, func() (bool, error) {
+			ctx, cancel := context.WithTimeout(context.Background(), k8sAPICallRetryTimeout)
+			defer cancel()
+			if ds, lastError = dsl.client.AppsV1().DaemonSets(dsl.namespace).Get(ctx, dsl.name, metav1.GetOptions{}); lastError != nil {
+				return false, nil
+			}
+			return true, nil
+		})
 		if err != nil {
-			return err
+			return fmt.Errorf("Timed out trying to get daemonset %s in namespace %s: %v", dsl.name, dsl.namespace, lastError)
 		}
 
 		valueString, exists := ds.ObjectMeta.Annotations[dsl.annotation]
