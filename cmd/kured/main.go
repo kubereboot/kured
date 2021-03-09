@@ -377,9 +377,7 @@ func rebootAsRequired(nodeID string, window *timewindow.TimeWindow, TTL time.Dur
 			continue
 		}
 
-		if !nodeMeta.Unschedulable {
-			drain(client, node)
-		}
+		drain(client, node)
 		commandReboot(nodeID)
 		for {
 			log.Infof("Waiting for reboot")
