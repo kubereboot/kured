@@ -9,7 +9,7 @@ jobs:
     name: Mark stale issues and PRs
     runs-on: ubuntu-latest
     steps:
-    # Stale by default waits for 60 days before marking PR/issues as stale, and closes them after 7 days.
+    # Stale by default waits for 60 days before marking PR/issues as stale, and closes them after 21 days.
     # Do not expire the first issues that would allow the community to grow.
     - uses: actions/stale@v3.0.18
       with:
