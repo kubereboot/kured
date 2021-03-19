@@ -19,6 +19,7 @@ jobs:
         stale-issue-label: 'no-issue-activity'
         stale-pr-label: 'no-pr-activity'
         exempt-issue-labels: 'good-first-issue'
+        days-before-close: 21
 
   check-docs-links:
     name: Check docs for incorrect links
