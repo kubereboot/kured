@@ -373,7 +373,7 @@ type nodeMeta struct {
 func addNodeAnnotations(client *kubernetes.Clientset, nodeID string, annotations map[string]string) {
 	node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 	if err != nil {
-		log.Fatal("Error retrieving node object via k8s API: %v", err)
+		log.Fatalf("Error retrieving node object via k8s API: %s", err)
 	}
 	for k, v := range annotations {
 		node.Annotations[k] = v
@@ -382,7 +382,7 @@ func addNodeAnnotations(client *kubernetes.Clientset, nodeID string, annotations
 
 	bytes, err := json.Marshal(node)
 	if err != nil {
-		log.Fatal("Error marshalling node object into JSON: %v", err)
+		log.Fatalf("Error marshalling node object into JSON: %v", err)
 	}
 
 	_, err = client.CoreV1().Nodes().Patch(context.TODO(), node.GetName(), types.StrategicMergePatchType, bytes, metav1.PatchOptions{})
@@ -391,7 +391,7 @@ func addNodeAnnotations(client *kubernetes.Clientset, nodeID string, annotations
 		for k, v := range annotations {
 			annotationsErr += fmt.Sprintf("%s=%s ", k, v)
 		}
-		log.Fatal("Error adding node annotations %s via k8s API: %v", annotationsErr, err)
+		log.Fatalf("Error adding node annotations %s via k8s API: %v", annotationsErr, err)
 	}
 }
 
@@ -404,7 +404,7 @@ func deleteNodeAnnotation(client *kubernetes.Clientset, nodeID, key string) {
 	patch := []byte(fmt.Sprintf("[{\"op\":\"remove\",\"path\":\"/metadata/annotations/%s\"}]", strings.ReplaceAll(key, "/", "~1")))
 	_, err := client.CoreV1().Nodes().Patch(context.TODO(), nodeID, types.JSONPatchType, patch, metav1.PatchOptions{})
 	if err != nil {
-		log.Fatal("Error deleting node annotation %s via k8s API: %v", key, err)
+		log.Fatalf("Error deleting node annotation %s via k8s API: %v", key, err)
 	}
 }
 
@@ -425,7 +425,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 	if holding(lock, &nodeMeta) {
 		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 		if err != nil {
-			log.Fatal("Error retrieving node object via k8s API: %v", err)
+			log.Fatalf("Error retrieving node object via k8s API: %v", err)
 		}
 		if !nodeMeta.Unschedulable {
 			uncordon(client, node)
@@ -480,7 +480,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 
 		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 		if err != nil {
-			log.Fatal("Error retrieving node object via k8s API: %v", err)
+			log.Fatalf("Error retrieving node object via k8s API: %v", err)
 		}
 		nodeMeta.Unschedulable = node.Spec.Unschedulable
 
