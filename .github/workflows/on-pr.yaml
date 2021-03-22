@@ -4,6 +4,20 @@ on:
   push:
 
 jobs:
+  pr-gotest:
+    name: Run go tests
+    runs-on: ubuntu-18.04
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: run tests
+        run: go test -json ./... > test.json
+      - name: Annotate tests
+        if: always()
+        uses: guyarb/golang-test-annoations@v0.3.0
+        with:
+          test-results: test.json
+
   pr-shellcheck:
     name: Lint bash code with shellcheck
     runs-on: ubuntu-latest

@@ -5,6 +5,20 @@ on:
   - cron: "30 1 * * *"
 
 jobs:
+  periodics-gotest:
+    name: Run go tests
+    runs-on: ubuntu-18.04
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: run tests
+        run: go test -json ./... > test.json
+      - name: Annotate tests
+        if: always()
+        uses: guyarb/golang-test-annoations@v0.3.0
+        with:
+          test-results: test.json
+
   periodics-mark-stale:
     name: Mark stale issues and PRs
     runs-on: ubuntu-latest
