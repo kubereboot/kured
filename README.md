@@ -219,20 +219,30 @@ If you choose to employ such an alert and have configured kured to
 probe for active alerts before rebooting, be sure to specify
 `--alert-filter-regexp=^RebootRequired$` to avoid deadlock!
 
-### Slack Notifications
+### Notifications
 
-If you specify a Slack hook via `--slack-hook-url`, kured will notify
-you immediately prior to rebooting a node:
-
+When you specify a formatted URL using `--notify-url`, kured will notify
+about draining and rebooting nodes across a list of technologies. 
 ![Notification](img/slack-notification.png)
-
-We recommend setting `--slack-username` to be the name of the
-environment, e.g. `dev` or `prod`.
 
 Alternatively you can use the `--message-template-drain` and `--message-template-reboot` to customize the text of the message, e.g.
 ```
 --message-template-drain="Draining node %s part of *my-cluster* in region *xyz*"
 ```
+
+Here is the syntax:
+
+slack:           `slack://tokenA/tokenB/tokenC`
+(`--slack-hook-url` is deprecated but possible to use)
+
+rocketchat:      `rocketchat://[username@]rocketchat-host/token[/channel|@recipient]`
+
+teams:           `teams://token-a/token-b/token-c`
+
+Email:           `smtp://username:password@host:port/?fromAddress=fromAddress&toAddresses=recipient1[,recipient2,...]`
+
+More details here: https://github.com/containrrr/shoutrrr/blob/master/docs/services/overview.md
+
 
 ### Overriding Lock Configuration
 

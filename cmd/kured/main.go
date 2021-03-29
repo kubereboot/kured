@@ -31,6 +31,7 @@ import (
 	"github.com/weaveworks/kured/pkg/notifications/slack"
 	"github.com/weaveworks/kured/pkg/taints"
 	"github.com/weaveworks/kured/pkg/timewindow"
+	shoutrrr "github.com/containrrr/shoutrrr"
 )
 
 var (
@@ -47,6 +48,7 @@ var (
 	alertFilter               *regexp.Regexp
 	rebootSentinelFile        string
 	rebootSentinelCommand     string
+	notifyURL                 string
 	slackHookURL              string
 	slackUsername             string
 	slackChannel              string
@@ -84,9 +86,10 @@ func init() {
 
 func main() {
 	rootCmd := &cobra.Command{
-		Use:   "kured",
-		Short: "Kubernetes Reboot Daemon",
-		Run:   root}
+		Use:    "kured",
+		Short:  "Kubernetes Reboot Daemon",
+		PreRun: flagCheck,
+		Run:    root}
 
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
 		"sentinel check period")
@@ -116,7 +119,9 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&slackUsername, "slack-username", "kured",
 		"slack username for notifications")
 	rootCmd.PersistentFlags().StringVar(&slackChannel, "slack-channel", "",
-		"slack channel for notifications")
+		"slack channel for reboot notfications")
+	rootCmd.PersistentFlags().StringVar(&notifyURL, "notify-url", "",
+		"notify URL for reboot notfications")
 	rootCmd.PersistentFlags().StringVar(&messageTemplateDrain, "message-template-drain", "Draining node %s",
 		"message template used to notify about a node being drained")
 	rootCmd.PersistentFlags().StringVar(&messageTemplateReboot, "message-template-reboot", "Rebooting node %s",
@@ -142,7 +147,19 @@ func main() {
 	}
 }
 
-// newCommand wires a Command with stdout/stderr to our standard loggers
+// temporary func that checks for deprecated slack-notification-related flags
+func flagCheck(cmd *cobra.Command, args []string) {
+	if slackHookURL != "" && notifyURL != "" {
+		log.Warnf("Cannot use both --notify-url and --slack-hook-url flags. Kured will use --notify-url flag only...")
+		slackHookURL = ""
+	}
+	if slackChannel != "" || slackHookURL != "" || slackUsername != "" {
+		log.Warnf("Deprecated flag(s). Please use --notify-url flag instead.")
+	}
+
+}
+
+// newCommand creates a new Command with stdout/stderr wired to our standard logger
 func newCommand(name string, arg ...string) *exec.Cmd {
 	cmd := exec.Command(name, arg...)
 	cmd.Stdout = log.NewEntry(log.StandardLogger()).
@@ -308,6 +325,11 @@ func drain(client *kubernetes.Clientset, node *v1.Node) {
 			log.Warnf("Error notifying slack: %v", err)
 		}
 	}
+	if notifyURL != "" {
+		if err := shoutrrr.Send(notifyURL, fmt.Sprintf(messageTemplateDrain, nodename)); err != nil {
+			log.Warnf("Error notifying: %v", err)
+		}
+	}
 
 	drainer := &kubectldrain.Helper{
 		Client:              client,
@@ -349,8 +371,16 @@ func invokeReboot(nodeID string, rebootCommand []string) {
 		}
 	}
 
-	if err := newCommand(rebootCommand[0], rebootCommand[1:]...).Run(); err != nil {
-		log.Fatalf("Error invoking %s command: %v", rebootCommand, err)
+	if notifyURL != "" {
+		if err := shoutrrr.Send(notifyURL, fmt.Sprintf(messageTemplateReboot, nodeID)); err != nil {
+			log.Warnf("Error notifying: %v", err)
+		}
+	}
+
+	// Relies on hostPID:true and privileged:true to enter host mount space
+	rebootCmd := newCommand("/usr/bin/nsenter", "-m/proc/1/ns/mnt", "/bin/systemctl", "reboot")
+	if err := rebootCmd.Run(); err != nil {
+		log.Fatalf("Error invoking reboot command: %v", err)
 	}
 }
 
