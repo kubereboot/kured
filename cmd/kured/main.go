@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/shlex"
 
+	shoutrrr "github.com/containrrr/shoutrrr"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/weaveworks/kured/pkg/alerts"
@@ -31,7 +32,6 @@ import (
 	"github.com/weaveworks/kured/pkg/notifications/slack"
 	"github.com/weaveworks/kured/pkg/taints"
 	"github.com/weaveworks/kured/pkg/timewindow"
-	shoutrrr "github.com/containrrr/shoutrrr"
 )
 
 var (
@@ -377,9 +377,7 @@ func invokeReboot(nodeID string, rebootCommand []string) {
 		}
 	}
 
-	// Relies on hostPID:true and privileged:true to enter host mount space
-	rebootCmd := newCommand("/usr/bin/nsenter", "-m/proc/1/ns/mnt", "/bin/systemctl", "reboot")
-	if err := rebootCmd.Run(); err != nil {
+	if err := newCommand(rebootCommand[0], rebootCommand[1:]...).Run(); err != nil {
 		log.Fatalf("Error invoking reboot command: %v", err)
 	}
 }
