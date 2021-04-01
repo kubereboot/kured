@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 	"github.com/weaveworks/kured/pkg/alerts"
 	assert "gotest.tools/v3/assert"
 
@@ -22,6 +23,15 @@ func (fbc BlockingChecker) isBlocked() bool {
 var _ RebootBlocker = BlockingChecker{}       // Verify that Type implements Interface.
 var _ RebootBlocker = (*BlockingChecker)(nil) // Verify that *Type implements Interface.
 
+func Test_flagCheck(t *testing.T) {
+	var cmd *cobra.Command
+	var args []string
+	slackHookURL = "https://hooks.slack.com/services/BLABLABA12345/IAM931A0VERY/COMPLICATED711854TOKEN1SET"
+	flagCheck(cmd, args)
+	if notifyURL != "slack://BLABLABA12345/IAM931A0VERY/COMPLICATED711854TOKEN1SET" {
+		t.Errorf("Slack URL Parsing is wrong: expecting %s  but got %s\n", "slack://BLABLABA12345/IAM931A0VERY/COMPLICATED711854TOKEN1SET", notifyURL)
+	}
+}
 func Test_rebootBlocked(t *testing.T) {
 	noCheckers := []RebootBlocker{}
 	nonblockingChecker := BlockingChecker{blocking: false}
