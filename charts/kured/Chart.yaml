@@ -2,7 +2,7 @@ apiVersion: v1
 appVersion: "1.6.1"
 description: A Helm chart for kured
 name: kured
-version: 2.4.0
+version: 2.4.1
 home: https://github.com/weaveworks/kured
 maintainers:
   - name: ckotzbauer

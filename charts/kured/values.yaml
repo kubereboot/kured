@@ -1,6 +1,6 @@
 image:
   repository: weaveworks/kured
-  tag: 1.6.1
+  tag: ""  # will default to the appVersion in Chart.yaml
   pullPolicy: IfNotPresent
   pullSecrets: []
 

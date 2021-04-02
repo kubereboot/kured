@@ -40,7 +40,6 @@ manifest:
 
 helm-chart:
 	sed -i "s#repository:.*/kured#repository: $(DH_ORG)/kured#g" charts/kured/values.yaml
-	sed -i "s#tag:.*#tag: $(VERSION)#g" charts/kured/values.yaml
 	sed -i "s#appVersion:.*#appVersion: \"$(VERSION)\"#g" charts/kured/Chart.yaml
 	sed -i "s#\`[0-9]*\.[0-9]*\.[0-9]*\`#\`$(VERSION)\`#g" charts/kured/README.md
 	echo "Please bump version in charts/kured/Chart.yaml"
