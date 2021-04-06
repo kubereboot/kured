@@ -37,5 +37,5 @@ jobs:
         uses: helm/kind-action@v1.1.0
         if: ${{ matrix.test-action == 'install' }}
 
-      - name: Run chart tests 
+      - name: Run chart tests
         run: ct ${{ matrix.test-action }} --config .github/ct.yaml
