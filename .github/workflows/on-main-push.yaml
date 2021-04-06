@@ -1,16 +1,16 @@
 # We publish every merged commit in the form of an image
 # named kured:<branch>-<short tag>
-name: Push image of latest master
+name: Push image of latest main
 on:
   push:
     branches:
-      - master
+      - main
 jobs:
   tag-scan-and-push-final-image:
     name: "Build, scan, and publish tagged image"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v2
 
       - name: Find go version
         run: |

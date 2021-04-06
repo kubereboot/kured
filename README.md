@@ -1,7 +1,7 @@
 
 # kured - Kubernetes Reboot Daemon
 
-<img src="https://github.com/weaveworks/kured/raw/master/img/logo.png" align="right"/>
+<img src="https://github.com/weaveworks/kured/raw/main/img/logo.png" align="right"/>
 
 * [Introduction](#introduction)
 * [Kubernetes & OS Compatibility](#kubernetes-&-os-compatibility)
@@ -44,16 +44,16 @@ maintaining the lock and draining worker nodes. Kubernetes aims to provide
 forwards and backwards compatibility of one minor version between client and
 server:
 
-| kured  | kubectl | k8s.io/client-go | k8s.io/apimachinery | expected kubernetes compatibility |
-|--------|---------|------------------|---------------------|-----------------------------------|
-| master | 1.20.1  | v0.20.1          | v0.20.1             | 1.19.x, 1.20.x, 1.21.x            |
-| 1.6.0  | 1.19.4  | v0.19.4          | v0.19.4             | 1.18.x, 1.19.x, 1.20.x            |
-| 1.5.1  | 1.18.8  | v0.18.8          | v0.18.8             | 1.17.x, 1.18.x, 1.19.x            |
-| 1.4.4  | 1.17.7  | v0.17.0          | v0.17.0             | 1.16.x, 1.17.x, 1.18.x            |
-| 1.3.0  | 1.15.10 | v12.0.0          | release-1.15        | 1.15.x, 1.16.x, 1.17.x            |
-| 1.2.0  | 1.13.6  | v10.0.0          | release-1.13        | 1.12.x, 1.13.x, 1.14.x            |
-| 1.1.0  | 1.12.1  | v9.0.0           | release-1.12        | 1.11.x, 1.12.x, 1.13.x            |
-| 1.0.0  | 1.7.6   | v4.0.0           | release-1.7         | 1.6.x, 1.7.x, 1.8.x               |
+| kured | kubectl | k8s.io/client-go | k8s.io/apimachinery | expected kubernetes compatibility |
+|-------|---------|------------------|---------------------|-----------------------------------|
+| main  | 1.20.1  | v0.20.1          | v0.20.1             | 1.19.x, 1.20.x, 1.21.x            |
+| 1.6.1 | 1.19.4  | v0.19.4          | v0.19.4             | 1.18.x, 1.19.x, 1.20.x            |
+| 1.5.1 | 1.18.8  | v0.18.8          | v0.18.8             | 1.17.x, 1.18.x, 1.19.x            |
+| 1.4.4 | 1.17.7  | v0.17.0          | v0.17.0             | 1.16.x, 1.17.x, 1.18.x            |
+| 1.3.0 | 1.15.10 | v12.0.0          | release-1.15        | 1.15.x, 1.16.x, 1.17.x            |
+| 1.2.0 | 1.13.6  | v10.0.0          | release-1.13        | 1.12.x, 1.13.x, 1.14.x            |
+| 1.1.0 | 1.12.1  | v9.0.0           | release-1.12        | 1.11.x, 1.12.x, 1.13.x            |
+| 1.0.0 | 1.7.6   | v4.0.0           | release-1.7         | 1.6.x, 1.7.x, 1.8.x               |
 
 See the [release notes](https://github.com/weaveworks/kured/releases)
 for specific version compatibility information, including which
@@ -222,11 +222,13 @@ probe for active alerts before rebooting, be sure to specify
 ### Notifications
 
 When you specify a formatted URL using `--notify-url`, kured will notify
-about draining and rebooting nodes across a list of technologies. 
+about draining and rebooting nodes across a list of technologies.
+
 ![Notification](img/slack-notification.png)
 
 Alternatively you can use the `--message-template-drain` and `--message-template-reboot` to customize the text of the message, e.g.
-```
+
+```cli
 --message-template-drain="Draining node %s part of *my-cluster* in region *xyz*"
 ```
 
@@ -241,8 +243,7 @@ teams:           `teams://token-a/token-b/token-c`
 
 Email:           `smtp://username:password@host:port/?fromAddress=fromAddress&toAddresses=recipient1[,recipient2,...]`
 
-More details here: https://github.com/containrrr/shoutrrr/blob/master/docs/services/overview.md
-
+More details here: <https://github.com/containrrr/shoutrrr/blob/main/docs/services/overview.md>
 
 ### Overriding Lock Configuration
 
@@ -332,7 +333,7 @@ our [development][development] docs.
 
 Use of `latest` for production deployments is bad practice - see
 [here](https://kubernetes.io/docs/concepts/configuration/overview) for
-details. The manifest on `master` refers to `latest` for local
+details. The manifest on `main` refers to `latest` for local
 development testing with minikube only; for production use choose a
 versioned manifest from the [release page](https://github.com/weaveworks/kured/releases/).
 
