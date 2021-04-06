@@ -56,6 +56,7 @@ The following changes have been made compared to the stable chart:
 | `configuration.slackChannel` | cli-parameter `--slack-channel`                                        | `""`                      |
 | `configuration.slackHookUrl` | cli-parameter `--slack-hook-url`                                       | `""`                      |
 | `configuration.slackUsername` | cli-parameter `--slack-username`                                      | `""`                      |
+| `configuration.notifyUrl` | cli-parameter `--notify-url`                                              | `""`                      |
 | `configuration.messageTemplateDrain` | cli-parameter `--message-template-drain`                       | `""`                      |
 | `configuration.messageTemplateReboot` | cli-parameter `--message-template-reboot`                     | `""`                      |
 | `configuration.startTime` | cli-parameter `--start-time`                                              | `""`                      |

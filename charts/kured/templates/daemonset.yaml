@@ -88,6 +88,9 @@ spec:
           {{- if .Values.configuration.slackUsername }}
             - --slack-username={{ .Values.configuration.slackUsername }}
           {{- end }}
+          {{- if .Values.configuration.notifyUrl }}
+            - --notify-url={{ .Values.configuration.notifyUrl }}
+          {{- end }}
           {{- if .Values.configuration.messageTemplateDrain }}
             - --message-template-drain={{ .Values.configuration.messageTemplateDrain }}
           {{- end }}
