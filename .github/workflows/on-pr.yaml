@@ -84,12 +84,13 @@ jobs:
         with:
           image-name: docker.io/${{ github.repository_owner }}/kured:${{ github.sha }}
 
-  # If the PRs don't break the behaviour in the helm chart, we can simply publish the helm chart at the time of the release.
+  # If the PRs don't break the behaviour in the helm chart, we can simply publish the helm charts at the time of a branch commit.
   e2e-helm:
     name: "Functional test of helm chart, e2e testing"
     runs-on: ubuntu-latest
     # only build with oldest and newest supported, it should be good enough.
     strategy:
+      fail-fast: false
       matrix:
         kubernetes:
           - "1.18"
@@ -161,13 +162,14 @@ jobs:
   # This workflow is useful when introducing new versions, to ensure our manifests
   # still work (even if there might be no manifest 'code' change).
   # The version used here is what hasn't been tested with the helm chart
+  # This should therefore be "mid version" and (optionally) next new version
   deploy-manifests:
     name: Deploy kured with current manifests
     runs-on: ubuntu-latest
     strategy:
       matrix:
         kubernetes:
-          - 1.18
+          - "1.19"
     steps:
       - uses: actions/checkout@v2
       - name: Find go version
