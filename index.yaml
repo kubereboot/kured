@@ -3,7 +3,25 @@ entries:
   kured:
   - apiVersion: v1
     appVersion: 1.6.1
-    created: "2021-04-02T08:06:31.246543945Z"
+    created: "2021-04-06T13:01:16.715078451Z"
+    description: A Helm chart for kured
+    digest: 4f26e153bec10f32d120c9abb521262aba97d96fbb80b0e8829b41157b556c4b
+    home: https://github.com/weaveworks/kured
+    icon: https://raw.githubusercontent.com/weaveworks/kured/main/img/logo.png
+    maintainers:
+    - email: christian.kotzbauer@gmail.com
+      name: ckotzbauer
+    - email: david@davidkarlsen.com
+      name: davidkarlsen
+    name: kured
+    sources:
+    - https://github.com/weaveworks/kured
+    urls:
+    - https://weaveworks.github.io/kured/kured-2.4.2.tgz
+    version: 2.4.2
+  - apiVersion: v1
+    appVersion: 1.6.1
+    created: "2021-04-06T13:01:16.714161094Z"
     description: A Helm chart for kured
     digest: 4788a1d33a938b6c17a760d6602eb03d68c86eb6be46c50272d9ebeeee3941ae
     home: https://github.com/weaveworks/kured
@@ -21,7 +39,7 @@ entries:
     version: 2.4.1
   - apiVersion: v1
     appVersion: 1.6.1
-    created: "2021-04-02T08:06:31.245478346Z"
+    created: "2021-04-06T13:01:16.713214735Z"
     description: A Helm chart for kured
     digest: 5cb1837122133aa6022b56140fb04583f232b4199ed44fe3746a6240e9d116a2
     home: https://github.com/weaveworks/kured
@@ -39,7 +57,7 @@ entries:
     version: 2.4.0
   - apiVersion: v1
     appVersion: 1.6.1
-    created: "2021-04-02T08:06:31.244652869Z"
+    created: "2021-04-06T13:01:16.712224972Z"
     description: A Helm chart for kured
     digest: d6eed3eac12ea285716e46f8de0fc101692fc1827d6a56780976ef8f0c4d1cce
     home: https://github.com/weaveworks/kured
@@ -57,7 +75,7 @@ entries:
     version: 2.3.2
   - apiVersion: v1
     appVersion: 1.6.1
-    created: "2021-04-02T08:06:31.243826292Z"
+    created: "2021-04-06T13:01:16.711557431Z"
     description: A Helm chart for kured
     digest: 84a75e3967d13440e3a856ecfc5a2a845ce19089a8b8b8da30d3e6344d1f3c3b
     home: https://github.com/weaveworks/kured
@@ -75,7 +93,7 @@ entries:
     version: 2.3.1
   - apiVersion: v1
     appVersion: 1.6.1
-    created: "2021-04-02T08:06:31.242989214Z"
+    created: "2021-04-06T13:01:16.710894489Z"
     description: A Helm chart for kured
     digest: db5f718db2a38cc4c46b5afb41fbc4cb82ac5298388008589bb1fc321d233ca3
     home: https://github.com/weaveworks/kured
@@ -93,7 +111,7 @@ entries:
     version: 2.3.0
   - apiVersion: v1
     appVersion: 1.5.1
-    created: "2021-04-02T08:06:31.242137735Z"
+    created: "2021-04-06T13:01:16.709668812Z"
     description: A Helm chart for kured
     digest: b3a8b13a79efa56a0a94fa91976faa4916fbdab826d9f50ddf63f4d9179a36e4
     home: https://github.com/weaveworks/kured
@@ -111,7 +129,7 @@ entries:
     version: 2.2.4
   - apiVersion: v1
     appVersion: 1.5.1
-    created: "2021-04-02T08:06:31.24132886Z"
+    created: "2021-04-06T13:01:16.70899537Z"
     description: A Helm chart for kured
     digest: 47d881f78ce887567dd3513c5bf0a1c4532c34e05cd9697cc602ce9e461fd10a
     home: https://github.com/weaveworks/kured
@@ -129,7 +147,7 @@ entries:
     version: 2.2.1
   - apiVersion: v1
     appVersion: 1.5.0
-    created: "2021-04-02T08:06:31.240561488Z"
+    created: "2021-04-06T13:01:16.708325128Z"
     description: A Helm chart for kured
     digest: f1d8d83d9992346275d8ed5b4cdb84164cbeaada73b1ff11d802f0d7a38c1621
     home: https://github.com/weaveworks/kured
@@ -147,7 +165,7 @@ entries:
     version: 2.2.0
   - apiVersion: v1
     appVersion: 1.4.5
-    created: "2021-04-02T08:06:31.239774615Z"
+    created: "2021-04-06T13:01:16.707676487Z"
     description: A Helm chart for kured
     digest: 5c63a1bf4aff4394afb703f44d6f20bcb0d9f79af4a89b7a1476148e5f8b0fd5
     home: https://github.com/weaveworks/kured
@@ -165,7 +183,7 @@ entries:
     version: 2.1.1
   - apiVersion: v1
     appVersion: 1.4.4
-    created: "2021-04-02T08:06:31.239009944Z"
+    created: "2021-04-06T13:01:16.707031347Z"
     description: A Helm chart for kured
     digest: 8ae0a2884d185ac6311d9333ba7b29c8815a2b433892bc073922c9ad5c0771bc
     home: https://github.com/weaveworks/kured
@@ -183,7 +201,7 @@ entries:
     version: 2.0.3
   - apiVersion: v1
     appVersion: 1.4.3
-    created: "2021-04-02T08:06:31.238244373Z"
+    created: "2021-04-06T13:01:16.706360205Z"
     description: A Helm chart for kured
     digest: 6b8057d3f8f5774ae75a57e38e63fe73ac7230871082177bd219543e03bc3981
     home: https://github.com/weaveworks/kured
@@ -201,7 +219,7 @@ entries:
     version: 2.0.1
   - apiVersion: v1
     appVersion: 1.4.2
-    created: "2021-04-02T08:06:31.237489202Z"
+    created: "2021-04-06T13:01:16.705726665Z"
     description: A Helm chart for kured
     digest: 3a97561f4b5ad420a9e73ca88bcfdc29f25d722195614fc797b770ff053df672
     home: https://github.com/weaveworks/kured
@@ -217,4 +235,4 @@ entries:
     urls:
     - https://weaveworks.github.io/kured/kured-2.0.0.tgz
     version: 2.0.0
-generated: "2021-04-02T08:06:31.23650041Z"
+generated: "2021-04-06T13:01:16.704895913Z"
