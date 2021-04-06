@@ -31,8 +31,8 @@ the main [README][readme] as well.
 
 Before `kured` is released, we want to make sure it still works fine on the
 previous, current and next minor version of Kubernetes (with respect to the
-embedded `client-go` & `kubectl`). For local testing e.g. `minikube` or
-`kind` can be sufficient.
+`client-go` & `kubectl` dependencies in use). For local testing e.g.
+`minikube` or `kind` can be sufficient.
 
 Deploy kured in your test scenario, make sure you pass the right `image`,
 update the e.g. `period` and `reboot-days` options, so you get immediate
@@ -88,10 +88,10 @@ A test-run with `kind` could look like this:
 
 ```console
 # create kind cluster
-kind create cluster --config .github/kind-cluster.yaml
+kind create cluster --config .github/kind-cluster-<k8s-version>.yaml
 
 # create reboot required files on pre-defined kind nodes
-./tests/create-reboot-sentinels.sh
+./tests/kind/create-reboot-sentinels.sh
 
 # check if reboot is working fine
 ./tests/kind/follow-coordinated-reboot.sh
@@ -101,6 +101,7 @@ kind create cluster --config .github/kind-cluster.yaml
 ## Publishing a new kured release
 
 ### Prepare Documentation
+
 Check that `README.md` has an updated compatibility matrix and that the
 url in the `kubectl` incantation (under "Installation") is updated to the
 new version you want to release.
@@ -121,7 +122,6 @@ actions.
 
 ### Create the combined manifest
 
-
 Now create the `kured-<release>-dockerhub.yaml` for e.g. `1.3.0`:
 
 ```sh
@@ -131,6 +131,7 @@ make DH_ORG="weaveworks" VERSION="${VERSION}" manifest
 cat kured-rbac.yaml > "$MANIFEST"
 cat kured-ds.yaml >> "$MANIFEST"
 ```
+
 ### Publish release artifacts
 
 Now you can head to the Github UI, use the version number as tag and upload the
