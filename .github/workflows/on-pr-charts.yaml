@@ -29,6 +29,11 @@ jobs:
         with:
           python-version: 3.7
 
+      - name: Set up Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: v3.4.0
+
       # Helm is already present in github actions, so do not re-install it
       - name: Setup chart testing
         uses: helm/chart-testing-action@v2.0.1
