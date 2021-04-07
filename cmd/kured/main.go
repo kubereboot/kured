@@ -353,7 +353,10 @@ func drain(client *kubernetes.Clientset, node *v1.Node) {
 	}
 
 	if err := kubectldrain.RunCordonOrUncordon(drainer, node, true); err != nil {
-		log.Fatalf("Error cordonning %s: %v", nodename, err)
+		if !forceReboot {
+			log.Fatalf("Error cordonning %s: %v", nodename, err)
+		}
+		log.Errorf("Error cordonning %s: %v, continuing with reboot anyway", nodename, err)
 	}
 
 	if err := kubectldrain.RunNodeDrain(drainer, nodename); err != nil {
