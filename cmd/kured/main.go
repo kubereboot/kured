@@ -38,9 +38,8 @@ var (
 	version = "unreleased"
 
 	// Command line flags
-	forceDrain                bool
 	forceReboot               bool
-	forceTimeout              time.Duration
+	drainTimeout              time.Duration
 	period                    time.Duration
 	drainGracePeriod          int
 	dsNamespace               string
@@ -96,11 +95,11 @@ func main() {
 		Run:    root}
 
 	rootCmd.PersistentFlags().BoolVar(&forceReboot, "force-reboot", false,
-		"enable/disable force reboot")
+		"force a reboot even if the drain is still running (default false)")
 	rootCmd.PersistentFlags().IntVar(&drainGracePeriod, "drain-grace-period", -1,
-		"drain grace period in seconds")
-	rootCmd.PersistentFlags().DurationVar(&forceTimeout, "force-timeout", time.Minute*30,
-		"total timeout which only applies when force-reboot is set to true")
+		"grace period of time for pods to wait for the node drain in seconds (default -1)")
+	rootCmd.PersistentFlags().DurationVar(&drainTimeout, "drain-timeout", time.Minute*30,
+		"timeout after which the drain is aborted (default: 30m)")
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
 		"sentinel check period")
 	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-namespace", "kube-system",
@@ -350,9 +349,7 @@ func drain(client *kubernetes.Clientset, node *v1.Node) {
 		IgnoreAllDaemonSets: true,
 		ErrOut:              os.Stderr,
 		Out:                 os.Stdout,
-	}
-	if forceReboot {
-		drainer.Timeout = forceTimeout
+		Timeout:             drainTimeout,
 	}
 
 	if err := kubectldrain.RunCordonOrUncordon(drainer, node, true); err != nil {
