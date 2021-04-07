@@ -11,4 +11,4 @@ maintainers:
     email: david@davidkarlsen.com
 sources:
   - https://github.com/weaveworks/kured
-icon: https://raw.githubusercontent.com/weaveworks/kured/master/img/logo.png
+icon: https://raw.githubusercontent.com/weaveworks/kured/main/img/logo.png

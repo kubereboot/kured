@@ -53,7 +53,7 @@ jobs:
     name: Check docs for incorrect links
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
     - name: Link Checker
       id: lc
       uses: peter-evans/link-checker@v1
@@ -84,12 +84,13 @@ jobs:
         with:
           image-name: docker.io/${{ github.repository_owner }}/kured:${{ github.sha }}
 
-  # If the PRs don't break the behaviour in the helm chart, we can simply publish the helm chart at the time of the release.
+  # If the PRs don't break the behaviour in the helm chart, we can simply publish the helm charts at the time of a branch commit.
   e2e-helm:
     name: "Functional test of helm chart, e2e testing"
     runs-on: ubuntu-latest
     # only build with oldest and newest supported, it should be good enough.
     strategy:
+      fail-fast: false
       matrix:
         kubernetes:
           - "1.18"
@@ -131,7 +132,7 @@ jobs:
       - name: Deploy kured on default namespace with its helm chart
         run: |
           # Documented in official helm doc to live on the edge
-          curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
           # Refresh bins
           hash -r
           helm install kured ./charts/kured/ --set configuration.period=1m
@@ -161,13 +162,14 @@ jobs:
   # This workflow is useful when introducing new versions, to ensure our manifests
   # still work (even if there might be no manifest 'code' change).
   # The version used here is what hasn't been tested with the helm chart
+  # This should therefore be "mid version" and (optionally) next new version
   deploy-manifests:
     name: Deploy kured with current manifests
     runs-on: ubuntu-latest
     strategy:
       matrix:
         kubernetes:
-          - 1.18
+          - "1.19"
     steps:
       - uses: actions/checkout@v2
       - name: Find go version

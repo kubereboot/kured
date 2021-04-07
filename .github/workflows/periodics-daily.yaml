@@ -39,7 +39,7 @@ jobs:
     name: Check docs for incorrect links
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
     - name: Link Checker
       id: lc
       uses: peter-evans/link-checker@v1
@@ -90,8 +90,8 @@ jobs:
           go-version: "${{ steps.awk_gomod.outputs.version }}"
       - name: Build artifacts
         run: |
-          make DH_ORG="${{ github.repository_owner }}" VERSION="master" image
-          make DH_ORG="${{ github.repository_owner }}" VERSION="master" helm-chart
+          make DH_ORG="${{ github.repository_owner }}" VERSION="main" image
+          make DH_ORG="${{ github.repository_owner }}" VERSION="main" helm-chart
 
       - name: "Workaround 'Failed to attach 1 to compat systemd cgroup /actions_job/...' on gh actions"
         run: |
@@ -109,12 +109,12 @@ jobs:
           config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
 
       - name: Preload previously built images onto kind cluster
-        run: kind load docker-image docker.io/${{ github.repository_owner }}/kured:master --name chart-testing
+        run: kind load docker-image docker.io/${{ github.repository_owner }}/kured:main --name chart-testing
 
       - name: Deploy kured on default namespace with its helm chart
         run: |
           # Documented in official helm doc to live on the edge
-          curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
           # Refresh bins
           hash -r
           helm install kured ./charts/kured/ --set configuration.period=1m

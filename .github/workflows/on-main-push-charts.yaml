@@ -2,7 +2,7 @@ name: Publish helm chart
 on:
   push:
     branches:
-      - "master"
+      - "main"
     paths:
       - "charts/**"
 
