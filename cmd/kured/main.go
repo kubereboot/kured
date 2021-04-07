@@ -98,8 +98,8 @@ func main() {
 		"force a reboot even if the drain is still running (default false)")
 	rootCmd.PersistentFlags().IntVar(&drainGracePeriod, "drain-grace-period", -1,
 		"grace period of time for pods to wait for the node drain in seconds (default -1)")
-	rootCmd.PersistentFlags().DurationVar(&drainTimeout, "drain-timeout", time.Minute*30,
-		"timeout after which the drain is aborted (default: 30m)")
+	rootCmd.PersistentFlags().DurationVar(&drainTimeout, "drain-timeout", 0,
+		"timeout after which the drain is aborted (default: 0, infinite time)")
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
 		"sentinel check period")
 	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-namespace", "kube-system",
