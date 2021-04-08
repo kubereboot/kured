@@ -38,27 +38,28 @@ var (
 	version = "unreleased"
 
 	// Command line flags
-	forceReboot               bool
-	drainTimeout              time.Duration
-	period                    time.Duration
-	drainGracePeriod          int
-	dsNamespace               string
-	dsName                    string
-	lockAnnotation            string
-	lockTTL                   time.Duration
-	prometheusURL             string
-	preferNoScheduleTaintName string
-	alertFilter               *regexp.Regexp
-	rebootSentinelFile        string
-	rebootSentinelCommand     string
-	notifyURL                 string
-	slackHookURL              string
-	slackUsername             string
-	slackChannel              string
-	messageTemplateDrain      string
-	messageTemplateReboot     string
-	podSelectors              []string
-	rebootCommand             string
+	forceReboot                     bool
+	drainTimeout                    time.Duration
+	period                          time.Duration
+	drainGracePeriod                int
+	skipWaitForDeleteTimeoutSeconds int
+	dsNamespace                     string
+	dsName                          string
+	lockAnnotation                  string
+	lockTTL                         time.Duration
+	prometheusURL                   string
+	preferNoScheduleTaintName       string
+	alertFilter                     *regexp.Regexp
+	rebootSentinelFile              string
+	rebootSentinelCommand           string
+	notifyURL                       string
+	slackHookURL                    string
+	slackUsername                   string
+	slackChannel                    string
+	messageTemplateDrain            string
+	messageTemplateReboot           string
+	podSelectors                    []string
+	rebootCommand                   string
 
 	rebootDays    []string
 	rebootStart   string
@@ -95,9 +96,11 @@ func main() {
 		Run:    root}
 
 	rootCmd.PersistentFlags().BoolVar(&forceReboot, "force-reboot", false,
-		"force a reboot even if the drain is still running (default false)")
+		"force a reboot even if the drain is still running (default: false)")
 	rootCmd.PersistentFlags().IntVar(&drainGracePeriod, "drain-grace-period", -1,
-		"grace period of time for pods to wait for the node drain in seconds (default -1)")
+		"time in seconds given to each pod to terminate gracefully, if negative, the default value specified in the pod will be used (default: -1)")
+	rootCmd.PersistentFlags().IntVar(&skipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", 0,
+		"when seconds is greater than zero, skip waiting for the pods whose deletion timestamp is older than N seconds while draining a node (default: 0)")
 	rootCmd.PersistentFlags().DurationVar(&drainTimeout, "drain-timeout", 0,
 		"timeout after which the drain is aborted (default: 0, infinite time)")
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
@@ -341,15 +344,16 @@ func drain(client *kubernetes.Clientset, node *v1.Node) {
 	}
 
 	drainer := &kubectldrain.Helper{
-		Client:              client,
-		Ctx:                 context.Background(),
-		GracePeriodSeconds:  drainGracePeriod,
-		Force:               true,
-		DeleteEmptyDirData:  true,
-		IgnoreAllDaemonSets: true,
-		ErrOut:              os.Stderr,
-		Out:                 os.Stdout,
-		Timeout:             drainTimeout,
+		Client:                          client,
+		Ctx:                             context.Background(),
+		GracePeriodSeconds:              drainGracePeriod,
+		SkipWaitForDeleteTimeoutSeconds: skipWaitForDeleteTimeoutSeconds,
+		Force:                           true,
+		DeleteEmptyDirData:              true,
+		IgnoreAllDaemonSets:             true,
+		ErrOut:                          os.Stderr,
+		Out:                             os.Stdout,
+		Timeout:                         drainTimeout,
 	}
 
 	if err := kubectldrain.RunCordonOrUncordon(drainer, node, true); err != nil {
@@ -357,6 +361,7 @@ func drain(client *kubernetes.Clientset, node *v1.Node) {
 			log.Fatalf("Error cordonning %s: %v", nodename, err)
 		}
 		log.Errorf("Error cordonning %s: %v, continuing with reboot anyway", nodename, err)
+		return
 	}
 
 	if err := kubectldrain.RunNodeDrain(drainer, nodename); err != nil {
@@ -364,6 +369,7 @@ func drain(client *kubernetes.Clientset, node *v1.Node) {
 			log.Fatalf("Error draining %s: %v", nodename, err)
 		}
 		log.Errorf("Error draining %s: %v, continuing with reboot anyway", nodename, err)
+		return
 	}
 }
 

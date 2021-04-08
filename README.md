@@ -83,12 +83,13 @@ The following arguments can be passed to kured via the daemonset pod template:
 Flags:
       --alert-filter-regexp regexp.Regexp   alert names to ignore when checking for active alerts
       --blocking-pod-selector stringArray   label selector identifying pods whose presence should prevent reboots
-      --drain-grace-period int              grace period of time for pods to wait for the node drain in seconds (default -1)
+      --drain-grace-period int              time in seconds given to each pod to terminate gracefully, if negative, the default value specified in the pod will be used (default: -1)
+      --skip-wait-for-delete-timeout int    when seconds is greater than zero, skip waiting for the pods whose deletion timestamp is older than N seconds while draining a node (default: 0)
       --ds-name string                      name of daemonset on which to place lock (default "kured")
       --ds-namespace string                 namespace containing daemonset on which to place lock (default "kube-system")
       --end-time string                     schedule reboot only before this time of day (default "23:59:59")
-      --force-reboot bool                   force a reboot even if the drain is still running (default false)
-      --drain-timeout duration              timeout after which the drain is aborted  (default 30m)
+      --force-reboot bool                   force a reboot even if the drain is still running (default: false)
+      --drain-timeout duration              timeout after which the drain is aborted (default: 0, infinite time)
   -h, --help                                help for kured
       --lock-annotation string              annotation in which to record locking node (default "weave.works/kured-node-lock")
       --lock-ttl duration                   expire lock annotation after this duration (default: 0, disabled)
