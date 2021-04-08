@@ -1,5 +1,5 @@
 .DEFAULT: all
-.PHONY: all clean image publish-image minikube-publish manifest helm-chart
+.PHONY: all clean image publish-image minikube-publish manifest helm-chart test tests
 
 DH_ORG=weaveworks
 VERSION=$(shell git symbolic-ref --short HEAD)-$(shell git rev-parse --short HEAD)
@@ -43,3 +43,11 @@ helm-chart:
 	sed -i "s#appVersion:.*#appVersion: \"$(VERSION)\"#g" charts/kured/Chart.yaml
 	sed -i "s#\`[0-9]*\.[0-9]*\.[0-9]*\`#\`$(VERSION)\`#g" charts/kured/README.md
 	echo "Please bump version in charts/kured/Chart.yaml"
+
+test: tests
+	echo "Running go tests"
+	go test ./...
+	echo "Running golint on pkg"
+	golint ./pkg/...
+	echo "Running golint on cmd"
+	golint ./cmd/...

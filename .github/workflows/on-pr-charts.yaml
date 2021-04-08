@@ -1,5 +1,6 @@
 #This is just extra testing, for lint check, and basic installation
-#If those fail, no need to test the rest of the PR (github will cancel the rest of the builds)
+#Those can fail earlier than functional tests (shorter tests)
+# and give developer feedback soon if they didn't test themselves
 name: PR - charts
 on:
   pull_request:
@@ -11,7 +12,7 @@ jobs:
   # tackling that for us.
   # Fail-fast ensures that if one of those matrix job fail, the other one gets cancelled.
   test-chart:
-    name: Test helm chart
+    name: Test helm chart changes
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
@@ -42,7 +43,7 @@ jobs:
 
   # This doesn't re-use the ct actions, due to many limitations (auto tear down, no real testing)
   deploy-chart:
-    name: "Functional test of helm chart with pre-published images"
+    name: Functional test of helm chart in its current state (needs published image of the helm chart)
     runs-on: ubuntu-latest
     needs: test-chart
     steps:

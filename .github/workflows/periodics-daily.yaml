@@ -68,7 +68,7 @@ jobs:
           image-name: docker.io/${{ github.repository_owner }}/kured:${{ github.sha }}
 
   deploy-helm:
-    name: Ensure a kubernetes change didn't break our code
+    name: Ensure our currently released helm chart works on all kubernetes versions
     runs-on: ubuntu-latest
     # only build with oldest and newest supported, it should be good enough.
     strategy:
@@ -88,10 +88,6 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: "${{ steps.awk_gomod.outputs.version }}"
-      - name: Build artifacts
-        run: |
-          make DH_ORG="${{ github.repository_owner }}" VERSION="main" image
-          make DH_ORG="${{ github.repository_owner }}" VERSION="main" helm-chart
 
       - name: "Workaround 'Failed to attach 1 to compat systemd cgroup /actions_job/...' on gh actions"
         run: |
@@ -107,9 +103,6 @@ jobs:
         uses: helm/kind-action@v1.1.0
         with:
           config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
-
-      - name: Preload previously built images onto kind cluster
-        run: kind load docker-image docker.io/${{ github.repository_owner }}/kured:main --name chart-testing
 
       - name: Deploy kured on default namespace with its helm chart
         run: |
