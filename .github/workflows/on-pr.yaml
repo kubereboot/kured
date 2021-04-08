@@ -84,92 +84,22 @@ jobs:
         with:
           image-name: docker.io/${{ github.repository_owner }}/kured:${{ github.sha }}
 
-  # If the PRs don't break the behaviour in the helm chart, we can simply publish the helm charts at the time of a branch commit.
-  e2e-helm:
-    name: "Functional test of helm chart, e2e testing"
+  # This ensures the latest code works with the manifests built from tree.
+  # It is useful for two things:
+  # - Test manifests changes (obviously), ensuring they don't break existing clusters
+  # - Ensure manifests work with the latest versions even with no manifest change
+  #     (compared to helm charts, manifests cannot easily template changes based on versions)
+  # Helm charts are _trailing_ releases, while manifests are done during development.
+  e2e-manifests:
+    name: End-to-End test with kured with code and manifests from HEAD
     runs-on: ubuntu-latest
-    # only build with oldest and newest supported, it should be good enough.
     strategy:
       fail-fast: false
       matrix:
         kubernetes:
           - "1.18"
-          - "1.20"
-    steps:
-      - uses: actions/checkout@v2
-      - name: Find go version
-        run: |
-          GO_VERSION=$(awk '/^go/ {print $2};' go.mod)
-          echo "::set-output name=version::${GO_VERSION}"
-        id: awk_gomod
-      - name: Ensure go version
-        uses: actions/setup-go@v2
-        with:
-          go-version: "${{ steps.awk_gomod.outputs.version }}"
-      - name: Build artifacts
-        run: |
-          make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" image
-          make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" helm-chart
-
-      - name: "Workaround 'Failed to attach 1 to compat systemd cgroup /actions_job/...' on gh actions"
-        run: |
-          sudo bash << EOF
-              cp /etc/docker/daemon.json /etc/docker/daemon.json.old
-              echo '{}' > /etc/docker/daemon.json
-              systemctl restart docker || journalctl --no-pager -n 500
-              systemctl status docker
-          EOF
-
-      # Default name for helm/kind-action kind clusters is "chart-testing"
-      - name: Create 5 node kind cluster
-        uses: helm/kind-action@v1.1.0
-        with:
-          config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
-
-      - name: Preload previously built images onto kind cluster
-        run: kind load docker-image docker.io/${{ github.repository_owner }}/kured:${{ github.sha }} --name chart-testing
-
-      - name: Deploy kured on default namespace with its helm chart
-        run: |
-          # Documented in official helm doc to live on the edge
-          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-          # Refresh bins
-          hash -r
-          helm install kured ./charts/kured/ --set configuration.period=1m
-          kubectl config set-context kind-chart-testing
-          kubectl get ds --all-namespaces
-          kubectl describe ds kured
-
-      - name: Ensure kured is ready
-        uses: nick-invision/retry@v2.4.0
-        with:
-          timeout_minutes: 10
-          max_attempts: 10
-          retry_wait_seconds: 60
-          # DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE should all be = 5
-          command: "kubectl get ds kured | grep -E 'kured.*5.*5.*5.*5.*5' "
-
-      - name: Create reboot sentinel files
-        run: |
-          ./tests/kind/create-reboot-sentinels.sh
-
-      - name: Follow reboot until success
-        env:
-          DEBUG: true
-        run: |
-          ./tests/kind/follow-coordinated-reboot.sh
-
-  # This workflow is useful when introducing new versions, to ensure our manifests
-  # still work (even if there might be no manifest 'code' change).
-  # The version used here is what hasn't been tested with the helm chart
-  # This should therefore be "mid version" and (optionally) next new version
-  deploy-manifests:
-    name: Deploy kured with current manifests
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        kubernetes:
           - "1.19"
+          - "1.20"
     steps:
       - uses: actions/checkout@v2
       - name: Find go version
@@ -185,6 +115,7 @@ jobs:
         run: |
           make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" image
           make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" manifest
+
       - name: Workaround "Failed to attach 1 to compat systemd cgroup /actions_job/..." on gh actions
         run: |
           sudo bash << EOF
@@ -193,16 +124,24 @@ jobs:
               systemctl restart docker || journalctl --no-pager -n 500
               systemctl status docker
           EOF
+
       # Default name for helm/kind-action kind clusters is "chart-testing"
-      - name: Create kind cluster
+      - name: Create kind cluster with 5 nodes
         uses: helm/kind-action@v1.1.0
         with:
           config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
+
       - name: Preload previously built images onto kind cluster
         run: kind load docker-image docker.io/${{ github.repository_owner }}/kured:${{ github.sha }} --name chart-testing
+
+      - name: Do not wait for an hour before detecting the rebootSentinel
+        run: |
+          sed -i 's/#\(.*\)--period=1h/\1--period=30s/g' kured-ds.yaml
+
       - name: Install kured with kubectl
         run: |
           kubectl apply -f kured-rbac.yaml && kubectl apply -f kured-ds.yaml
+
       - name: Ensure kured is ready
         uses: nick-invision/retry@v2.4.0
         with:
@@ -212,8 +151,18 @@ jobs:
           # DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE should all be = to cluster_size
           command: "kubectl get ds -n kube-system kured | grep -E 'kured.*5.*5.*5.*5.*5'"
 
-  test-prom:
-    name: "Test prometheus with latest code from HEAD"
+      - name: Create reboot sentinel files
+        run: |
+          ./tests/kind/create-reboot-sentinels.sh
+
+      - name: Follow reboot until success
+        env:
+          DEBUG: true
+        run: |
+          ./tests/kind/follow-coordinated-reboot.sh
+
+  scenario-prom-helm:
+    name: Test prometheus with latest code from HEAD (=overrides image of the helm chart)
     runs-on: ubuntu-latest
     # only build with oldest and newest supported, it should be good enough.
     strategy:
@@ -237,7 +186,7 @@ jobs:
           make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" image
           make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" helm-chart
 
-      - name: "Workaround 'Failed to attach 1 to compat systemd cgroup /actions_job/...' on gh actions"
+      - name: Workaround 'Failed to attach 1 to compat systemd cgroup /actions_job/...' on gh actions
         run: |
           sudo bash << EOF
               cp /etc/docker/daemon.json /etc/docker/daemon.json.old
@@ -288,7 +237,88 @@ jobs:
       - name: Get metrics (need reboot)
         uses: nick-invision/retry@v2.4.0
         with:
-          timeout_minutes: 15        
+          timeout_minutes: 15
           max_attempts: 10
           retry_wait_seconds: 60
           command: "./tests/kind/test-metrics.sh 1"
+
+
+  # TEMPLATE Scenario testing.
+  # Note: keep in mind that the helm chart's appVersion is overriden to test your HEAD of the branch,
+  # if you `make helm-chart`.
+  # This will allow you to test properly your scenario and not use an existing image which will not
+  # contain your feature.
+
+  # scenario-<REPLACETHIS>-helm:
+  #   #example: Testing <REPLACETHIS> with helm chart and code from HEAD"
+  #   name: "<REPLACETHIS>"
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     fail-fast: false
+  #     # You can define your own kubernetes versions. For example if your helm chart change should behave differently with different kubernetes versions.
+  #     matrix:
+  #       kubernetes:
+  #         - "1.20"
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #     - name: Find go version
+  #       run: |
+  #         GO_VERSION=$(awk '/^go/ {print $2};' go.mod)
+  #         echo "::set-output name=version::${GO_VERSION}"
+  #       id: awk_gomod
+  #     - name: Ensure go version
+  #       uses: actions/setup-go@v2
+  #       with:
+  #         go-version: "${{ steps.awk_gomod.outputs.version }}"
+  #     - name: Build artifacts
+  #       run: |
+  #         make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" image
+  #         make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" helm-chart
+  #
+  #     - name: "Workaround 'Failed to attach 1 to compat systemd cgroup /actions_job/...' on gh actions"
+  #       run: |
+  #         sudo bash << EOF
+  #             cp /etc/docker/daemon.json /etc/docker/daemon.json.old
+  #             echo '{}' > /etc/docker/daemon.json
+  #             systemctl restart docker || journalctl --no-pager -n 500
+  #             systemctl status docker
+  #         EOF
+  #
+  #     # Default name for helm/kind-action kind clusters is "chart-testing"
+  #     - name: Create 5 node kind cluster
+  #       uses: helm/kind-action@master
+  #       with:
+  #         config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
+  #
+  #     - name: Preload previously built images onto kind cluster
+  #       run: kind load docker-image docker.io/${{ github.repository_owner }}/kured:${{ github.sha }} --name chart-testing
+  #
+  #     - name: Deploy kured on default namespace with its helm chart
+  #       run: |
+  #         # Documented in official helm doc to live on the edge
+  #         curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  #         # Refresh bins
+  #         hash -r
+  #         helm install kured ./charts/kured/ --wait --values ./charts/kured/ci/<REPLACETHIS>-values.yaml
+  #         kubectl config set-context kind-chart-testing
+  #         kubectl get ds --all-namespaces
+  #         kubectl describe ds kured
+  #
+  #     - name: Ensure kured is ready
+  #       uses: nick-invision/retry@v2.4.0
+  #       with:
+  #         timeout_minutes: 10
+  #         max_attempts: 10
+  #         retry_wait_seconds: 60
+  #         # DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE should all be = 5
+  #         command: "kubectl get ds kured | grep -E 'kured.*5.*5.*5.*5.*5' "
+  #
+  #     - name: Create reboot sentinel files
+  #       run: |
+  #         ./tests/kind/create-reboot-sentinels.sh
+  #
+  #     - name: Test <REPLACETHIS>
+  #       env:
+  #         DEBUG: true
+  #       run: |
+  #         <TODO>

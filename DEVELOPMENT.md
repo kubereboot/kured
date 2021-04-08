@@ -13,7 +13,9 @@ you are planning to contribute code.
 [issues]: https://github.com/weaveworks/kured/issues
 [readme]: README.md
 
-## Updating k8s support
+## Regular development activities
+
+### Updating k8s support
 
 Whenever we want to update e.g. the `kubectl` or `client-go` dependencies,
 some RBAC changes might be necessary too.
@@ -24,15 +26,90 @@ This is what it took to support Kubernetes 1.14:
 That the process can be more involved that that can be seen in
 <https://github.com/weaveworks/kured/commits/support-k8s-1.10>
 
+Please update our .github/workflows with the new k8s images, starting by
+the creation of a .github/kind-cluster-<version>.yaml, then updating
+our workflows with the new versions.
+
 Once you updated everything, make sure you update the support matrix on
 the main [README][readme] as well.
 
-## Release testing
+### Updating other dependencies
+
+Dependabot proposes changes in our go.mod/go.sum.
+Some of those changes are covered by CI testing, some are not.
+
+Please make sure to test those not covered by CI (mostly the integration
+with other tools) manually before merging.
+
+### Review periodic jobs
+
+We run periodic jobs (see also Automated testing section of this documentation).
+Those should be monitored for failures.
+
+If a failure happen in periodics, something terribly wrong must have happened
+(or github is failing at the creation of a kind cluster). Please monitor those
+failures carefully.
+
+### Introducing new features
+
+When you introduce a new feature, the kured team expects you to have tested
+your change thoroughly. If possible, include all the necessary testing in your change.
+
+If your change involves a user facing change (change in flags of kured for example),
+please include expose your new feature in our default manifest (`kured-ds.yaml`),
+as a comment.
+
+Do not update the helm chart directly.
+Helm charts and our release manifests (see below) are our stable interfaces.
+Any user facing changes will therefore have to wait for a while before being
+exposed to our users.
+
+This also means that when you expose a new feature, you should create another PR
+for your changes in `charts/` to make your feature available for our next kured version.
+In this change, you can directly bump the appVersion to the next minor version.
+(for example, if current appVersion is 1.6.x, make sure you update your appVersion
+to 1.7.0). It allows us to have an easy view of what we land each release.
+
+Do not hesitate to increase the test coverage for your feature, whether it's unit
+testing to full functional testing (even using helm charts)
+
+### Increasing test coverage
+
+We are welcoming any change to increase our test coverage.
+See also our github issues for the label `testing`.
+
+### Updating helm charts
+
+Helm charts are continuously published. Any change in `charts/` will be immediately
+pushed in production.
+
+## Automated testing
+
+Our CI is covered by github actions.
+You can see their contents in .github/workflows.
+
+We currently run:
+- go tests and lint
+- shellcheck
+- a check for dead links in our docs
+- a security check against our base image (alpine)
+- a deep functional test using our manifests on all supported k8s versions
+- basic deployment using our helm chart on any chart change
+
+Changes in helm charts are not functionally tested on PRs. We assume that
+the PRs to implement the feature are properly tested by our users and
+contributors before merge.
+
+To test your code manually, follow the section Manual testing.
+
+## Manual (release) testing
 
 Before `kured` is released, we want to make sure it still works fine on the
 previous, current and next minor version of Kubernetes (with respect to the
 `client-go` & `kubectl` dependencies in use). For local testing e.g.
-`minikube` or `kind` can be sufficient.
+`minikube` or `kind` can be sufficient. This will allow you to catch issues
+that might not have been tested in our CI, like integration with other tools,
+or your specific use case.
 
 Deploy kured in your test scenario, make sure you pass the right `image`,
 update the e.g. `period` and `reboot-days` options, so you get immediate
@@ -42,7 +119,11 @@ results, if you login to a node and run:
 sudo touch /var/run/reboot-required
 ```
 
-### Testing with `minikube`
+### Example of golang testing
+
+Please run `make test`. You should have golint installed.
+
+### Example of testing with `minikube`
 
 A test-run with `minikube` could look like this:
 
@@ -82,7 +163,7 @@ If all the tests ran well, kured maintainers can reach out to the Weaveworks
 team to get an upcoming `kured` release tested in the Dev environment for
 real life testing.
 
-### Testing with `kind`
+### Example of testing with `kind`
 
 A test-run with `kind` could look like this:
 
