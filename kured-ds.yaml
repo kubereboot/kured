@@ -64,3 +64,4 @@ spec:
 #            - --start-time=0:00
 #            - --time-zone=UTC
 #            - --annotate-nodes=false
+#            - --lock-release-delay=30m

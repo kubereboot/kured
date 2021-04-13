@@ -43,6 +43,7 @@ var (
 	dsName                    string
 	lockAnnotation            string
 	lockTTL                   time.Duration
+	lockReleaseDelay          time.Duration
 	prometheusURL             string
 	preferNoScheduleTaintName string
 	alertFilter               *regexp.Regexp
@@ -101,6 +102,8 @@ func main() {
 		"annotation in which to record locking node")
 	rootCmd.PersistentFlags().DurationVar(&lockTTL, "lock-ttl", 0,
 		"expire lock annotation after this duration (default: 0, disabled)")
+	rootCmd.PersistentFlags().DurationVar(&lockReleaseDelay, "lock-release-delay", 0,
+		"delay lock release for this duration (default: 0, disabled)")
 	rootCmd.PersistentFlags().StringVar(&prometheusURL, "prometheus-url", "",
 		"Prometheus instance to probe for active alerts")
 	rootCmd.PersistentFlags().Var(&regexpValue{&alertFilter}, "alert-filter-regexp",
@@ -307,6 +310,12 @@ func acquire(lock *daemonsetlock.DaemonSetLock, metadata interface{}, TTL time.D
 		return true
 	}
 }
+func throttle(releaseDelay time.Duration) {
+	if releaseDelay > 0 {
+		log.Infof("Delaying lock release by %v", releaseDelay)
+		time.Sleep(releaseDelay)
+	}
+}
 
 func release(lock *daemonsetlock.DaemonSetLock) {
 	log.Infof("Releasing lock")
@@ -436,7 +445,7 @@ func deleteNodeAnnotation(client *kubernetes.Clientset, nodeID, key string) {
 	}
 }
 
-func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []string, window *timewindow.TimeWindow, TTL time.Duration) {
+func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []string, window *timewindow.TimeWindow, TTL time.Duration, releaseDelay time.Duration) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Fatal(err)
@@ -468,6 +477,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 				deleteNodeAnnotation(client, nodeID, KuredRebootInProgressAnnotation)
 			}
 		}
+		throttle(releaseDelay)
 		release(lock)
 	}
 
@@ -586,6 +596,11 @@ func root(cmd *cobra.Command, args []string) {
 	} else {
 		log.Info("Lock TTL not set, lock will remain until being released")
 	}
+	if lockReleaseDelay > 0 {
+		log.Infof("Lock release delay set, lock release will be delayed by: %v", lockReleaseDelay)
+	} else {
+		log.Info("Lock release delay not set, lock will be released immediately after rebooting")
+	}
 	log.Infof("PreferNoSchedule taint: %s", preferNoScheduleTaintName)
 	log.Infof("Blocking Pod Selectors: %v", podSelectors)
 	log.Infof("Reboot schedule: %v", window)
@@ -601,7 +616,7 @@ func root(cmd *cobra.Command, args []string) {
 	hostSentinelCommand := buildHostCommand(1, sentinelCommand)
 	hostRestartCommand := buildHostCommand(1, restartCommand)
 
-	go rebootAsRequired(nodeID, hostRestartCommand, hostSentinelCommand, window, lockTTL)
+	go rebootAsRequired(nodeID, hostRestartCommand, hostSentinelCommand, window, lockTTL, lockReleaseDelay)
 	go maintainRebootRequiredMetric(nodeID, hostSentinelCommand)
 
 	http.Handle("/metrics", promhttp.Handler())
