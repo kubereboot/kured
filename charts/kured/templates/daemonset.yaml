@@ -55,6 +55,9 @@ spec:
           {{- if .Values.configuration.lockTtl }}
             - --lock-ttl={{ .Values.configuration.lockTtl }}
           {{- end }}
+          {{- if .Values.configuration.lockReleaseDelay }}
+            - --lock-release-delay={{ .Values.configuration.lockReleaseDelay }}
+          {{- end }}
           {{- if .Values.configuration.alertFilterRegexp }}
             - --alert-filter-regexp={{ .Values.configuration.alertFilterRegexp }}
           {{- end }}

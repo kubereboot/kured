@@ -21,3 +21,4 @@ configuration:
   # startTime: ""             # only reboot after this time of day (default "0:00")
   # timeZone: ""              # time-zone to use (valid zones from "time" golang package)
   # annotateNodes: false       # enable 'weave.works/kured-reboot-in-progress' and 'weave.works/kured-most-recent-reboot-needed' node annotations to signify kured reboot operations
+  # lockReleaseDelay: "5m"    # throttle node reboots
