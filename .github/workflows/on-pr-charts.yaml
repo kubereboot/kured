@@ -39,3 +39,35 @@ jobs:
 
       - name: Run chart tests
         run: ct ${{ matrix.test-action }} --config .github/ct.yaml
+
+  # This doesn't re-use the ct actions, due to many limitations (auto tear down, no real testing)
+  deploy-chart:
+    name: "Functional test of helm chart with pre-published images"
+    runs-on: ubuntu-latest
+    needs: test-chart
+    steps:
+      - uses: actions/checkout@v2
+      
+      # Default name for helm/kind-action kind clusters is "chart-testing"
+      - name: Create 1 node kind cluster
+        uses: helm/kind-action@master
+
+      - name: Deploy kured on default namespace with its helm chart
+        run: |
+          # Documented in official helm doc to live on the edge
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          # Refresh bins
+          hash -r
+          helm install kured ./charts/kured/ --set configuration.period=1m --wait
+          kubectl config set-context kind-chart-testing
+          kubectl get ds --all-namespaces
+          kubectl describe ds kured
+
+      - name: Test if successful deploy
+        uses: nick-invision/retry@v2.4.0
+        with:
+          timeout_minutes: 10
+          max_attempts: 10
+          retry_wait_seconds: 10
+          # DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE should all be = to cluster_size
+          command: "kubectl get ds kured | grep -E 'kured.*1.*1.*1.*1.*1'"
