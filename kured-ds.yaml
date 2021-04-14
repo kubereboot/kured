@@ -44,23 +44,31 @@ spec:
                   fieldPath: spec.nodeName
           command:
             - /usr/bin/kured
-#            - --alert-filter-regexp=^RebootRequired$
-#            - --blocking-pod-selector=runtime=long,cost=expensive
-#            - --blocking-pod-selector=name=temperamental
-#            - --blocking-pod-selector=...
-#            - --ds-name=kured
-#            - --ds-namespace=kube-system
-#            - --end-time=23:59:59
-#            - --lock-annotation=weave.works/kured-node-lock
+#            - --force-reboot=false
+#            - --drain-grace-period=-1
+#            - --skip-wait-for-delete-timeout=0
+#            - --drain-timeout=0
 #            - --period=1h
+#            - --ds-namespace=kube-system
+#            - --ds-name=kured
+#            - --lock-annotation=weave.works/kured-node-lock
+#            - --lock-ttl=0
 #            - --prometheus-url=http://prometheus.monitoring.svc.cluster.local
-#            - --reboot-days=sun,mon,tue,wed,thu,fri,sat
+#            - --alert-filter-regexp=^RebootRequired$
 #            - --reboot-sentinel=/var/run/reboot-required
+#            - --prefer-no-schedule-taint=""
+#            - --reboot-sentinel-command=""
 #            - --slack-hook-url=https://hooks.slack.com/...
 #            - --slack-username=prod
 #            - --slack-channel=alerting
+#            - --notify-url="" # See also shoutrrr url format
 #            - --message-template-drain=Draining node %s
 #            - --message-template-drain=Rebooting node %s
+#            - --blocking-pod-selector=runtime=long,cost=expensive
+#            - --blocking-pod-selector=name=temperamental
+#            - --blocking-pod-selector=...
+#            - --reboot-days=sun,mon,tue,wed,thu,fri,sat
 #            - --start-time=0:00
+#            - --end-time=23:59:59
 #            - --time-zone=UTC
 #            - --annotate-nodes=false
