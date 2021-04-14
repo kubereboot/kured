@@ -211,3 +211,84 @@ jobs:
           retry_wait_seconds: 60
           # DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE should all be = to cluster_size
           command: "kubectl get ds -n kube-system kured | grep -E 'kured.*5.*5.*5.*5.*5'"
+
+  test-prom:
+    name: "Test prometheus with latest code from HEAD"
+    runs-on: ubuntu-latest
+    # only build with oldest and newest supported, it should be good enough.
+    strategy:
+      fail-fast: false
+      matrix:
+        kubernetes:
+          - "1.20"
+    steps:
+      - uses: actions/checkout@v2
+      - name: Find go version
+        run: |
+          GO_VERSION=$(awk '/^go/ {print $2};' go.mod)
+          echo "::set-output name=version::${GO_VERSION}"
+        id: awk_gomod
+      - name: Ensure go version
+        uses: actions/setup-go@v2
+        with:
+          go-version: "${{ steps.awk_gomod.outputs.version }}"
+      - name: Build artifacts
+        run: |
+          make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" image
+          make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" helm-chart
+
+      - name: "Workaround 'Failed to attach 1 to compat systemd cgroup /actions_job/...' on gh actions"
+        run: |
+          sudo bash << EOF
+              cp /etc/docker/daemon.json /etc/docker/daemon.json.old
+              echo '{}' > /etc/docker/daemon.json
+              systemctl restart docker || journalctl --no-pager -n 500
+              systemctl status docker
+          EOF
+
+      # Default name for helm/kind-action kind clusters is "chart-testing"
+      - name: Create 1 node kind cluster
+        uses: helm/kind-action@master
+
+      - name: Preload previously built images onto kind cluster
+        run: kind load docker-image docker.io/${{ github.repository_owner }}/kured:${{ github.sha }} --name chart-testing
+
+      - name: Deploy kured on default namespace with its helm chart
+        run: |
+          # Documented in official helm doc to live on the edge
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          # Refresh bins
+          hash -r
+          helm install kured ./charts/kured/ --wait --values ./charts/kured/ci/prometheus-values.yaml
+          kubectl config set-context kind-chart-testing
+          kubectl get ds --all-namespaces
+          kubectl describe ds kured
+
+      - name: Ensure kured is ready
+        uses: nick-invision/retry@v2.4.0
+        with:
+          timeout_minutes: 10
+          max_attempts: 10
+          retry_wait_seconds: 60
+          # DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE
+          command: "kubectl get ds kured | grep -E 'kured.*1.*1.*1.*1.*1' "
+
+      - name: Get metrics (healthy)
+        uses: nick-invision/retry@v2.4.0
+        with:
+          timeout_minutes: 2
+          max_attempts: 12
+          retry_wait_seconds: 5
+          command: "./tests/kind/test-metrics.sh 0"
+
+      - name: Create reboot sentinel files
+        run: |
+          ./tests/kind/create-reboot-sentinels.sh
+
+      - name: Get metrics (need reboot)
+        uses: nick-invision/retry@v2.4.0
+        with:
+          timeout_minutes: 15        
+          max_attempts: 10
+          retry_wait_seconds: 60
+          command: "./tests/kind/test-metrics.sh 1"
