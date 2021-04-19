@@ -100,7 +100,7 @@ func main() {
 		Run:    root}
 
 	rootCmd.PersistentFlags().BoolVar(&forceReboot, "force-reboot", false,
-		"force a reboot even if the drain is still running (default: false)")
+		"force a reboot even if the drain fails or times out (default: false)")
 	rootCmd.PersistentFlags().IntVar(&drainGracePeriod, "drain-grace-period", -1,
 		"time in seconds given to each pod to terminate gracefully, if negative, the default value specified in the pod will be used (default: -1)")
 	rootCmd.PersistentFlags().IntVar(&skipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", 0,
