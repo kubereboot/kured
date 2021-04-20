@@ -93,8 +93,8 @@ github.com/clbanning/x2j v0.0.0-20191024224557-825249438eec/go.mod h1:jMjuTZXRI4
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa/go.mod h1:zn76sxSg3SzpJ0PPJaLDCu+Bu0Lg3sKTORVIj19EIF8=
 github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd/go.mod h1:sE/e/2PUdi/liOCUjSTXgM1o87ZssimdTWN964YiIeI=
-github.com/containrrr/shoutrrr v0.4.2 h1:fAoWgO2DLbHeE3aMpeLJm/eZqZ/7hZ5aGoJAJZqGeOA=
-github.com/containrrr/shoutrrr v0.4.2/go.mod h1:zqL2BvfC1W4FujrT4b3/ZCLxvD+uoeEpBL7rg9Dqpbg=
+github.com/containrrr/shoutrrr v0.4.3 h1:7AHxRWFrWJJuVTfhooorVKIHOrG+v3mAk3qBkQUkBoU=
+github.com/containrrr/shoutrrr v0.4.3/go.mod h1:zqL2BvfC1W4FujrT4b3/ZCLxvD+uoeEpBL7rg9Dqpbg=
 github.com/coreos/bbolt v1.3.2/go.mod h1:iRUV2dpdMOn7Bo10OQBFzIJO9kkE559Wcmn+qkEiiKk=
 github.com/coreos/etcd v3.3.10+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=
 github.com/coreos/etcd v3.3.13+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=
