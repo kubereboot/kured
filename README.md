@@ -305,6 +305,11 @@ which holds lock might be killed thus annotation will stay there for ever.
 
 Using `--lock-ttl=30m` will allow other nodes to take over if TTL has expired (in this case 30min) and continue reboot process.
 
+### Delaying Lock Release
+
+
+Using `--lock-release-delay=30m` will cause nodes to hold the lock for the specified time frame (in this case 30min) before it is released and the reboot process continues. This can be used to throttle reboots across the cluster.
+
 ## Building
 
 Kured now uses [Go
