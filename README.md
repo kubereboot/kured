@@ -3,25 +3,27 @@
 
 <img src="https://github.com/weaveworks/kured/raw/main/img/logo.png" align="right"/>
 
-* [Introduction](#introduction)
-* [Kubernetes & OS Compatibility](#kubernetes-&-os-compatibility)
-* [Installation](#installation)
-* [Configuration](#configuration)
-  * [Reboot Sentinel File & Period](#reboot-sentinel-file-&-period)
-  * [Setting a schedule](#setting-a-schedule)
-  * [Blocking Reboots via Alerts](#blocking-reboots-via-alerts)
-  * [Blocking Reboots via Pods](#blocking-reboots-via-pods)
-  * [Prometheus Metrics](#prometheus-metrics)
-  * [Slack Notifications](#slack-notifications)
-  * [Overriding Lock Configuration](#overriding-lock-configuration)
-* [Operation](#operation)
-  * [Testing](#testing)
-  * [Disabling Reboots](#disabling-reboots)
-  * [Manual Unlock](#manual-unlock)
-  * [Automatic Unlock](#automatic-unlock)
-* [Building](#building)
-* [Frequently Asked/Anticipated Questions](#frequently-askedanticipated-questions)
-* [Getting Help](#getting-help)
+- [Introduction](#introduction)
+- [Kubernetes & OS Compatibility](#kubernetes--os-compatibility)
+- [Installation](#installation)
+- [Configuration](#configuration)
+  - [Reboot Sentinel File & Period](#reboot-sentinel-file--period)
+  - [Setting a schedule](#setting-a-schedule)
+  - [Blocking Reboots via Alerts](#blocking-reboots-via-alerts)
+  - [Blocking Reboots via Pods](#blocking-reboots-via-pods)
+  - [Prometheus Metrics](#prometheus-metrics)
+  - [Notifications](#notifications)
+  - [Overriding Lock Configuration](#overriding-lock-configuration)
+- [Operation](#operation)
+  - [Testing](#testing)
+  - [Disabling Reboots](#disabling-reboots)
+  - [Manual Unlock](#manual-unlock)
+  - [Automatic Unlock](#automatic-unlock)
+  - [Delaying Lock Release](#delaying-lock-release)
+- [Building](#building)
+- [Frequently Asked/Anticipated Questions](#frequently-askedanticipated-questions)
+  - [Why is there no `latest` tag on Docker Hub?](#why-is-there-no-latest-tag-on-docker-hub)
+- [Getting Help](#getting-help)
 
 ## Introduction
 
@@ -95,6 +97,7 @@ Flags:
       --lock-ttl duration                   expire lock annotation after this duration (default: 0, disabled)
       --message-template-drain string       message template used to notify about a node being drained (default "Draining node %s")
       --message-template-reboot string      message template used to notify about a node being rebooted (default "Rebooting node %s")
+      --notify-url                          url for reboot notifications (cannot use with --slack-hook-url flags)
       --period duration                     reboot check period (default 1h0m0s)
       --prefer-no-schedule-taint string     Taint name applied during pending node reboot (to prevent receiving additional pods from other rebooting nodes). Disabled by default. Set e.g. to "weave.works/kured-node-reboot" to enable tainting.
       --prometheus-url string               Prometheus instance to probe for active alerts
@@ -103,7 +106,7 @@ Flags:
       --reboot-sentinel string              path to file whose existence signals need to reboot (default "/var/run/reboot-required")
       --reboot-sentinel-command string      command for which a successful run signals need to reboot (default ""). If non-empty, sentinel file will be ignored.
       --slack-channel string                slack channel for reboot notfications
-      --slack-hook-url string               slack hook URL for reboot notfications
+      --slack-hook-url string               slack hook URL for reboot notfications [deprecated in favor of --notify-url]
       --slack-username string               slack username for reboot notfications (default "kured")
       --start-time string                   schedule reboot only after this time of day (default "0:00")
       --time-zone string                    use this timezone for schedule inputs (default "UTC")
@@ -238,14 +241,16 @@ Alternatively you can use the `--message-template-drain` and `--message-template
 
 Here is the syntax:
 
-slack:           `slack://tokenA/tokenB/tokenC`
+- slack:           `slack://tokenA/tokenB/tokenC`
 (`--slack-hook-url` is deprecated but possible to use)
 
-rocketchat:      `rocketchat://[username@]rocketchat-host/token[/channel|@recipient]`
+- rocketchat:      `rocketchat://[username@]rocketchat-host/token[/channel|@recipient]`
 
-teams:           `teams://token-a/token-b/token-c`
+- teams:           `teams://tName/token-a/token-b/token-c`
 
-Email:           `smtp://username:password@host:port/?fromAddress=fromAddress&toAddresses=recipient1[,recipient2,...]`
+   > **Attention** as the [format of the url has changed](https://github.com/containrrr/shoutrrr/issues/138) you also have to specify a `tName`
+
+- Email:           `smtp://username:password@host:port/?fromAddress=fromAddress&toAddresses=recipient1[,recipient2,...]`
 
 More details here: <https://github.com/containrrr/shoutrrr/blob/main/docs/services/overview.md>
 
