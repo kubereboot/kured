@@ -24,7 +24,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Run ShellCheck
-      uses: bewuethr/shellcheck-action@v2
+      uses: bewuethr/shellcheck-action@v2.0.4
 
   pr-lint-code:
     name: Lint golang code
