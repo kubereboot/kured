@@ -36,6 +36,8 @@ jobs:
 
       - name: Create default kind cluster
         uses: helm/kind-action@v1.1.0
+        with:
+          version: v0.11.0
         if: ${{ matrix.test-action == 'install' }}
 
       - name: Run chart tests
@@ -52,6 +54,8 @@ jobs:
       # Default name for helm/kind-action kind clusters is "chart-testing"
       - name: Create 1 node kind cluster
         uses: helm/kind-action@v1.1.0
+        with:
+          version: v0.11.0
 
       - name: Deploy kured on default namespace with its helm chart
         run: |
