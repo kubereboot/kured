@@ -3,25 +3,27 @@
 
 <img src="https://github.com/weaveworks/kured/raw/main/img/logo.png" align="right"/>
 
-* [Introduction](#introduction)
-* [Kubernetes & OS Compatibility](#kubernetes-&-os-compatibility)
-* [Installation](#installation)
-* [Configuration](#configuration)
-  * [Reboot Sentinel File & Period](#reboot-sentinel-file-&-period)
-  * [Setting a schedule](#setting-a-schedule)
-  * [Blocking Reboots via Alerts](#blocking-reboots-via-alerts)
-  * [Blocking Reboots via Pods](#blocking-reboots-via-pods)
-  * [Prometheus Metrics](#prometheus-metrics)
-  * [Slack Notifications](#slack-notifications)
-  * [Overriding Lock Configuration](#overriding-lock-configuration)
-* [Operation](#operation)
-  * [Testing](#testing)
-  * [Disabling Reboots](#disabling-reboots)
-  * [Manual Unlock](#manual-unlock)
-  * [Automatic Unlock](#automatic-unlock)
-* [Building](#building)
-* [Frequently Asked/Anticipated Questions](#frequently-askedanticipated-questions)
-* [Getting Help](#getting-help)
+- [Introduction](#introduction)
+- [Kubernetes & OS Compatibility](#kubernetes--os-compatibility)
+- [Installation](#installation)
+- [Configuration](#configuration)
+  - [Reboot Sentinel File & Period](#reboot-sentinel-file--period)
+  - [Setting a schedule](#setting-a-schedule)
+  - [Blocking Reboots via Alerts](#blocking-reboots-via-alerts)
+  - [Blocking Reboots via Pods](#blocking-reboots-via-pods)
+  - [Prometheus Metrics](#prometheus-metrics)
+  - [Notifications](#notifications)
+  - [Overriding Lock Configuration](#overriding-lock-configuration)
+- [Operation](#operation)
+  - [Testing](#testing)
+  - [Disabling Reboots](#disabling-reboots)
+  - [Manual Unlock](#manual-unlock)
+  - [Automatic Unlock](#automatic-unlock)
+  - [Delaying Lock Release](#delaying-lock-release)
+- [Building](#building)
+- [Frequently Asked/Anticipated Questions](#frequently-askedanticipated-questions)
+  - [Why is there no `latest` tag on Docker Hub?](#why-is-there-no-latest-tag-on-docker-hub)
+- [Getting Help](#getting-help)
 
 ## Introduction
 
@@ -46,7 +48,8 @@ server:
 
 | kured | kubectl | k8s.io/client-go | k8s.io/apimachinery | expected kubernetes compatibility |
 |-------|---------|------------------|---------------------|-----------------------------------|
-| main  | 1.20.1  | v0.20.1          | v0.20.1             | 1.19.x, 1.20.x, 1.21.x            |
+| main  | 1.20.5  | v0.20.5          | v0.20.5             | 1.19.x, 1.20.x, 1.21.x            |
+| 1.7.0 | 1.20.5  | v0.20.5          | v0.20.5             | 1.19.x, 1.20.x, 1.21.x            |
 | 1.6.1 | 1.19.4  | v0.19.4          | v0.19.4             | 1.18.x, 1.19.x, 1.20.x            |
 | 1.5.1 | 1.18.8  | v0.18.8          | v0.18.8             | 1.17.x, 1.18.x, 1.19.x            |
 | 1.4.4 | 1.17.7  | v0.17.0          | v0.17.0             | 1.16.x, 1.17.x, 1.18.x            |
@@ -83,14 +86,19 @@ The following arguments can be passed to kured via the daemonset pod template:
 Flags:
       --alert-filter-regexp regexp.Regexp   alert names to ignore when checking for active alerts
       --blocking-pod-selector stringArray   label selector identifying pods whose presence should prevent reboots
+      --drain-grace-period int              time in seconds given to each pod to terminate gracefully, if negative, the default value specified in the pod will be used (default: -1)
+      --skip-wait-for-delete-timeout int    when seconds is greater than zero, skip waiting for the pods whose deletion timestamp is older than N seconds while draining a node (default: 0)
       --ds-name string                      name of daemonset on which to place lock (default "kured")
       --ds-namespace string                 namespace containing daemonset on which to place lock (default "kube-system")
       --end-time string                     schedule reboot only before this time of day (default "23:59:59")
+      --force-reboot bool                   force a reboot even if the drain is still running (default: false)
+      --drain-timeout duration              timeout after which the drain is aborted (default: 0, infinite time)
   -h, --help                                help for kured
       --lock-annotation string              annotation in which to record locking node (default "weave.works/kured-node-lock")
       --lock-ttl duration                   expire lock annotation after this duration (default: 0, disabled)
       --message-template-drain string       message template used to notify about a node being drained (default "Draining node %s")
       --message-template-reboot string      message template used to notify about a node being rebooted (default "Rebooting node %s")
+      --notify-url                          url for reboot notifications (cannot use with --slack-hook-url flags)
       --period duration                     reboot check period (default 1h0m0s)
       --prefer-no-schedule-taint string     Taint name applied during pending node reboot (to prevent receiving additional pods from other rebooting nodes). Disabled by default. Set e.g. to "weave.works/kured-node-reboot" to enable tainting.
       --prometheus-url string               Prometheus instance to probe for active alerts
@@ -99,7 +107,7 @@ Flags:
       --reboot-sentinel string              path to file whose existence signals need to reboot (default "/var/run/reboot-required")
       --reboot-sentinel-command string      command for which a successful run signals need to reboot (default ""). If non-empty, sentinel file will be ignored.
       --slack-channel string                slack channel for reboot notfications
-      --slack-hook-url string               slack hook URL for reboot notfications
+      --slack-hook-url string               slack hook URL for reboot notfications [deprecated in favor of --notify-url]
       --slack-username string               slack username for reboot notfications (default "kured")
       --start-time string                   schedule reboot only after this time of day (default "0:00")
       --time-zone string                    use this timezone for schedule inputs (default "UTC")
@@ -234,14 +242,16 @@ Alternatively you can use the `--message-template-drain` and `--message-template
 
 Here is the syntax:
 
-slack:           `slack://tokenA/tokenB/tokenC`
+- slack:           `slack://tokenA/tokenB/tokenC`
 (`--slack-hook-url` is deprecated but possible to use)
 
-rocketchat:      `rocketchat://[username@]rocketchat-host/token[/channel|@recipient]`
+- rocketchat:      `rocketchat://[username@]rocketchat-host/token[/channel|@recipient]`
 
-teams:           `teams://token-a/token-b/token-c`
+- teams:           `teams://tName/token-a/token-b/token-c`
 
-Email:           `smtp://username:password@host:port/?fromAddress=fromAddress&toAddresses=recipient1[,recipient2,...]`
+   > **Attention** as the [format of the url has changed](https://github.com/containrrr/shoutrrr/issues/138) you also have to specify a `tName`
+
+- Email:           `smtp://username:password@host:port/?fromAddress=fromAddress&toAddresses=recipient1[,recipient2,...]`
 
 More details here: <https://github.com/containrrr/shoutrrr/blob/main/docs/services/overview.md>
 
@@ -300,6 +310,11 @@ In exceptional circumstances (especially when used with cluster-autoscaler) a no
 which holds lock might be killed thus annotation will stay there for ever.
 
 Using `--lock-ttl=30m` will allow other nodes to take over if TTL has expired (in this case 30min) and continue reboot process.
+
+### Delaying Lock Release
+
+
+Using `--lock-release-delay=30m` will cause nodes to hold the lock for the specified time frame (in this case 30min) before it is released and the reboot process continues. This can be used to throttle reboots across the cluster.
 
 ## Building
 

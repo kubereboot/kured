@@ -1,0 +1,13 @@
+# This is tested twice:
+# Basic install test with chart-testing (on charts PRs)
+# Functional testing in PRs (other PRs)
+
+service:
+  create: true
+  name: kured-prometheus-endpoint
+  port: 8080
+  type: NodePort
+  nodePort: 30000
+
+# Do not override the configuration: period in this, so that
+# We can test prometheus exposed metrics without rebooting.

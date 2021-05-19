@@ -65,6 +65,7 @@ service:
   port: 8080
   annotations: {}
   name: ""
+  type: ClusterIP
 
 podLabels: {}
 

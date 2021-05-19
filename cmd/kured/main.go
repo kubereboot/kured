@@ -38,24 +38,29 @@ var (
 	version = "unreleased"
 
 	// Command line flags
-	period                    time.Duration
-	dsNamespace               string
-	dsName                    string
-	lockAnnotation            string
-	lockTTL                   time.Duration
-	prometheusURL             string
-	preferNoScheduleTaintName string
-	alertFilter               *regexp.Regexp
-	rebootSentinelFile        string
-	rebootSentinelCommand     string
-	notifyURL                 string
-	slackHookURL              string
-	slackUsername             string
-	slackChannel              string
-	messageTemplateDrain      string
-	messageTemplateReboot     string
-	podSelectors              []string
-	rebootCommand             string
+	forceReboot                     bool
+	drainTimeout                    time.Duration
+	period                          time.Duration
+	drainGracePeriod                int
+	skipWaitForDeleteTimeoutSeconds int
+	dsNamespace                     string
+	dsName                          string
+	lockAnnotation                  string
+	lockTTL                         time.Duration
+	lockReleaseDelay                time.Duration  
+	prometheusURL                   string
+	preferNoScheduleTaintName       string
+	alertFilter                     *regexp.Regexp
+	rebootSentinelFile              string
+	rebootSentinelCommand           string
+	notifyURL                       string
+	slackHookURL                    string
+	slackUsername                   string
+	slackChannel                    string
+	messageTemplateDrain            string
+	messageTemplateReboot           string
+	podSelectors                    []string
+	rebootCommand                   string
 
 	rebootDays    []string
 	rebootStart   string
@@ -91,6 +96,14 @@ func main() {
 		PreRun: flagCheck,
 		Run:    root}
 
+	rootCmd.PersistentFlags().BoolVar(&forceReboot, "force-reboot", false,
+		"force a reboot even if the drain is still running (default: false)")
+	rootCmd.PersistentFlags().IntVar(&drainGracePeriod, "drain-grace-period", -1,
+		"time in seconds given to each pod to terminate gracefully, if negative, the default value specified in the pod will be used (default: -1)")
+	rootCmd.PersistentFlags().IntVar(&skipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", 0,
+		"when seconds is greater than zero, skip waiting for the pods whose deletion timestamp is older than N seconds while draining a node (default: 0)")
+	rootCmd.PersistentFlags().DurationVar(&drainTimeout, "drain-timeout", 0,
+		"timeout after which the drain is aborted (default: 0, infinite time)")
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
 		"sentinel check period")
 	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-namespace", "kube-system",
@@ -101,6 +114,8 @@ func main() {
 		"annotation in which to record locking node")
 	rootCmd.PersistentFlags().DurationVar(&lockTTL, "lock-ttl", 0,
 		"expire lock annotation after this duration (default: 0, disabled)")
+	rootCmd.PersistentFlags().DurationVar(&lockReleaseDelay, "lock-release-delay", 0,
+		"delay lock release for this duration (default: 0, disabled)")
 	rootCmd.PersistentFlags().StringVar(&prometheusURL, "prometheus-url", "",
 		"Prometheus instance to probe for active alerts")
 	rootCmd.PersistentFlags().Var(&regexpValue{&alertFilter}, "alert-filter-regexp",
@@ -308,6 +323,13 @@ func acquire(lock *daemonsetlock.DaemonSetLock, metadata interface{}, TTL time.D
 	}
 }
 
+func throttle(releaseDelay time.Duration) {
+	if releaseDelay > 0 {
+		log.Infof("Delaying lock release by %v", releaseDelay)
+		time.Sleep(releaseDelay)
+	}
+}
+
 func release(lock *daemonsetlock.DaemonSetLock) {
 	log.Infof("Releasing lock")
 	if err := lock.Release(); err != nil {
@@ -332,20 +354,32 @@ func drain(client *kubernetes.Clientset, node *v1.Node) {
 	}
 
 	drainer := &kubectldrain.Helper{
-		Client:              client,
-		GracePeriodSeconds:  -1,
-		Force:               true,
-		DeleteEmptyDirData:  true,
-		IgnoreAllDaemonSets: true,
-		ErrOut:              os.Stderr,
-		Out:                 os.Stdout,
+		Client:                          client,
+		Ctx:                             context.Background(),
+		GracePeriodSeconds:              drainGracePeriod,
+		SkipWaitForDeleteTimeoutSeconds: skipWaitForDeleteTimeoutSeconds,
+		Force:                           true,
+		DeleteEmptyDirData:              true,
+		IgnoreAllDaemonSets:             true,
+		ErrOut:                          os.Stderr,
+		Out:                             os.Stdout,
+		Timeout:                         drainTimeout,
 	}
+
 	if err := kubectldrain.RunCordonOrUncordon(drainer, node, true); err != nil {
-		log.Fatalf("Error cordonning %s: %v", nodename, err)
+		if !forceReboot {
+			log.Fatalf("Error cordonning %s: %v", nodename, err)
+		}
+		log.Errorf("Error cordonning %s: %v, continuing with reboot anyway", nodename, err)
+		return
 	}
 
 	if err := kubectldrain.RunNodeDrain(drainer, nodename); err != nil {
-		log.Fatalf("Error draining %s: %v", nodename, err)
+		if !forceReboot {
+			log.Fatalf("Error draining %s: %v", nodename, err)
+		}
+		log.Errorf("Error draining %s: %v, continuing with reboot anyway", nodename, err)
+		return
 	}
 }
 
@@ -436,7 +470,7 @@ func deleteNodeAnnotation(client *kubernetes.Clientset, nodeID, key string) {
 	}
 }
 
-func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []string, window *timewindow.TimeWindow, TTL time.Duration) {
+func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []string, window *timewindow.TimeWindow, TTL time.Duration, releaseDelay time.Duration) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Fatal(err)
@@ -468,6 +502,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 				deleteNodeAnnotation(client, nodeID, KuredRebootInProgressAnnotation)
 			}
 		}
+		throttle(releaseDelay)
 		release(lock)
 	}
 
@@ -586,6 +621,11 @@ func root(cmd *cobra.Command, args []string) {
 	} else {
 		log.Info("Lock TTL not set, lock will remain until being released")
 	}
+	if lockReleaseDelay > 0 {
+		log.Infof("Lock release delay set, lock release will be delayed by: %v", lockReleaseDelay)
+	} else {
+		log.Info("Lock release delay not set, lock will be released immediately after rebooting")
+	}
 	log.Infof("PreferNoSchedule taint: %s", preferNoScheduleTaintName)
 	log.Infof("Blocking Pod Selectors: %v", podSelectors)
 	log.Infof("Reboot schedule: %v", window)
@@ -601,7 +641,7 @@ func root(cmd *cobra.Command, args []string) {
 	hostSentinelCommand := buildHostCommand(1, sentinelCommand)
 	hostRestartCommand := buildHostCommand(1, restartCommand)
 
-	go rebootAsRequired(nodeID, hostRestartCommand, hostSentinelCommand, window, lockTTL)
+	go rebootAsRequired(nodeID, hostRestartCommand, hostSentinelCommand, window, lockTTL, lockReleaseDelay)
 	go maintainRebootRequiredMetric(nodeID, hostSentinelCommand)
 
 	http.Handle("/metrics", promhttp.Handler())
