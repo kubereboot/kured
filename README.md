@@ -96,6 +96,7 @@ Flags:
   -h, --help                                help for kured
       --lock-annotation string              annotation in which to record locking node (default "weave.works/kured-node-lock")
       --lock-ttl duration                   expire lock annotation after this duration (default: 0, disabled)
+      --lock-release-delay duration         hold lock after reboot by this duration (default: 0, disabled)
       --message-template-drain string       message template used to notify about a node being drained (default "Draining node %s")
       --message-template-reboot string      message template used to notify about a node being rebooted (default "Rebooting node %s")
       --notify-url                          url for reboot notifications (cannot use with --slack-hook-url flags)
