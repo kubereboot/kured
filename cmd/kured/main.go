@@ -87,6 +87,8 @@ const (
 	KuredMostRecentRebootNeededAnnotation string = "weave.works/kured-most-recent-reboot-needed"
 )
 
+const ExcludeFromLoadBalancersLabel = "node.kubernetes.io~1exclude-from-external-load-balancers"
+
 func init() {
 	prometheus.MustRegister(rebootRequiredGauge)
 }
@@ -345,6 +347,28 @@ func release(lock *daemonsetlock.DaemonSetLock) {
 	}
 }
 
+func deregisterLB(client *kubernetes.Clientset, nodeID string) {
+	log.Infof("De-registering node from external load balancers")
+	
+	// add "exclude-from-external-load-balancers" node label
+	labelPatch := fmt.Sprintf(`[{"op":"add","path":"/metadata/labels/%s","value":"" }]`, ExcludeFromLoadBalancersLabel)
+	_, err := client.CoreV1().Nodes().Patch(context.TODO(), nodeID, types.JSONPatchType, []byte(labelPatch), metav1.PatchOptions{})
+	if err != nil {
+		log.Warnf("Unable to add \"%s\" label to node", ExcludeFromLoadBalancersLabel)
+	}
+}
+
+func registerLB(client *kubernetes.Clientset, nodeID string) {
+	log.Infof("Registering node with external load balancers")
+	
+	// remove "exclude-from-external-load-balancers" node label
+	labelPatch := fmt.Sprintf(`[{"op":"remove","path":"/metadata/labels/%s"}]`, ExcludeFromLoadBalancersLabel)
+	_, err := client.CoreV1().Nodes().Patch(context.TODO(), nodeID, types.JSONPatchType, []byte(labelPatch), metav1.PatchOptions{})
+	if err != nil {
+		log.Warnf("Unable to remove \"%s\" label from node", ExcludeFromLoadBalancersLabel)
+	}
+}
+
 func drain(client *kubernetes.Clientset, node *v1.Node) {
 	nodename := node.GetName()
 
@@ -510,6 +534,9 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 				deleteNodeAnnotation(client, nodeID, KuredRebootInProgressAnnotation)
 			}
 		}
+
+		registerLB(client, nodeID)
+		
 		throttle(releaseDelay)
 		release(lock)
 	}
@@ -580,7 +607,12 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 			continue
 		}
 
+		deregisterLB(client, nodeID)
 		drain(client, node)
+
+		log.Infof("Waiting for node to finish de-registering from load balancer (105 sec.)")
+		time.Sleep(105 * time.Second)
+
 		invokeReboot(nodeID, rebootCommand)
 		for {
 			log.Infof("Waiting for reboot")
