@@ -32,7 +32,7 @@ jobs:
 
       # Helm is already present in github actions, so do not re-install it
       - name: Setup chart testing
-        uses: helm/chart-testing-action@v2.0.1
+        uses: helm/chart-testing-action@v2.1.0
 
       - name: Create default kind cluster
         uses: helm/kind-action@v1.1.0
