@@ -160,11 +160,15 @@ Prometheus server:
 ```
 
 By default the presence of *any* active (pending or firing) alerts
-will block reboots, however you can ignore specific alerts:
+will block reboots, however you can ignore specific alerts, or add them by using labels:
 
 ```console
 --alert-filter-regexp=^(RebootRequired|AnotherBenignAlert|...$
+--alert-include-label="team=infra,severity=critical..."
 ```
+The --alert-filter-regexp will exclude active alerts by filtering (regex) on alertnames.
+The --alert-include-label will include active alerts by querying on prometheus labels. The labels will trump the regex filtering. So make sure to filter by the correct labels, like `"severity":"critical"`.
+For instance: When a regex-filter is set to exclude an (arbitrary) active alert `Podcrash`, and the alert-label-filter is specified on the namespace of the Pod (e.g. `"namespace": "dev"`), it will block rebooting. 
 
 See the section on Prometheus metrics for an important application of this
 filter.

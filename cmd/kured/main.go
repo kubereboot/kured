@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	papi "github.com/prometheus/client_golang/api"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
@@ -47,10 +48,11 @@ var (
 	dsName                          string
 	lockAnnotation                  string
 	lockTTL                         time.Duration
-	lockReleaseDelay                time.Duration  
+	lockReleaseDelay                time.Duration
 	prometheusURL                   string
 	preferNoScheduleTaintName       string
 	alertFilter                     *regexp.Regexp
+	alertIncludeLabel               map[string]string
 	rebootSentinelFile              string
 	rebootSentinelCommand           string
 	notifyURL                       string
@@ -120,6 +122,8 @@ func main() {
 		"Prometheus instance to probe for active alerts")
 	rootCmd.PersistentFlags().Var(&regexpValue{&alertFilter}, "alert-filter-regexp",
 		"alert names to ignore when checking for active alerts")
+	rootCmd.PersistentFlags().StringToStringVar(&alertIncludeLabel, "alert-include-label", map[string]string{},
+		"queries active alerts using Prometheus labels and blocks rebooting if found, e.g. team=infra,severity=critical")
 	rootCmd.PersistentFlags().StringVar(&rebootSentinelFile, "reboot-sentinel", "/var/run/reboot-required",
 		"path to file whose existence triggers the reboot command")
 	rootCmd.PersistentFlags().StringVar(&preferNoScheduleTaintName, "prefer-no-schedule-taint", "",
@@ -128,7 +132,6 @@ func main() {
 		"command for which a zero return code will trigger a reboot command")
 	rootCmd.PersistentFlags().StringVar(&rebootCommand, "reboot-command", "/bin/systemctl reboot",
 		"command to run when a reboot is required")
-
 	rootCmd.PersistentFlags().StringVar(&slackHookURL, "slack-hook-url", "",
 		"slack hook URL for notifications")
 	rootCmd.PersistentFlags().StringVar(&slackUsername, "slack-username", "kured",
@@ -141,10 +144,8 @@ func main() {
 		"message template used to notify about a node being drained")
 	rootCmd.PersistentFlags().StringVar(&messageTemplateReboot, "message-template-reboot", "Rebooting node %s",
 		"message template used to notify about a node being rebooted")
-
 	rootCmd.PersistentFlags().StringArrayVar(&podSelectors, "blocking-pod-selector", nil,
 		"label selector identifying pods whose presence should prevent reboots")
-
 	rootCmd.PersistentFlags().StringSliceVar(&rebootDays, "reboot-days", timewindow.EveryDay,
 		"schedule reboot on these days")
 	rootCmd.PersistentFlags().StringVar(&rebootStart, "start-time", "0:00",
@@ -153,7 +154,6 @@ func main() {
 		"schedule reboot only before this time of day")
 	rootCmd.PersistentFlags().StringVar(&timezone, "time-zone", "UTC",
 		"use this timezone for schedule inputs")
-
 	rootCmd.PersistentFlags().BoolVar(&annotateNodes, "annotate-nodes", false,
 		"if set, the annotations 'weave.works/kured-reboot-in-progress' and 'weave.works/kured-most-recent-reboot-needed' will be given to nodes undergoing kured reboots")
 
@@ -228,8 +228,6 @@ type RebootBlocker interface {
 // PrometheusBlockingChecker contains info for connecting
 // to prometheus, and can give info about whether a reboot should be blocked
 type PrometheusBlockingChecker struct {
-	// URL to contact prometheus API for checking alerts
-	promURL string
 	// regexp used to get alerts
 	filter *regexp.Regexp
 }
@@ -245,7 +243,9 @@ type KubernetesBlockingChecker struct {
 }
 
 func (pb PrometheusBlockingChecker) isBlocked() bool {
-	alertNames, err := alerts.PrometheusActiveAlerts(pb.promURL, pb.filter)
+	prom, _ := alerts.PromClient{}.New(papi.Config{Address: prometheusURL})
+
+	alertNames, err := prom.ActiveAlerts(pb.filter, map[string]string{})
 	if err != nil {
 		log.Warnf("Reboot blocked: prometheus query error: %v", err)
 		return true
@@ -531,7 +531,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 
 		var blockCheckers []RebootBlocker
 		if prometheusURL != "" {
-			blockCheckers = append(blockCheckers, PrometheusBlockingChecker{promURL: prometheusURL, filter: alertFilter})
+			blockCheckers = append(blockCheckers, PrometheusBlockingChecker{filter: alertFilter})
 		}
 		if podSelectors != nil {
 			blockCheckers = append(blockCheckers, KubernetesBlockingChecker{client: client, nodename: nodeID, filter: podSelectors})

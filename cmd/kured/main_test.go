@@ -23,7 +23,7 @@ func Test_rebootBlocked(t *testing.T) {
 	noCheckers := []RebootBlocker{}
 	nonblockingChecker := BlockingChecker{blocking: false}
 	blockingChecker := BlockingChecker{blocking: true}
-	brokenPrometheusClient := PrometheusBlockingChecker{promURL: "", filter: nil}
+	brokenPrometheusClient := PrometheusBlockingChecker{filter: nil}
 
 	type args struct {
 		blockers []RebootBlocker
