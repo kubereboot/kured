@@ -228,6 +228,8 @@ type RebootBlocker interface {
 // PrometheusBlockingChecker contains info for connecting
 // to prometheus, and can give info about whether a reboot should be blocked
 type PrometheusBlockingChecker struct {
+	// labels to query get  alerts
+	includeLabel map[string]string
 	// regexp used to get alerts
 	filter *regexp.Regexp
 }
@@ -245,7 +247,7 @@ type KubernetesBlockingChecker struct {
 func (pb PrometheusBlockingChecker) isBlocked() bool {
 	prom, _ := alerts.PromClient{}.New(papi.Config{Address: prometheusURL})
 
-	alertNames, err := prom.ActiveAlerts(pb.filter, map[string]string{})
+	alertNames, err := prom.ActiveAlerts(pb.filter, pb.includeLabel)
 	if err != nil {
 		log.Warnf("Reboot blocked: prometheus query error: %v", err)
 		return true
@@ -531,7 +533,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 
 		var blockCheckers []RebootBlocker
 		if prometheusURL != "" {
-			blockCheckers = append(blockCheckers, PrometheusBlockingChecker{filter: alertFilter})
+			blockCheckers = append(blockCheckers, PrometheusBlockingChecker{filter: alertFilter, includeLabel: alertIncludeLabel})
 		}
 		if podSelectors != nil {
 			blockCheckers = append(blockCheckers, KubernetesBlockingChecker{client: client, nodename: nodeID, filter: podSelectors})

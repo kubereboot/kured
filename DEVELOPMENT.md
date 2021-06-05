@@ -171,6 +171,9 @@ A test-run with `kind` could look like this:
 # create kind cluster
 kind create cluster --config .github/kind-cluster-<k8s-version>.yaml
 
+# load the image to the kind cluster
+kind load docker-image docker.io/weaveworks/kured
+
 # create reboot required files on pre-defined kind nodes
 ./tests/kind/create-reboot-sentinels.sh
 

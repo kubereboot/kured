@@ -55,7 +55,7 @@ spec:
 #            - --lock-ttl=0
 #            - --prometheus-url=http://prometheus.monitoring.svc.cluster.local
 #            - --alert-filter-regexp=^RebootRequired$
-#            - --alert-include-label="team=infra,severity=critical"
+#            - --alert-include-label=team=infra,severity=critical
 #            - --reboot-sentinel=/var/run/reboot-required
 #            - --prefer-no-schedule-taint=""
 #            - --reboot-sentinel-command=""

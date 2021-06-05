@@ -3,10 +3,11 @@ package alerts
 import (
 	"context"
 	"fmt"
-	"log"
 	"regexp"
 	"sort"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	papi "github.com/prometheus/client_golang/api"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
@@ -55,11 +56,10 @@ func (p *PromClient) ActiveAlerts(filter *regexp.Regexp, inclLabel map[string]st
 			for _, sample := range vector {
 				if alertName, isAlert := sample.Metric[model.AlertNameLabel]; isAlert && sample.Value != 0 {
 					if filter == nil || !filter.MatchString(string(alertName)) {
-						log.Print("Added to the BlockingList, by regexFilter: ", alertName)
+						log.Info("Added to the BlockingList, by regexFilter: ", alertName)
 						activeAlertSet[string(alertName)] = true
 					}
 					for k, v := range inclLabel {
-						fmt.Println(k, v)
 						if sample.Metric[model.LabelName(k)] == model.LabelValue(v) {
 							// because filtering by labels doesn't check for alertname, we want to make sure
 							// there's no deadlock, that is, Kured is alerting itself on the block-list.
@@ -67,7 +67,7 @@ func (p *PromClient) ActiveAlerts(filter *regexp.Regexp, inclLabel map[string]st
 								continue
 							}
 							activeAlertSet[string(alertName)] = true
-							log.Print("Added to the BlockingList, by includeLabel: ", alertName)
+							log.Info("Added to the BlockingList, by includeLabel: ", alertName)
 						}
 					}
 				}
