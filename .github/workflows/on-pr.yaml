@@ -144,7 +144,7 @@ jobs:
           kubectl apply -f kured-rbac.yaml && kubectl apply -f kured-ds.yaml
 
       - name: Ensure kured is ready
-        uses: nick-invision/retry@v2.4.0
+        uses: nick-invision/retry@v2.4.1
         with:
           timeout_minutes: 10
           max_attempts: 10
@@ -217,7 +217,7 @@ jobs:
           kubectl describe ds kured
 
       - name: Ensure kured is ready
-        uses: nick-invision/retry@v2.4.0
+        uses: nick-invision/retry@v2.4.1
         with:
           timeout_minutes: 10
           max_attempts: 10
@@ -226,7 +226,7 @@ jobs:
           command: "kubectl get ds kured | grep -E 'kured.*1.*1.*1.*1.*1' "
 
       - name: Get metrics (healthy)
-        uses: nick-invision/retry@v2.4.0
+        uses: nick-invision/retry@v2.4.1
         with:
           timeout_minutes: 2
           max_attempts: 12
@@ -238,7 +238,7 @@ jobs:
           ./tests/kind/create-reboot-sentinels.sh
 
       - name: Get metrics (need reboot)
-        uses: nick-invision/retry@v2.4.0
+        uses: nick-invision/retry@v2.4.1
         with:
           timeout_minutes: 15
           max_attempts: 10
@@ -308,7 +308,7 @@ jobs:
   #         kubectl describe ds kured
   #
   #     - name: Ensure kured is ready
-  #       uses: nick-invision/retry@v2.4.0
+  #       uses: nick-invision/retry@v2.4.1
   #       with:
   #         timeout_minutes: 10
   #         max_attempts: 10

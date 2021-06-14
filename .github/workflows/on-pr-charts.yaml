@@ -69,7 +69,7 @@ jobs:
           kubectl describe ds kured
 
       - name: Test if successful deploy
-        uses: nick-invision/retry@v2.4.0
+        uses: nick-invision/retry@v2.4.1
         with:
           timeout_minutes: 10
           max_attempts: 10
