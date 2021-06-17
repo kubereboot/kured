@@ -82,6 +82,9 @@ spec:
           {{- if .Values.configuration.rebootSentinel }}
             - --reboot-sentinel={{ .Values.configuration.rebootSentinel }}
           {{- end }}
+          {{- if .Values.configuration.rebootCommand }}
+            - --reboot-command={{ .Values.configuration.rebootCommand }}
+          {{- end }}
           {{- if .Values.configuration.slackChannel }}
             - --slack-channel={{ .Values.configuration.slackChannel }}
           {{- end }}
