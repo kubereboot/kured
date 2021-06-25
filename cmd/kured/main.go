@@ -52,7 +52,6 @@ var (
 	prometheusURL                   string
 	preferNoScheduleTaintName       string
 	alertFilter                     *regexp.Regexp
-	alertIncludeLabel               map[string]string
 	rebootSentinelFile              string
 	rebootSentinelCommand           string
 	notifyURL                       string
@@ -122,8 +121,6 @@ func main() {
 		"Prometheus instance to probe for active alerts")
 	rootCmd.PersistentFlags().Var(&regexpValue{&alertFilter}, "alert-filter-regexp",
 		"alert names to ignore when checking for active alerts")
-	rootCmd.PersistentFlags().StringToStringVar(&alertIncludeLabel, "alert-include-label", map[string]string{},
-		"queries active alerts using Prometheus labels and blocks rebooting if found, e.g. team=infra,severity=critical")
 	rootCmd.PersistentFlags().StringVar(&rebootSentinelFile, "reboot-sentinel", "/var/run/reboot-required",
 		"path to file whose existence triggers the reboot command")
 	rootCmd.PersistentFlags().StringVar(&preferNoScheduleTaintName, "prefer-no-schedule-taint", "",
@@ -228,8 +225,9 @@ type RebootBlocker interface {
 // PrometheusBlockingChecker contains info for connecting
 // to prometheus, and can give info about whether a reboot should be blocked
 type PrometheusBlockingChecker struct {
-	// labels to query get  alerts
-	includeLabel map[string]string
+	// prometheusClient to make prometheus-go-client and api config available
+	// into the PrometheusBlockingChecker struct
+	promClient *alerts.PromClient
 	// regexp used to get alerts
 	filter *regexp.Regexp
 }
@@ -245,9 +243,8 @@ type KubernetesBlockingChecker struct {
 }
 
 func (pb PrometheusBlockingChecker) isBlocked() bool {
-	prom, _ := alerts.PromClient{}.New(papi.Config{Address: prometheusURL})
 
-	alertNames, err := prom.ActiveAlerts(pb.filter, pb.includeLabel)
+	alertNames, err := pb.promClient.ActiveAlerts(pb.filter)
 	if err != nil {
 		log.Warnf("Reboot blocked: prometheus query error: %v", err)
 		return true
@@ -515,6 +512,12 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 		preferNoScheduleTaint.Disable()
 	}
 
+	// instantiate prometheus client
+	promClient, err := alerts.PromClient{}.New(papi.Config{Address: prometheusURL})
+	if err != nil {
+		log.Fatal("Unable to create prometheus client: ", err)
+	}
+
 	source := rand.NewSource(time.Now().UnixNano())
 	tick := delaytick.New(source, period)
 	for range tick {
@@ -533,7 +536,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 
 		var blockCheckers []RebootBlocker
 		if prometheusURL != "" {
-			blockCheckers = append(blockCheckers, PrometheusBlockingChecker{filter: alertFilter, includeLabel: alertIncludeLabel})
+			blockCheckers = append(blockCheckers, PrometheusBlockingChecker{promClient: promClient, filter: alertFilter})
 		}
 		if podSelectors != nil {
 			blockCheckers = append(blockCheckers, KubernetesBlockingChecker{client: client, nodename: nodeID, filter: podSelectors})

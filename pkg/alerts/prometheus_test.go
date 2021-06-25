@@ -45,12 +45,11 @@ func TestActiveAlerts(t *testing.T) {
 	addr := "http://localhost:10001"
 
 	for _, tc := range []struct {
-		it        string
-		rFilter   string
-		inclLabel map[string]string
-		respBody  string
-		aName     string
-		wantN     int
+		it       string
+		rFilter  string
+		respBody string
+		aName    string
+		wantN    int
 	}{
 		{
 			it:       "should return no active alerts",
@@ -71,11 +70,10 @@ func TestActiveAlerts(t *testing.T) {
 			wantN:    5,
 		},
 		{
-			it:        "should return all active alerts by include label / regex filter",
-			respBody:  responsebody,
-			rFilter:   "*",
-			inclLabel: map[string]string{"": ""},
-			wantN:     5,
+			it:       "should return all active alerts by regex filter",
+			respBody: responsebody,
+			rFilter:  "*",
+			wantN:    5,
 		},
 		{
 			it:       "should return ScheduledRebootFailing active alerts",
@@ -85,101 +83,10 @@ func TestActiveAlerts(t *testing.T) {
 			wantN:    1,
 		},
 		{
-			it:        "should return subset of active alerts by includeLabel",
-			respBody:  responsebody,
-			rFilter:   "",
-			inclLabel: map[string]string{"team": "platform-infra"},
-			wantN:     3,
-		},
-		{
-			it:        "should not return active alerts if no labels match",
-			respBody:  responsebody,
-			rFilter:   "",
-			inclLabel: map[string]string{"non-existent": "label"},
-			wantN:     0,
-		},
-		{
-			it:        "should not return active alerts if no labels are configured",
-			respBody:  responsebody,
-			rFilter:   "",
-			inclLabel: map[string]string{},
-			wantN:     0,
-		},
-		{
-			it:        "should return a subset of active alerts if multiple labels are configured",
-			respBody:  responsebody,
-			rFilter:   "",
-			inclLabel: map[string]string{"team": "platform-infra", "severity": "warning"},
-			wantN:     4,
-		},
-		{
-			it:        "should return a subset of active alerts if multiple labels are configured but one is sufficient",
-			respBody:  responsebody,
-			rFilter:   "",
-			inclLabel: map[string]string{"team": "platform-infra", "not": "existent"},
-			wantN:     3,
-		},
-		{
-			it:        "should return a subset of active alerts given regex-filter and includelabel",
-			respBody:  responsebody,
-			rFilter:   "Pod",
-			inclLabel: map[string]string{"namespace": "dev"},
-			wantN:     4,
-		},
-		{
-			it:        "should return an active alerts when regex-filter and includelabel specify the same target",
-			respBody:  responsebody,
-			rFilter:   "PrometheusTargetDown",
-			inclLabel: map[string]string{"job": "kubernetes-pods"},
-			wantN:     5,
-		},
-		{
-			it:        "should return an active alerts when regex-filter and includelabel specify the same target",
-			respBody:  `{"status":"success","data":{"resultType":"vector","result":[{"metric":{"__name__":"ALERTS","alertname":"ScheduledRebootFailing","alertstate":"pending","severity":"warning","team":"platform-infra"},"value":[1622472933.973,"1"]}]}}`,
-			rFilter:   "ScheduledRebootFailing",
-			inclLabel: map[string]string{"team": "platform-infra"},
-			wantN:     1,
-		},
-		{
-			it:        "should not return an active alerts includelabels aren't equal to specified by user",
-			respBody:  `{"status":"success","data":{"resultType":"vector","result":[{"metric":{"__name__":"ALERTS","alertname":"ScheduledRebootFailing","alertstate":"pending","severity":"warning","team":"platform-infra"},"value":[1622472933.973,"1"]}]}}`,
-			rFilter:   "",
-			inclLabel: map[string]string{"teams": "platform-infras"},
-			wantN:     0,
-		},
-		{
-			it:        "should return a subset of active alerts given includelabel trumps regex",
-			respBody:  responsebody,
-			rFilter:   "Pod",
-			inclLabel: map[string]string{"team": "platform-infra"},
-			wantN:     3,
-		},
-		{
-			it:        "should not return an active alert if RebootRequired is firing (label filtering)",
-			respBody:  `{"status":"success","data":{"resultType":"vector","result":[{"metric":{"__name__":"ALERTS","alertname":"RebootRequired","alertstate":"pending","severity":"warning","team":"platform-infra"},"value":[1622472933.973,"1"]}]}}`,
-			rFilter:   "",
-			inclLabel: map[string]string{"team": "platform-infra"},
-			wantN:     0,
-		},
-		{
 			it:       "should not return an active alert if RebootRequired is firing (regex filter)",
 			respBody: `{"status":"success","data":{"resultType":"vector","result":[{"metric":{"__name__":"ALERTS","alertname":"RebootRequired","alertstate":"pending","severity":"warning","team":"platform-infra"},"value":[1622472933.973,"1"]}]}}`,
 			rFilter:  "RebootRequired",
 			wantN:    0,
-		},
-		{
-			it:        "should not return an active alert if RebootRequired is firing (regex and label filter )",
-			respBody:  `{"status":"success","data":{"resultType":"vector","result":[{"metric":{"__name__":"ALERTS","alertname":"RebootRequired","alertstate":"pending","severity":"warning","team":"platform-infra"},"value":[1622472933.973,"1"]}]}}`,
-			rFilter:   "RebootRequired",
-			inclLabel: map[string]string{"team": "platform-infra"},
-			wantN:     0,
-		},
-		{
-			it:        "should not return an active alert if RebootRequired is firing (regex and label filter )",
-			respBody:  `{"status":"success","data":{"resultType":"vector","result":[{"metric":{"__name__":"ALERTS","alertname":"RebootRequired","alertstate":"firing","severity":"warning","team":"platform-infra"},"value":[1622472933.973,"1"]},{"metric":{"__name__":"ALERTS","alertname":"ScheduledRebootFailing","alertstate":"pending","severity":"warning","team":"platform-infra"},"value":[1622472933.973,"1"]}]}}`,
-			rFilter:   "RebootRequired|Schedule",
-			inclLabel: map[string]string{"team": "platform-infra", "severity": "warning"},
-			wantN:     1,
 		},
 	} {
 		// Start mockServer
@@ -200,7 +107,7 @@ func TestActiveAlerts(t *testing.T) {
 
 			// instantiate the prometheus client with the mockserver-address
 			p, _ := PromClient{}.New(api.Config{Address: mockServer.URL})
-			result, err := p.ActiveAlerts(regex, tc.inclLabel)
+			result, err := p.ActiveAlerts(regex)
 			if err != nil {
 				log.Fatal(err)
 			}
