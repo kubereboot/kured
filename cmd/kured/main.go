@@ -541,6 +541,9 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 		log.Fatal(err)
 	}
 
+	// Remove ExcludeFromELBs label immediately to allow ELB registration
+	disableExcludeFromELBs(client, nodeID)
+	
 	lock := daemonsetlock.New(client, nodeID, dsNamespace, dsName, lockAnnotation)
 
 	nodeMeta := nodeMeta{}
@@ -549,6 +552,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 		if err != nil {
 			log.Fatalf("Error retrieving node object via k8s API: %v", err)
 		}
+
 		if !nodeMeta.Unschedulable {
 			uncordon(client, node)
 		}
@@ -572,7 +576,6 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 	// Remove taint immediately during startup to quickly allow scheduling again.
 	if !rebootRequired(sentinelCommand) {
 		preferNoScheduleTaint.Disable()
-		disableExcludeFromELBs(client, nodeID)
 	}
 
 	// instantiate prometheus client
@@ -587,14 +590,12 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 		if !window.Contains(time.Now()) {
 			// Remove taint outside the reboot time window to allow for normal operation.
 			preferNoScheduleTaint.Disable()
-			disableExcludeFromELBs(client, nodeID)
 			continue
 		}
 
 		if !rebootRequired(sentinelCommand) {
 			log.Infof("Reboot not required")
 			preferNoScheduleTaint.Disable()
-			disableExcludeFromELBs(client, nodeID)
 			continue
 		}
 		log.Infof("Reboot required")
