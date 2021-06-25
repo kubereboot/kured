@@ -168,8 +168,8 @@ func flagCheck(cmd *cobra.Command, args []string) {
 		log.Warnf("Cannot use both --notify-url and --slack-hook-url flags. Kured will use --notify-url flag only...")
 		slackHookURL = ""
 	}
-	if slackChannel != "" || slackHookURL != "" || slackUsername != "" {
-		log.Warnf("Deprecated flag(s). Please use --notify-url flag instead.")
+	if slackChannel != "" || slackHookURL != "" {
+		log.Warnf("slack-* flag(s) are being deprecated. Please use --notify-url flag instead.")
 	}
 
 }
