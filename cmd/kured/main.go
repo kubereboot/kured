@@ -41,6 +41,7 @@ var (
 	// Command line flags
 	forceReboot                     bool
 	drainTimeout                    time.Duration
+	rebootDelay                     time.Duration
 	period                          time.Duration
 	drainGracePeriod                int
 	skipWaitForDeleteTimeoutSeconds int
@@ -87,7 +88,11 @@ const (
 	KuredMostRecentRebootNeededAnnotation string = "weave.works/kured-most-recent-reboot-needed"
 )
 
-const ExcludeFromLoadBalancersLabel = "node.kubernetes.io~1exclude-from-external-load-balancers"
+const (
+        ExcludeFromELBsLabelKey = "node.kubernetes.io/exclude-from-external-load-balancers"
+        ExcludeFromELBsLabelVal = "kured-remove-after-reboot"
+	ExcludeFromELBsLabelKeyEscaped = "node.kubernetes.io~1exclude-from-external-load-balancers"
+)
 
 func init() {
 	prometheus.MustRegister(rebootRequiredGauge)
@@ -108,6 +113,8 @@ func main() {
 		"when seconds is greater than zero, skip waiting for the pods whose deletion timestamp is older than N seconds while draining a node (default: 0)")
 	rootCmd.PersistentFlags().DurationVar(&drainTimeout, "drain-timeout", 0,
 		"timeout after which the drain is aborted (default: 0, infinite time)")
+	rootCmd.PersistentFlags().DurationVar(&rebootDelay, "reboot-delay", 0,
+		"delay reboot for this duration (default: 0, disabled)")
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
 		"sentinel check period")
 	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-namespace", "kube-system",
@@ -347,25 +354,46 @@ func release(lock *daemonsetlock.DaemonSetLock) {
 	}
 }
 
-func deregisterLB(client *kubernetes.Clientset, nodeID string) {
-	log.Infof("De-registering node from external load balancers")
+func enableExcludeFromELBs(client *kubernetes.Clientset, nodeID string) {
+	log.Infof("Adding ExcludeFromELBs label to node")
 	
-	// add "exclude-from-external-load-balancers" node label
-	labelPatch := fmt.Sprintf(`[{"op":"add","path":"/metadata/labels/%s","value":"" }]`, ExcludeFromLoadBalancersLabel)
-	_, err := client.CoreV1().Nodes().Patch(context.TODO(), nodeID, types.JSONPatchType, []byte(labelPatch), metav1.PatchOptions{})
+	// Add ExcludeFromELBs node label
+	labelPatch := fmt.Sprintf(`[{"op":"add","path":"/metadata/labels/%s","value":"%s" }]`, ExcludeFromELBsLabelKeyEscaped, ExcludeFromELBsLabelVal)
+	_, err := client.CoreV1().Nodes().Patch(context.Background(), nodeID, types.JSONPatchType, []byte(labelPatch), metav1.PatchOptions{})
 	if err != nil {
-		log.Warnf("Unable to add \"%s\" label to node", ExcludeFromLoadBalancersLabel)
+		log.Errorf("Unable to add ExcludeFromELBs label to node: %s" , err.Error())
 	}
 }
 
-func registerLB(client *kubernetes.Clientset, nodeID string) {
-	log.Infof("Registering node with external load balancers")
+func disableExcludeFromELBs(client *kubernetes.Clientset, nodeID string) {
+	ctx := context.Background()
 	
-	// remove "exclude-from-external-load-balancers" node label
-	labelPatch := fmt.Sprintf(`[{"op":"remove","path":"/metadata/labels/%s"}]`, ExcludeFromLoadBalancersLabel)
-	_, err := client.CoreV1().Nodes().Patch(context.TODO(), nodeID, types.JSONPatchType, []byte(labelPatch), metav1.PatchOptions{})
+	// Get node
+	node, err := client.CoreV1().Nodes().Get(ctx, nodeID, metav1.GetOptions{})
 	if err != nil {
-		log.Warnf("Unable to remove \"%s\" label from node", ExcludeFromLoadBalancersLabel)
+		log.Warnf("Unable to find node: %s", nodeID)
+		return
+	}
+
+	// Check ExcludeFromELBs node label
+	labelVal, ok := node.Labels[ExcludeFromELBsLabelKey]
+	if !ok {
+		return
+	}
+
+	// Different label value found
+	if labelVal != ExcludeFromELBsLabelVal {
+		log.Warnf("Found ExcludeFromELBs label on node with value: %s (no action taken)", labelVal)
+		return
+	}
+
+	// Remove ExcludeFromELBs node label
+	labelPatch := fmt.Sprintf(`[{"op":"remove","path":"/metadata/labels/%s"}]`, ExcludeFromELBsLabelKeyEscaped)
+	_, err = client.CoreV1().Nodes().Patch(ctx, nodeID, types.JSONPatchType, []byte(labelPatch), metav1.PatchOptions{})
+	if err != nil {
+		log.Errorf("Unable to remove ExcludeFromELBs label from node: %s", err.Error())
+	} else {
+		log.Infof("Removed ExcludeFromELBs label from node")
 	}
 }
 
@@ -534,8 +562,6 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 				deleteNodeAnnotation(client, nodeID, KuredRebootInProgressAnnotation)
 			}
 		}
-
-		registerLB(client, nodeID)
 		
 		throttle(releaseDelay)
 		release(lock)
@@ -546,6 +572,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 	// Remove taint immediately during startup to quickly allow scheduling again.
 	if !rebootRequired(sentinelCommand) {
 		preferNoScheduleTaint.Disable()
+		disableExcludeFromELBs(client, nodeID)
 	}
 
 	// instantiate prometheus client
@@ -560,12 +587,14 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 		if !window.Contains(time.Now()) {
 			// Remove taint outside the reboot time window to allow for normal operation.
 			preferNoScheduleTaint.Disable()
+			disableExcludeFromELBs(client, nodeID)
 			continue
 		}
 
 		if !rebootRequired(sentinelCommand) {
 			log.Infof("Reboot not required")
 			preferNoScheduleTaint.Disable()
+			disableExcludeFromELBs(client, nodeID)
 			continue
 		}
 		log.Infof("Reboot required")
@@ -607,11 +636,13 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 			continue
 		}
 
-		deregisterLB(client, nodeID)
+		enableExcludeFromELBs(client, nodeID)
 		drain(client, node)
 
-		log.Infof("Waiting for node to finish de-registering from load balancer (105 sec.)")
-		time.Sleep(105 * time.Second)
+		if rebootDelay > 0 {
+			log.Infof("Delaying reboot for %v", rebootDelay)
+			time.Sleep(rebootDelay)
+		}
 
 		invokeReboot(nodeID, rebootCommand)
 		for {
