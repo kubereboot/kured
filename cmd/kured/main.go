@@ -383,7 +383,7 @@ func disableExcludeFromELBs(client *kubernetes.Clientset, nodeID string) {
 
 	// Different label value found
 	if labelVal != ExcludeFromELBsLabelVal {
-		log.Warnf("Found ExcludeFromELBs label on node with value: %s (no action taken)", labelVal)
+		log.Debugf("Found ExcludeFromELBs label on node with value: '%s' (no action taken)", labelVal)
 		return
 	}
 
