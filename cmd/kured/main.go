@@ -89,8 +89,11 @@ const (
 )
 
 const (
+	// ExcludeFromELBsLabelKey is a label key that tells the K8S control plane to exclude a node from external load balancers
         ExcludeFromELBsLabelKey = "node.kubernetes.io/exclude-from-external-load-balancers"
+	// ExcludeFromELBsLabelVal is a label value used to track label placement by kured
         ExcludeFromELBsLabelVal = "kured-remove-after-reboot"
+	// ExcludeFromELBsLabelKeyEscaped is the escaped label key value passed to the Patch() function
 	ExcludeFromELBsLabelKeyEscaped = "node.kubernetes.io~1exclude-from-external-load-balancers"
 )
 
