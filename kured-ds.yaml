@@ -30,8 +30,8 @@ spec:
       containers:
         - name: kured
           image: docker.io/weaveworks/kured
-          # If you find yourself here wondering why there is no
-          # :latest tag on Docker Hub,see the FAQ in the README
+                 # If you find yourself here wondering why there is no
+                 # :latest tag on Docker Hub,see the FAQ in the README
           imagePullPolicy: IfNotPresent
           securityContext:
             privileged: true # Give permission to nsenter /proc/1/ns/mnt
