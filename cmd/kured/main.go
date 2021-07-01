@@ -129,6 +129,7 @@ func main() {
 		"command for which a zero return code will trigger a reboot command")
 	rootCmd.PersistentFlags().StringVar(&rebootCommand, "reboot-command", "/bin/systemctl reboot",
 		"command to run when a reboot is required")
+
 	rootCmd.PersistentFlags().StringVar(&slackHookURL, "slack-hook-url", "",
 		"slack hook URL for notifications")
 	rootCmd.PersistentFlags().StringVar(&slackUsername, "slack-username", "kured",
@@ -141,8 +142,10 @@ func main() {
 		"message template used to notify about a node being drained")
 	rootCmd.PersistentFlags().StringVar(&messageTemplateReboot, "message-template-reboot", "Rebooting node %s",
 		"message template used to notify about a node being rebooted")
+
 	rootCmd.PersistentFlags().StringArrayVar(&podSelectors, "blocking-pod-selector", nil,
 		"label selector identifying pods whose presence should prevent reboots")
+
 	rootCmd.PersistentFlags().StringSliceVar(&rebootDays, "reboot-days", timewindow.EveryDay,
 		"schedule reboot on these days")
 	rootCmd.PersistentFlags().StringVar(&rebootStart, "start-time", "0:00",
@@ -151,6 +154,7 @@ func main() {
 		"schedule reboot only before this time of day")
 	rootCmd.PersistentFlags().StringVar(&timezone, "time-zone", "UTC",
 		"use this timezone for schedule inputs")
+
 	rootCmd.PersistentFlags().BoolVar(&annotateNodes, "annotate-nodes", false,
 		"if set, the annotations 'weave.works/kured-reboot-in-progress' and 'weave.works/kured-most-recent-reboot-needed' will be given to nodes undergoing kured reboots")
 
