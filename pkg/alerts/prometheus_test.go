@@ -106,7 +106,7 @@ func TestActiveAlerts(t *testing.T) {
 			regex, _ := regexp.Compile(tc.rFilter)
 
 			// instantiate the prometheus client with the mockserver-address
-			p, _ := PromClient{}.New(api.Config{Address: mockServer.URL})
+			p, _ := New(api.Config{Address: mockServer.URL})
 			result, err := p.ActiveAlerts(regex)
 			if err != nil {
 				log.Fatal(err)

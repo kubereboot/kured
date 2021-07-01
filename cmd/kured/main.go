@@ -513,7 +513,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 	}
 
 	// instantiate prometheus client
-	promClient, err := alerts.PromClient{}.New(papi.Config{Address: prometheusURL})
+	promClient, err := alerts.New(papi.Config{Address: prometheusURL})
 	if err != nil {
 		log.Fatal("Unable to create prometheus client: ", err)
 	}
