@@ -20,9 +20,9 @@ type PromClient struct {
 	api  v1.API
 }
 
-// New creates a new client to the Prometheus API.
+// NewPromClient creates a new client to the Prometheus API.
 // It returns an error on any problem.
-func New(conf papi.Config) (*PromClient, error) {
+func NewPromClient(conf papi.Config) (*PromClient, error) {
 	promClient, err := papi.NewClient(conf)
 	if err != nil {
 		return nil, err

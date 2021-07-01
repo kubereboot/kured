@@ -28,7 +28,7 @@ func Test_rebootBlocked(t *testing.T) {
 	blockingChecker := BlockingChecker{blocking: true}
 
 	// Instantiate a prometheusClient with a broken_url
-	promClient, err := alerts.New(papi.Config{Address: "broken_url"})
+	promClient, err := alerts.NewPromClient(papi.Config{Address: "broken_url"})
 	if err != nil {
 		log.Fatal("Can't create prometheusClient: ", err)
 	}
