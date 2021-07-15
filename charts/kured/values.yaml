@@ -80,3 +80,7 @@ tolerations:
 affinity: {}
 
 nodeSelector: {}
+
+volumeMounts: []
+
+volumes: []
