@@ -83,7 +83,8 @@ The following changes have been made compared to the stable chart:
 | `tolerations`           | Tolerations to apply to the daemonset (eg to allow running on master)       | `[{"key": "node-role.kubernetes.io/master", "effect": "NoSchedule"}]`|
 | `affinity`              | Affinity for the daemonset (ie, restrict which nodes kured runs on)         | `{}`                       |
 | `nodeSelector`          | Node Selector for the daemonset (ie, restrict which nodes kured runs on)    | `{}`                       |
-
+| `volumeMounts`          | Maps of volumes mount to mount                                              | `{}`                       |
+| `volumes`               | Maps of volumes to mount                                                    | `{}`                       |
 See https://github.com/weaveworks/kured#configuration for values (not contained in the `configuration` object) for `extraArgs`. Note that
 ```yaml
 extraArgs:
