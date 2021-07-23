@@ -85,6 +85,15 @@ spec:
           {{- if .Values.configuration.rebootCommand }}
             - --reboot-command={{ .Values.configuration.rebootCommand }}
           {{- end }}
+          {{- if .Values.configuration.forceReboot }}
+            - --force-reboot={{ .Values.configuration.forceReboot }}
+          {{- end }}
+          {{- if .Values.configuration.drainTimeout }}
+            - --drain-timeout={{ .Values.configuration.drainTimeout }}
+          {{- end }}
+          {{- if .Values.configuration.skipWaitForDeleteTimeout }}
+            - --skip-wait-for-delete-timeout={{ .Values.configuration.skipWaitForDeleteTimeout }}
+          {{- end }}
           {{- if .Values.configuration.slackChannel }}
             - --slack-channel={{ .Values.configuration.slackChannel }}
           {{- end }}
