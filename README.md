@@ -258,7 +258,7 @@ Here is the syntax:
 
 - Email:           `smtp://username:password@host:port/?fromAddress=fromAddress&toAddresses=recipient1[,recipient2,...]`
 
-More details here: <https://github.com/containrrr/shoutrrr/blob/main/docs/services/overview.md>
+More details here: [containrrr.dev/shoutrrr/v0.4/services/overview](https://containrrr.dev/shoutrrr/v0.4/services/overview)
 
 ### Overriding Lock Configuration
 
