@@ -3,6 +3,24 @@ entries:
   kured:
   - apiVersion: v1
     appVersion: 1.7.0
+    created: "2021-07-26T11:19:41.659147727Z"
+    description: A Helm chart for kured
+    digest: 68154ea2c074c0d331548b9e17f3c3246b283251eb1c5331eabb60dba168c1ed
+    home: https://github.com/weaveworks/kured
+    icon: https://raw.githubusercontent.com/weaveworks/kured/main/img/logo.png
+    maintainers:
+    - email: christian.kotzbauer@gmail.com
+      name: ckotzbauer
+    - email: david@davidkarlsen.com
+      name: davidkarlsen
+    name: kured
+    sources:
+    - https://github.com/weaveworks/kured
+    urls:
+    - https://weaveworks.github.io/kured/kured-2.8.0.tgz
+    version: 2.8.0
+  - apiVersion: v1
+    appVersion: 1.7.0
     created: "2021-07-16T07:55:57.986831107Z"
     description: A Helm chart for kured
     digest: 2607eabd4c1fd308e9825f30148ee67bc066660f800c92eeaffb7a9678c5451f
@@ -325,4 +343,4 @@ entries:
     urls:
     - https://weaveworks.github.io/kured/kured-2.0.0.tgz
     version: 2.0.0
-generated: "2021-07-16T07:55:57.985866505Z"
+generated: "2021-07-26T11:19:41.658028064Z"
