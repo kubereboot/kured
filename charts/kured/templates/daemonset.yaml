@@ -119,6 +119,10 @@ spec:
             - --{{ $key }}
             {{- end }}
           {{- end }}
+{{- if .Values.volumeMounts }}
+          volumeMounts:
+{{- toYaml .Values.volumeMounts  | nindent 12 }}
+{{- end }}
           ports:
             - containerPort: 8080
               name: metrics
@@ -144,3 +148,7 @@ spec:
       affinity:
 {{ toYaml . | indent 8 }}
       {{- end }}
+{{- if .Values.volumes }}
+      volumes:
+{{- toYaml .Values.volumes  | nindent 8 }}
+{{- end }}
