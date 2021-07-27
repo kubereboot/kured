@@ -45,48 +45,62 @@ func TestActiveAlerts(t *testing.T) {
 	addr := "http://localhost:10001"
 
 	for _, tc := range []struct {
-		it       string
-		rFilter  string
-		respBody string
-		aName    string
-		wantN    int
+		it         string
+		rFilter    string
+		respBody   string
+		aName      string
+		wantN      int
+		firingOnly bool
 	}{
 		{
-			it:       "should return no active alerts",
-			respBody: responsebody,
-			rFilter:  "",
-			wantN:    0,
+			it:         "should return no active alerts",
+			respBody:   responsebody,
+			rFilter:    "",
+			wantN:      0,
+			firingOnly: false,
 		},
 		{
-			it:       "should return a subset of all alerts",
-			respBody: responsebody,
-			rFilter:  "Pod",
-			wantN:    3,
+			it:         "should return a subset of all alerts",
+			respBody:   responsebody,
+			rFilter:    "Pod",
+			wantN:      3,
+			firingOnly: false,
 		},
 		{
-			it:       "should return all active alerts by regex",
-			respBody: responsebody,
-			rFilter:  "*",
-			wantN:    5,
+			it:         "should return all active alerts by regex",
+			respBody:   responsebody,
+			rFilter:    "*",
+			wantN:      5,
+			firingOnly: false,
 		},
 		{
-			it:       "should return all active alerts by regex filter",
-			respBody: responsebody,
-			rFilter:  "*",
-			wantN:    5,
+			it:         "should return all active alerts by regex filter",
+			respBody:   responsebody,
+			rFilter:    "*",
+			wantN:      5,
+			firingOnly: false,
 		},
 		{
-			it:       "should return ScheduledRebootFailing active alerts",
-			respBody: `{"status":"success","data":{"resultType":"vector","result":[{"metric":{"__name__":"ALERTS","alertname":"ScheduledRebootFailing","alertstate":"pending","severity":"warning","team":"platform-infra"},"value":[1622472933.973,"1"]}]}}`,
-			aName:    "ScheduledRebootFailing",
-			rFilter:  "*",
-			wantN:    1,
+			it:         "should return only firing alerts if firingOnly is true",
+			respBody:   responsebody,
+			rFilter:    "*",
+			wantN:      4,
+			firingOnly: true,
 		},
 		{
-			it:       "should not return an active alert if RebootRequired is firing (regex filter)",
-			respBody: `{"status":"success","data":{"resultType":"vector","result":[{"metric":{"__name__":"ALERTS","alertname":"RebootRequired","alertstate":"pending","severity":"warning","team":"platform-infra"},"value":[1622472933.973,"1"]}]}}`,
-			rFilter:  "RebootRequired",
-			wantN:    0,
+			it:         "should return ScheduledRebootFailing active alerts",
+			respBody:   `{"status":"success","data":{"resultType":"vector","result":[{"metric":{"__name__":"ALERTS","alertname":"ScheduledRebootFailing","alertstate":"pending","severity":"warning","team":"platform-infra"},"value":[1622472933.973,"1"]}]}}`,
+			aName:      "ScheduledRebootFailing",
+			rFilter:    "*",
+			wantN:      1,
+			firingOnly: false,
+		},
+		{
+			it:         "should not return an active alert if RebootRequired is firing (regex filter)",
+			respBody:   `{"status":"success","data":{"resultType":"vector","result":[{"metric":{"__name__":"ALERTS","alertname":"RebootRequired","alertstate":"pending","severity":"warning","team":"platform-infra"},"value":[1622472933.973,"1"]}]}}`,
+			rFilter:    "RebootRequired",
+			wantN:      0,
+			firingOnly: false,
 		},
 	} {
 		// Start mockServer
@@ -111,7 +125,7 @@ func TestActiveAlerts(t *testing.T) {
 				log.Fatal(err)
 			}
 
-			result, err := p.ActiveAlerts(regex)
+			result, err := p.ActiveAlerts(regex, tc.firingOnly)
 			if err != nil {
 				log.Fatal(err)
 			}
