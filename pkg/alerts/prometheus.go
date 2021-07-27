@@ -7,22 +7,39 @@ import (
 	"sort"
 	"time"
 
-	"github.com/prometheus/client_golang/api"
+	papi "github.com/prometheus/client_golang/api"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 )
 
-// PrometheusActiveAlerts returns a list of names of active (e.g. pending or firing) alerts, filtered
-// by the supplied regexp.
-func PrometheusActiveAlerts(prometheusURL string, filter *regexp.Regexp) ([]string, error) {
-	client, err := api.NewClient(api.Config{Address: prometheusURL})
+// PromClient is a wrapper around the Prometheus Client interface and implements the api
+// This way, the PromClient can be instantiated with the configuration the Client needs, and
+// the ability to use the methods the api has, like Query and so on.
+type PromClient struct {
+	papi papi.Client
+	api  v1.API
+}
+
+// NewPromClient creates a new client to the Prometheus API.
+// It returns an error on any problem.
+func NewPromClient(conf papi.Config) (*PromClient, error) {
+	promClient, err := papi.NewClient(conf)
 	if err != nil {
 		return nil, err
 	}
+	client := PromClient{papi: promClient, api: v1.NewAPI(promClient)}
+	return &client, nil
+}
 
-	queryAPI := v1.NewAPI(client)
+// ActiveAlerts is a method of type PromClient, it returns a list of names of active alerts
+// (e.g. pending or firing), filtered by the supplied regexp or by the includeLabels query.
+// filter by regexp means when the regex finds the alert-name; the alert is exluded from the
+// block-list and will NOT block rebooting. query by includeLabel means,
+// if the query finds an alert, it will include it to the block-list and it WILL block rebooting.
+func (p *PromClient) ActiveAlerts(filter *regexp.Regexp) ([]string, error) {
 
-	value, _, err := queryAPI.Query(context.Background(), "ALERTS", time.Now())
+	// get all alerts from prometheus
+	value, _, err := p.api.Query(context.Background(), "ALERTS", time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +59,7 @@ func PrometheusActiveAlerts(prometheusURL string, filter *regexp.Regexp) ([]stri
 			for activeAlert := range activeAlertSet {
 				activeAlerts = append(activeAlerts, activeAlert)
 			}
-			sort.Sort(sort.StringSlice(activeAlerts))
+			sort.Strings(activeAlerts)
 
 			return activeAlerts, nil
 		}

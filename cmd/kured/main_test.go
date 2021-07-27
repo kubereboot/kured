@@ -5,7 +5,10 @@ import (
 	"testing"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/weaveworks/kured/pkg/alerts"
 	assert "gotest.tools/v3/assert"
+
+	papi "github.com/prometheus/client_golang/api"
 )
 
 type BlockingChecker struct {
@@ -23,7 +26,13 @@ func Test_rebootBlocked(t *testing.T) {
 	noCheckers := []RebootBlocker{}
 	nonblockingChecker := BlockingChecker{blocking: false}
 	blockingChecker := BlockingChecker{blocking: true}
-	brokenPrometheusClient := PrometheusBlockingChecker{promURL: "", filter: nil}
+
+	// Instantiate a prometheusClient with a broken_url
+	promClient, err := alerts.NewPromClient(papi.Config{Address: "broken_url"})
+	if err != nil {
+		log.Fatal("Can't create prometheusClient: ", err)
+	}
+	brokenPrometheusClient := PrometheusBlockingChecker{promClient: promClient, filter: nil}
 
 	type args struct {
 		blockers []RebootBlocker

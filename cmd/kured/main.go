@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	papi "github.com/prometheus/client_golang/api"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
@@ -228,8 +229,9 @@ type RebootBlocker interface {
 // PrometheusBlockingChecker contains info for connecting
 // to prometheus, and can give info about whether a reboot should be blocked
 type PrometheusBlockingChecker struct {
-	// URL to contact prometheus API for checking alerts
-	promURL string
+	// prometheusClient to make prometheus-go-client and api config available
+	// into the PrometheusBlockingChecker struct
+	promClient *alerts.PromClient
 	// regexp used to get alerts
 	filter *regexp.Regexp
 }
@@ -245,7 +247,8 @@ type KubernetesBlockingChecker struct {
 }
 
 func (pb PrometheusBlockingChecker) isBlocked() bool {
-	alertNames, err := alerts.PrometheusActiveAlerts(pb.promURL, pb.filter)
+
+	alertNames, err := pb.promClient.ActiveAlerts(pb.filter)
 	if err != nil {
 		log.Warnf("Reboot blocked: prometheus query error: %v", err)
 		return true
@@ -513,6 +516,12 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 		preferNoScheduleTaint.Disable()
 	}
 
+	// instantiate prometheus client
+	promClient, err := alerts.NewPromClient(papi.Config{Address: prometheusURL})
+	if err != nil {
+		log.Fatal("Unable to create prometheus client: ", err)
+	}
+
 	source := rand.NewSource(time.Now().UnixNano())
 	tick := delaytick.New(source, period)
 	for range tick {
@@ -531,7 +540,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 
 		var blockCheckers []RebootBlocker
 		if prometheusURL != "" {
-			blockCheckers = append(blockCheckers, PrometheusBlockingChecker{promURL: prometheusURL, filter: alertFilter})
+			blockCheckers = append(blockCheckers, PrometheusBlockingChecker{promClient: promClient, filter: alertFilter})
 		}
 		if podSelectors != nil {
 			blockCheckers = append(blockCheckers, KubernetesBlockingChecker{client: client, nodename: nodeID, filter: podSelectors})
