@@ -47,6 +47,7 @@ The following changes have been made compared to the stable chart:
 | `configuration.lockTtl` | cli-parameter `--lock-ttl`                                                  | `0`                       |
 | `configuration.lockReleaseDelay` | cli-parameter `--lock-release-delay`                               | `0`                       |
 | `configuration.alertFilterRegexp` | cli-parameter `--alert-filter-regexp`                             | `""`                       |
+| `configuration.alertFiringOnly` | cli-parameter `--alert-firing-only`                                 | `false`                   |
 | `configuration.blockingPodSelector` | Array of selectors for multiple cli-parameters `--blocking-pod-selector` | `[]`             |
 | `configuration.endTime` | cli-parameter `--end-time`                                                  | `""`                      |
 | `configuration.lockAnnotation` | cli-parameter `--lock-annotation`                                    | `""`                      |
