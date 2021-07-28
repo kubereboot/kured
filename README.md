@@ -85,6 +85,7 @@ The following arguments can be passed to kured via the daemonset pod template:
 ```console
 Flags:
       --alert-filter-regexp regexp.Regexp   alert names to ignore when checking for active alerts
+      --alert-firing-only bool              only consider firing alerts when checking for active alerts
       --blocking-pod-selector stringArray   label selector identifying pods whose presence should prevent reboots
       --drain-grace-period int              time in seconds given to each pod to terminate gracefully, if negative, the default value specified in the pod will be used (default: -1)
       --skip-wait-for-delete-timeout int    when seconds is greater than zero, skip waiting for the pods whose deletion timestamp is older than N seconds while draining a node (default: 0)
@@ -164,6 +165,11 @@ will block reboots, however you can ignore specific alerts:
 
 ```console
 --alert-filter-regexp=^(RebootRequired|AnotherBenignAlert|...$
+```
+
+You can also only block reboots for firing alerts:
+```console
+--alert-firing-only=true
 ```
 
 See the section on Prometheus metrics for an important application of this

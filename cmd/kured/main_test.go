@@ -32,7 +32,7 @@ func Test_rebootBlocked(t *testing.T) {
 	if err != nil {
 		log.Fatal("Can't create prometheusClient: ", err)
 	}
-	brokenPrometheusClient := PrometheusBlockingChecker{promClient: promClient, filter: nil}
+	brokenPrometheusClient := PrometheusBlockingChecker{promClient: promClient, filter: nil, firingOnly: false}
 
 	type args struct {
 		blockers []RebootBlocker
