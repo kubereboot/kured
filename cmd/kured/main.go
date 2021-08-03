@@ -41,6 +41,7 @@ var (
 	// Command line flags
 	forceReboot                     bool
 	drainTimeout                    time.Duration
+	rebootDelay                     time.Duration
 	period                          time.Duration
 	drainGracePeriod                int
 	skipWaitForDeleteTimeoutSeconds int
@@ -106,6 +107,8 @@ func main() {
 		"when seconds is greater than zero, skip waiting for the pods whose deletion timestamp is older than N seconds while draining a node (default: 0)")
 	rootCmd.PersistentFlags().DurationVar(&drainTimeout, "drain-timeout", 0,
 		"timeout after which the drain is aborted (default: 0, infinite time)")
+	rootCmd.PersistentFlags().DurationVar(&rebootDelay, "reboot-delay", 0,
+		"delay reboot for this duration (default: 0, disabled)")
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
 		"sentinel check period")
 	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-namespace", "kube-system",
@@ -581,6 +584,12 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 		}
 
 		drain(client, node)
+
+		if rebootDelay > 0 {
+			log.Infof("Delaying reboot for %v", rebootDelay)
+			time.Sleep(rebootDelay)
+		}
+
 		invokeReboot(nodeID, rebootCommand)
 		for {
 			log.Infof("Waiting for reboot")
