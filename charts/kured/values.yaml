@@ -4,7 +4,7 @@ image:
   pullPolicy: IfNotPresent
   pullSecrets: []
 
-updateStrategy: OnDelete
+updateStrategy: RollingUpdate
 #  requires RollingUpdate updateStrategy
 maxUnavailable: 1
 
