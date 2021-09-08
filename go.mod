@@ -1,6 +1,6 @@
 module github.com/weaveworks/kured
 
-go 1.15
+go 1.16
 
 require (
 	github.com/containrrr/shoutrrr v0.5.1
