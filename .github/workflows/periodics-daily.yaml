@@ -32,7 +32,7 @@ jobs:
         stale-pr-message: 'This PR was automatically considered stale due to lack of activity. Please refresh it and/or join our slack channels to highlight it, before it automatically closes (in 7 days).'
         stale-issue-label: 'no-issue-activity'
         stale-pr-label: 'no-pr-activity'
-        exempt-issue-labels: ['good first issue', 'keep']
+        exempt-issue-labels: 'good first issue,keep'
         days-before-close: 21
 
   check-docs-links:
