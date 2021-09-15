@@ -51,6 +51,10 @@ The following changes have been made compared to the stable chart:
 | `configuration.endTime` | cli-parameter `--end-time`                                                  | `""`                      |
 | `configuration.lockAnnotation` | cli-parameter `--lock-annotation`                                    | `""`                      |
 | `configuration.period` | cli-parameter `--period`                                                     | `""`                      |
+| `configuration.forceReboot` | cli-parameter `--force-reboot`                                          | `false`                   |
+| `configuration.drainGracePeriod` | cli-parameter `--drain-grace-period`                               | `""`                      |
+| `configuration.drainTimeout` | cli-parameter `--drain-timeout`                                        | `""`                      |
+| `configuration.skipWaitForDeleteTimeout` | cli-parameter `--skip-wait-for-delete-timeout`             | `""`                      |
 | `configuration.prometheusUrl` | cli-parameter `--prometheus-url`                                      | `""`                      |
 | `configuration.rebootDays` | Array of days for multiple cli-parameters `--reboot-days`                | `[]`                      |
 | `configuration.rebootSentinel` | cli-parameter `--reboot-sentinel`                                    | `""`                      |
