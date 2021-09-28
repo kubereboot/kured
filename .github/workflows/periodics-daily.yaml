@@ -74,9 +74,9 @@ jobs:
     strategy:
       matrix:
         kubernetes:
-          - "1.19"
           - "1.20"
           - "1.21"
+          - "1.22"
     steps:
       - uses: actions/checkout@v2
       - name: Find go version
