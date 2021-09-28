@@ -401,6 +401,7 @@ func uncordon(client *kubernetes.Clientset, node *v1.Node) {
 		Client: client,
 		ErrOut: os.Stderr,
 		Out:    os.Stdout,
+		Ctx:    context.Background(),
 	}
 	if err := kubectldrain.RunCordonOrUncordon(drainer, node, false); err != nil {
 		log.Fatalf("Error uncordonning %s: %v", nodename, err)
