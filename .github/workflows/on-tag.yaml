@@ -37,6 +37,13 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME_WEAVEWORKSKUREDCI }}
           password: ${{ secrets.DOCKERHUB_TOKEN_WEAVEWORKSKUREDCI }}
 
+      - name: Login to quay.io
+        uses: docker/login-action@v1
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAYIO_USERNAME_WEAVEWORKSKUREDCI }}
+          password: ${{ secrets.QUAYIO_TOKEN_WEAVEWORKSKUREDCI }}
+
       - name: Publish image
         run: |
           make DH_ORG="${{ github.repository_owner }}" VERSION="${{ steps.tags.outputs.version }}" publish-image
