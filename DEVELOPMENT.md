@@ -187,19 +187,12 @@ Check that `README.md` has an updated compatibility matrix and that the
 url in the `kubectl` incantation (under "Installation") is updated to the
 new version you want to release.
 
-### Create a tag on the repo and publish the image
+### Create a tag on the repo
 
 Before going further, we should freeze the code for a release, by
-tagging the code, and publishing its immutable artifact: the kured
-docker image.
+tagging the code. The Github-Action should start a new job and push
+the new image to the registry.
 
-```sh
-make DH_ORG="weaveworks" VERSION="1.3.0" image
-```
-
-Then docker push the image. In the future, that might be automatically
-done when creating a tag on the repository, with the help of github
-actions.
 
 ### Create the combined manifest
 
@@ -237,3 +230,6 @@ A change in the helm chart requires a bump of the `version`
 in `charts/kured/Chart.yaml` (following the versioning rules).
 Update it, and issue a PR. Upon merge, that PR will automatically
 publish the chart to the gh-pages branch.
+
+When there are open helm-chart PRs which are on hold until the helm-chart has been updated
+with the new kured version, they can be merged now (unless a rebase is needed from the contributor).
