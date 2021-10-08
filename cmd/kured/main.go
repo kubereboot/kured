@@ -41,6 +41,7 @@ var (
 	// Command line flags
 	forceReboot                     bool
 	drainTimeout                    time.Duration
+	rebootDelay                     time.Duration
 	period                          time.Duration
 	drainGracePeriod                int
 	skipWaitForDeleteTimeoutSeconds int
@@ -52,6 +53,7 @@ var (
 	prometheusURL                   string
 	preferNoScheduleTaintName       string
 	alertFilter                     *regexp.Regexp
+	alertFiringOnly                 bool
 	rebootSentinelFile              string
 	rebootSentinelCommand           string
 	notifyURL                       string
@@ -98,13 +100,15 @@ func main() {
 		Run:    root}
 
 	rootCmd.PersistentFlags().BoolVar(&forceReboot, "force-reboot", false,
-		"force a reboot even if the drain is still running (default: false)")
+		"force a reboot even if the drain fails or times out (default: false)")
 	rootCmd.PersistentFlags().IntVar(&drainGracePeriod, "drain-grace-period", -1,
 		"time in seconds given to each pod to terminate gracefully, if negative, the default value specified in the pod will be used (default: -1)")
 	rootCmd.PersistentFlags().IntVar(&skipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", 0,
 		"when seconds is greater than zero, skip waiting for the pods whose deletion timestamp is older than N seconds while draining a node (default: 0)")
 	rootCmd.PersistentFlags().DurationVar(&drainTimeout, "drain-timeout", 0,
 		"timeout after which the drain is aborted (default: 0, infinite time)")
+	rootCmd.PersistentFlags().DurationVar(&rebootDelay, "reboot-delay", 0,
+		"delay reboot for this duration (default: 0, disabled)")
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
 		"sentinel check period")
 	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-namespace", "kube-system",
@@ -121,6 +125,8 @@ func main() {
 		"Prometheus instance to probe for active alerts")
 	rootCmd.PersistentFlags().Var(&regexpValue{&alertFilter}, "alert-filter-regexp",
 		"alert names to ignore when checking for active alerts")
+	rootCmd.PersistentFlags().BoolVar(&alertFiringOnly, "alert-firing-only", false,
+		"only consider firing alerts when checking for active alerts (default: false)")
 	rootCmd.PersistentFlags().StringVar(&rebootSentinelFile, "reboot-sentinel", "/var/run/reboot-required",
 		"path to file whose existence triggers the reboot command")
 	rootCmd.PersistentFlags().StringVar(&preferNoScheduleTaintName, "prefer-no-schedule-taint", "",
@@ -234,6 +240,8 @@ type PrometheusBlockingChecker struct {
 	promClient *alerts.PromClient
 	// regexp used to get alerts
 	filter *regexp.Regexp
+	// bool to indicate if only firing alerts should be considered
+	firingOnly bool
 }
 
 // KubernetesBlockingChecker contains info for connecting
@@ -248,7 +256,7 @@ type KubernetesBlockingChecker struct {
 
 func (pb PrometheusBlockingChecker) isBlocked() bool {
 
-	alertNames, err := pb.promClient.ActiveAlerts(pb.filter)
+	alertNames, err := pb.promClient.ActiveAlerts(pb.filter, pb.firingOnly)
 	if err != nil {
 		log.Warnf("Reboot blocked: prometheus query error: %v", err)
 		return true
@@ -393,6 +401,7 @@ func uncordon(client *kubernetes.Clientset, node *v1.Node) {
 		Client: client,
 		ErrOut: os.Stderr,
 		Out:    os.Stdout,
+		Ctx:    context.Background(),
 	}
 	if err := kubectldrain.RunCordonOrUncordon(drainer, node, false); err != nil {
 		log.Fatalf("Error uncordonning %s: %v", nodename, err)
@@ -540,7 +549,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 
 		var blockCheckers []RebootBlocker
 		if prometheusURL != "" {
-			blockCheckers = append(blockCheckers, PrometheusBlockingChecker{promClient: promClient, filter: alertFilter})
+			blockCheckers = append(blockCheckers, PrometheusBlockingChecker{promClient: promClient, filter: alertFilter, firingOnly: alertFiringOnly})
 		}
 		if podSelectors != nil {
 			blockCheckers = append(blockCheckers, KubernetesBlockingChecker{client: client, nodename: nodeID, filter: podSelectors})
@@ -576,6 +585,12 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 		}
 
 		drain(client, node)
+
+		if rebootDelay > 0 {
+			log.Infof("Delaying reboot for %v", rebootDelay)
+			time.Sleep(rebootDelay)
+		}
+
 		invokeReboot(nodeID, rebootCommand)
 		for {
 			log.Infof("Waiting for reboot")

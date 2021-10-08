@@ -15,7 +15,7 @@ jobs:
         run: go test -json ./... > test.json
       - name: Annotate tests
         if: always()
-        uses: guyarb/golang-test-annoations@v0.4.0
+        uses: guyarb/golang-test-annoations@v0.5.0
         with:
           test-results: test.json
 
@@ -32,7 +32,7 @@ jobs:
         stale-pr-message: 'This PR was automatically considered stale due to lack of activity. Please refresh it and/or join our slack channels to highlight it, before it automatically closes (in 7 days).'
         stale-issue-label: 'no-issue-activity'
         stale-pr-label: 'no-pr-activity'
-        exempt-issue-labels: ['good first issue', 'keep']
+        exempt-issue-labels: 'good first issue,keep'
         days-before-close: 21
 
   check-docs-links:
@@ -74,9 +74,9 @@ jobs:
     strategy:
       matrix:
         kubernetes:
-          - "1.19"
           - "1.20"
           - "1.21"
+          - "1.22"
     steps:
       - uses: actions/checkout@v2
       - name: Find go version
@@ -117,7 +117,7 @@ jobs:
           kubectl describe ds kured
 
       - name: Ensure kured is ready
-        uses: nick-invision/retry@v2.4.1
+        uses: nick-invision/retry@v2.5.0
         with:
           timeout_minutes: 10
           max_attempts: 10
