@@ -5,6 +5,7 @@ image:
 configuration:
   # annotationTtl: 0          # force clean annotation after this amount of time (default 0, disabled)
   # alertFilterRegexp: ""     # alert names to ignore when checking for active alerts
+  # alertFiringOnly: false     # only consider firing alerts when checking for active alerts
   # blockingPodSelector: []   # label selector identifying pods whose presence should prevent reboots
   # endTime: ""               # only reboot before this time of day (default "23:59")
   # lockAnnotation: ""        # annotation in which to record locking node (default "weave.works/kured-node-lock")
@@ -16,6 +17,7 @@ configuration:
   # prometheusUrl: ""         # Prometheus instance to probe for active alerts
   # rebootDays: []            # only reboot on these days (default [su,mo,tu,we,th,fr,sa])
   # rebootSentinel: ""        # path to file whose existence signals need to reboot (default "/var/run/reboot-required")
+  # rebootSentinelCommand: ""  # command for which a successful run signals need to reboot (default ""). If non-empty, sentinel file will be ignored.
   # slackChannel: ""          # slack channel for reboot notfications
   # slackHookUrl: ""          # slack hook URL for reboot notfications
   # slackUsername: ""         # slack username for reboot notfications (default "kured")

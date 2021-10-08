@@ -24,6 +24,7 @@ extraEnvVars:
 configuration:
   lockTtl: 0                 # force clean annotation after this amount of time (default 0, disabled)
   alertFilterRegexp: ""      # alert names to ignore when checking for active alerts
+  alertFiringOnly: false     # only consider firing alerts when checking for active alerts
   blockingPodSelector: []    # label selector identifying pods whose presence should prevent reboots
   endTime: ""                # only reboot before this time of day (default "23:59")
   lockAnnotation: ""         # annotation in which to record locking node (default "weave.works/kured-node-lock")
@@ -35,7 +36,9 @@ configuration:
   prometheusUrl: ""          # Prometheus instance to probe for active alerts
   rebootDays: []             # only reboot on these days (default [su,mo,tu,we,th,fr,sa])
   rebootSentinel: ""         # path to file whose existence signals need to reboot (default "/var/run/reboot-required")
+  rebootSentinelCommand: ""  # command for which a successful run signals need to reboot (default ""). If non-empty, sentinel file will be ignored.
   rebootCommand: "/bin/systemctl reboot"  # command to run when a reboot is required by the sentinel
+  rebootDelay: ""            # add a delay after drain finishes but before the reboot command is issued
   slackChannel: ""           # slack channel for reboot notfications
   slackHookUrl: ""           # slack hook URL for reboot notfications
   slackUsername: ""          # slack username for reboot notfications (default "kured")
@@ -46,6 +49,7 @@ configuration:
   timeZone: ""               # time-zone to use (valid zones from "time" golang package)
   annotateNodes: false       # enable 'weave.works/kured-reboot-in-progress' and 'weave.works/kured-most-recent-reboot-needed' node annotations to signify kured reboot operations
   lockReleaseDelay: 0        # hold lock after reboot by this amount of time (default 0, disabled)
+  preferNoScheduleTaint: ""  # Taint name applied during pending node reboot (to prevent receiving additional pods from other rebooting nodes). Disabled by default. Set e.g. to "weave.works/kured-node-reboot" to enable tainting.
 
 rbac:
   create: true

@@ -61,6 +61,9 @@ spec:
           {{- if .Values.configuration.alertFilterRegexp }}
             - --alert-filter-regexp={{ .Values.configuration.alertFilterRegexp }}
           {{- end }}
+          {{- if .Values.configuration.alertFiringOnly }}
+            - --alert-firing-only={{ .Values.configuration.alertFiringOnly }}
+          {{- end }}
           {{- range .Values.configuration.blockingPodSelector }}
             - --blocking-pod-selector={{ . }}
           {{- end }}
@@ -74,7 +77,7 @@ spec:
             - --period={{ .Values.configuration.period }}
           {{- end }}
           {{- if .Values.configuration.forceReboot }}
-           - --force-reboot
+            - --force-reboot
           {{- end }}
           {{- if .Values.configuration.drainGracePeriod }}
             - --drain-grace-period={{ .Values.configuration.drainGracePeriod }}
@@ -94,8 +97,14 @@ spec:
           {{- if .Values.configuration.rebootSentinel }}
             - --reboot-sentinel={{ .Values.configuration.rebootSentinel }}
           {{- end }}
+          {{- if .Values.configuration.rebootSentinelCommand }}
+            - --reboot-sentinel-command={{ .Values.configuration.rebootSentinelCommand }}
+          {{- end }}
           {{- if .Values.configuration.rebootCommand }}
             - --reboot-command={{ .Values.configuration.rebootCommand }}
+          {{- end }}
+          {{- if .Values.configuration.rebootDelay }}
+            - --reboot-delay={{ .Values.configuration.rebootDelay }}
           {{- end }}
           {{- if .Values.configuration.slackChannel }}
             - --slack-channel={{ .Values.configuration.slackChannel }}
@@ -123,6 +132,9 @@ spec:
           {{- end }}
           {{- if .Values.configuration.annotateNodes }}
             - --annotate-nodes={{ .Values.configuration.annotateNodes }}
+          {{- end }}
+          {{- if .Values.configuration.preferNoScheduleTaint }}
+            - --prefer-no-schedule-taint={{ .Values.configuration.preferNoScheduleTaint }}
           {{- end }}
           {{- range $key, $value := .Values.extraArgs }}
             {{- if $value }}

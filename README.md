@@ -107,6 +107,7 @@ Flags:
       --prometheus-url string               Prometheus instance to probe for active alerts
       --reboot-command string               command to run when a reboot is required by the sentinel (default "/sbin/systemctl reboot")
       --reboot-days strings                 schedule reboot on these days (default [su,mo,tu,we,th,fr,sa])
+      --reboot-delay duration               add a delay after drain finishes but before the reboot command is issued (default 0, no time)
       --reboot-sentinel string              path to file whose existence signals need to reboot (default "/var/run/reboot-required")
       --reboot-sentinel-command string      command for which a successful run signals need to reboot (default ""). If non-empty, sentinel file will be ignored.
       --slack-channel string                slack channel for reboot notfications

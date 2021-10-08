@@ -47,6 +47,7 @@ The following changes have been made compared to the stable chart:
 | `configuration.lockTtl` | cli-parameter `--lock-ttl`                                                  | `0`                       |
 | `configuration.lockReleaseDelay` | cli-parameter `--lock-release-delay`                               | `0`                       |
 | `configuration.alertFilterRegexp` | cli-parameter `--alert-filter-regexp`                             | `""`                       |
+| `configuration.alertFiringOnly` | cli-parameter `--alert-firing-only`                                 | `false`                   |
 | `configuration.blockingPodSelector` | Array of selectors for multiple cli-parameters `--blocking-pod-selector` | `[]`             |
 | `configuration.endTime` | cli-parameter `--end-time`                                                  | `""`                      |
 | `configuration.lockAnnotation` | cli-parameter `--lock-annotation`                                    | `""`                      |
@@ -58,7 +59,9 @@ The following changes have been made compared to the stable chart:
 | `configuration.prometheusUrl` | cli-parameter `--prometheus-url`                                      | `""`                      |
 | `configuration.rebootDays` | Array of days for multiple cli-parameters `--reboot-days`                | `[]`                      |
 | `configuration.rebootSentinel` | cli-parameter `--reboot-sentinel`                                    | `""`                      |
+| `configuration.rebootSentinelCommand` | cli-parameter `--reboot-sentinel-command`                     | `""`                      |
 | `configuration.rebootCommand` | cli-parameter `--reboot-command`                                      | `""`                      |
+| `configuration.rebootDelay` | cli-parameter `--reboot-delay`                                          | `""`                      |
 | `configuration.slackChannel` | cli-parameter `--slack-channel`                                        | `""`                      |
 | `configuration.slackHookUrl` | cli-parameter `--slack-hook-url`                                       | `""`                      |
 | `configuration.slackUsername` | cli-parameter `--slack-username`                                      | `""`                      |
@@ -68,6 +71,7 @@ The following changes have been made compared to the stable chart:
 | `configuration.startTime` | cli-parameter `--start-time`                                              | `""`                      |
 | `configuration.timeZone` | cli-parameter `--time-zone`                                                | `""`                      |
 | `configuration.annotateNodes` | cli-parameter `--annotate-nodes`                                      | `false`                   |
+| `configuration.preferNoScheduleTaint` | Taint name applied during pending node reboot                 | `""`                   |
 | `rbac.create`           | Create RBAC roles                                                           | `true`                     |
 | `serviceAccount.create` | Create a service account                                                    | `true`                     |
 | `serviceAccount.name`   | Service account name to create (or use if `serviceAccount.create` is false) | (chart fullname)           |
