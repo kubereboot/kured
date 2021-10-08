@@ -60,6 +60,7 @@ The following changes have been made compared to the stable chart:
 | `configuration.rebootDays` | Array of days for multiple cli-parameters `--reboot-days`                | `[]`                      |
 | `configuration.rebootSentinel` | cli-parameter `--reboot-sentinel`                                    | `""`                      |
 | `configuration.rebootCommand` | cli-parameter `--reboot-command`                                      | `""`                      |
+| `configuration.rebootDelay` | cli-parameter `--reboot-delay`                                          | `""`                      |
 | `configuration.slackChannel` | cli-parameter `--slack-channel`                                        | `""`                      |
 | `configuration.slackHookUrl` | cli-parameter `--slack-hook-url`                                       | `""`                      |
 | `configuration.slackUsername` | cli-parameter `--slack-username`                                      | `""`                      |

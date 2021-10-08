@@ -69,6 +69,7 @@ spec:
 #            - --blocking-pod-selector=name=temperamental
 #            - --blocking-pod-selector=...
 #            - --reboot-days=sun,mon,tue,wed,thu,fri,sat
+#            - --reboot-delay=90s
 #            - --start-time=0:00
 #            - --end-time=23:59:59
 #            - --time-zone=UTC

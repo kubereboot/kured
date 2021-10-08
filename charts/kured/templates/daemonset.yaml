@@ -100,6 +100,9 @@ spec:
           {{- if .Values.configuration.rebootCommand }}
             - --reboot-command={{ .Values.configuration.rebootCommand }}
           {{- end }}
+          {{- if .Values.configuration.rebootDelay }}
+            - --reboot-delay={{ .Values.configuration.rebootDelay }}
+          {{- end }}
           {{- if .Values.configuration.slackChannel }}
             - --slack-channel={{ .Values.configuration.slackChannel }}
           {{- end }}
