@@ -77,7 +77,7 @@ spec:
             - --period={{ .Values.configuration.period }}
           {{- end }}
           {{- if .Values.configuration.forceReboot }}
-           - --force-reboot
+            - --force-reboot
           {{- end }}
           {{- if .Values.configuration.drainGracePeriod }}
             - --drain-grace-period={{ .Values.configuration.drainGracePeriod }}
