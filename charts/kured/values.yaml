@@ -49,6 +49,7 @@ configuration:
   timeZone: ""               # time-zone to use (valid zones from "time" golang package)
   annotateNodes: false       # enable 'weave.works/kured-reboot-in-progress' and 'weave.works/kured-most-recent-reboot-needed' node annotations to signify kured reboot operations
   lockReleaseDelay: 0        # hold lock after reboot by this amount of time (default 0, disabled)
+  preferNoScheduleTaint: ""  # Taint name applied during pending node reboot (to prevent receiving additional pods from other rebooting nodes). Disabled by default. Set e.g. to "weave.works/kured-node-reboot" to enable tainting.
 
 rbac:
   create: true

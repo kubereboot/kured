@@ -133,6 +133,9 @@ spec:
           {{- if .Values.configuration.annotateNodes }}
             - --annotate-nodes={{ .Values.configuration.annotateNodes }}
           {{- end }}
+          {{- if .Values.configuration.preferNoScheduleTaint }}
+            - --prefer-no-schedule-taint={{ .Values.configuration.preferNoScheduleTaint }}
+          {{- end }}
           {{- range $key, $value := .Values.extraArgs }}
             {{- if $value }}
             - --{{ $key }}={{ $value }}
