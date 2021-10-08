@@ -36,6 +36,7 @@ configuration:
   prometheusUrl: ""          # Prometheus instance to probe for active alerts
   rebootDays: []             # only reboot on these days (default [su,mo,tu,we,th,fr,sa])
   rebootSentinel: ""         # path to file whose existence signals need to reboot (default "/var/run/reboot-required")
+  rebootSentinelCommand: ""  # command for which a successful run signals need to reboot (default ""). If non-empty, sentinel file will be ignored.
   rebootCommand: "/bin/systemctl reboot"  # command to run when a reboot is required by the sentinel
   rebootDelay: ""            # add a delay after drain finishes but before the reboot command is issued
   slackChannel: ""           # slack channel for reboot notfications

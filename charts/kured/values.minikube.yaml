@@ -17,6 +17,7 @@ configuration:
   # prometheusUrl: ""         # Prometheus instance to probe for active alerts
   # rebootDays: []            # only reboot on these days (default [su,mo,tu,we,th,fr,sa])
   # rebootSentinel: ""        # path to file whose existence signals need to reboot (default "/var/run/reboot-required")
+  # rebootSentinelCommand: ""  # command for which a successful run signals need to reboot (default ""). If non-empty, sentinel file will be ignored.
   # slackChannel: ""          # slack channel for reboot notfications
   # slackHookUrl: ""          # slack hook URL for reboot notfications
   # slackUsername: ""         # slack username for reboot notfications (default "kured")
