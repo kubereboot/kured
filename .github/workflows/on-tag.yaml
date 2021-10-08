@@ -37,6 +37,13 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME_WEAVEWORKSKUREDCI }}
           password: ${{ secrets.DOCKERHUB_TOKEN_WEAVEWORKSKUREDCI }}
 
+      - name: Login to ghcr.io
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.KURED_WEAVE_GHCR_BOT_TOKEN }}
+
       - name: Publish image
         run: |
           make DH_ORG="${{ github.repository_owner }}" VERSION="${{ steps.tags.outputs.version }}" publish-image
