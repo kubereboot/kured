@@ -24,6 +24,7 @@ extraEnvVars:
 configuration:
   lockTtl: 0                 # force clean annotation after this amount of time (default 0, disabled)
   alertFilterRegexp: ""      # alert names to ignore when checking for active alerts
+  alertFiringOnly: false     # only consider firing alerts when checking for active alerts
   blockingPodSelector: []    # label selector identifying pods whose presence should prevent reboots
   endTime: ""                # only reboot before this time of day (default "23:59")
   lockAnnotation: ""         # annotation in which to record locking node (default "weave.works/kured-node-lock")

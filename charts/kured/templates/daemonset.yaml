@@ -61,6 +61,9 @@ spec:
           {{- if .Values.configuration.alertFilterRegexp }}
             - --alert-filter-regexp={{ .Values.configuration.alertFilterRegexp }}
           {{- end }}
+          {{- if .Values.configuration.alertFiringOnly }}
+            - --alert-firing-only={{ .Values.configuration.alertFiringOnly }}
+          {{- end }}
           {{- range .Values.configuration.blockingPodSelector }}
             - --blocking-pod-selector={{ . }}
           {{- end }}
