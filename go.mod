@@ -3,7 +3,7 @@ module github.com/weaveworks/kured
 go 1.16
 
 require (
-	github.com/containrrr/shoutrrr v0.5.1
+	github.com/containrrr/shoutrrr v0.5.2
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/common v0.31.1
