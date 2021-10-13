@@ -95,17 +95,25 @@ func Test_buildHostCommand(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
+		GOOS string
 		want []string
 	}{
 		{
-			name: "Ensure command will run with nsenter",
+			name: "Ensure command will run with nsenter on Linux",
 			args: args{pid: 1, command: []string{"ls", "-Fal"}},
+			GOOS: "linux",
 			want: []string{"/usr/bin/nsenter", "-m/proc/1/ns/mnt", "--", "ls", "-Fal"},
+		},
+		{
+			name: "Ensure command runs as specified on Windows",
+			args: args{pid: 1, command: []string{"powershell", "ls"}},
+			GOOS: "windows",
+			want: []string{"powershell", "ls"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := buildHostCommand(tt.args.pid, tt.args.command); !reflect.DeepEqual(got, tt.want) {
+			if got := buildHostCommand(tt.args.pid, tt.args.command, tt.GOOS); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("buildHostCommand() = %v, want %v", got, tt.want)
 			}
 		})
@@ -120,6 +128,7 @@ func Test_buildSentinelCommand(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
+		GOOS string
 		want []string
 	}{
 		{
@@ -128,6 +137,7 @@ func Test_buildSentinelCommand(t *testing.T) {
 				rebootSentinelFile:    "/test1",
 				rebootSentinelCommand: "",
 			},
+			GOOS: "linux",
 			want: []string{"test", "-f", "/test1"},
 		},
 		{
@@ -136,12 +146,31 @@ func Test_buildSentinelCommand(t *testing.T) {
 				rebootSentinelFile:    "/test1",
 				rebootSentinelCommand: "/sbin/reboot-required -r",
 			},
+			GOOS: "linux",
 			want: []string{"/sbin/reboot-required", "-r"},
+		},
+		{
+			name: "Ensure a sentinelFile on generates a powershell command with the right file on Windows",
+			args: args{
+				rebootSentinelFile:    "/test1",
+				rebootSentinelCommand: "",
+			},
+			GOOS: "windows",
+			want: []string{"powershell.exe", "/c", "if", "(Test-Path", "/test1)", "{exit", "0}", "else", "{exit", "1}"},
+		},
+		{
+			name: "Ensure a sentinelCommand has priority over sentinelFile if both are provided on Windows",
+			args: args{
+				rebootSentinelFile:    "/test1",
+				rebootSentinelCommand: "powershell.exe ./Test-RebootRequired",
+			},
+			GOOS: "windows",
+			want: []string{"powershell.exe", "./Test-RebootRequired"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := buildSentinelCommand(tt.args.rebootSentinelFile, tt.args.rebootSentinelCommand); !reflect.DeepEqual(got, tt.want) {
+			if got := buildSentinelCommand(tt.args.rebootSentinelFile, tt.args.rebootSentinelCommand, tt.GOOS); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("buildSentinelCommand() = %v, want %v", got, tt.want)
 			}
 		})
@@ -155,6 +184,7 @@ func Test_parseRebootCommand(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
+		GOOS string
 		want []string
 	}{
 		{

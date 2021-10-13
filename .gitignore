@@ -1,3 +1,4 @@
 cmd/kured/kured
+cmd/kured/kured.exe
 vendor
 build

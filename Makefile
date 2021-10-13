@@ -18,6 +18,7 @@ DEPS=$(call godeps,./cmd/kured)
 cmd/kured/kured: $(DEPS)
 cmd/kured/kured: cmd/kured/*.go
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=$(VERSION)" -o $@ cmd/kured/*.go
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "-X main.version=$(VERSION)" -o $@.exe cmd/kured/*.go
 
 build/.image.done: cmd/kured/Dockerfile cmd/kured/kured
 	mkdir -p build
@@ -28,6 +29,15 @@ build/.image.done: cmd/kured/Dockerfile cmd/kured/kured
 	touch $@
 
 image: build/.image.done
+
+# TODO: figure out the story for building Windows container images.
+# We can either build on Windows machines which is simpler but does require a Windows machine
+# or use buildkit which is more complicated but then we can build on linux nodes.
+windows-image: cmd/kured/kured.exe cmd/kured/Windows.Dockerfile
+	mkdir -p build
+	cp $^ build
+	cp ./scripts/*.ps1 build
+	docker build --isolation=hyperv -f build/Windows.Dockerfile ./build
 
 publish-image: image
 	$(SUDO) docker push docker.io/$(DH_ORG)/kured:$(VERSION)

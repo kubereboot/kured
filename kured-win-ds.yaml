@@ -1,0 +1,103 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kured
+  namespace: kube-system
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kured-win        # Must match `--ds-name`
+  namespace: kube-system # Must match `--ds-namespace`
+spec:
+  selector:
+    matchLabels:
+      name: kured
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: kured
+    spec:
+      serviceAccountName: kured
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+        - key: node.kubernetes.io/unschedulable
+          effect: NoSchedule
+      restartPolicy: Always # for testing
+      nodeSelector:
+        "kubernetes.io/os": windows
+      securityContext:
+        windowsOptions:
+          hostProcess: true
+          runAsUserName: "NT AUTHORITY\\SYSTEM"
+      hostNetwork: true # Required for HostProcess containers on Windows
+      initContainers:
+        - name: kured-init
+          securityContext:
+            windowsOptions:
+              hostProcess: true
+              runAsUserName: "NT AUTHORITY\\SYSTEM"
+          image: mrosse3/kured-windows-nanoserver:latest
+          imagePullPolicy: Always # for testing
+          env:
+            - name: KURED_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          command:
+            - powershell.exe
+            - -File
+            - Register-StartupTask.ps1
+      containers:
+        - name: kured
+          image: mrosse3/kured-windows-nanoserver:latest
+            # If you find yourself here wondering why there is no
+            # :latest tag on Docker Hub,see the FAQ in the README
+          imagePullPolicy: Always # for testing
+
+          env:
+            # Pass in the name of the node on which this pod is scheduled
+            # for use with drain/uncordon operations and lock acquisition
+            - name: KURED_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          command:
+            - kured.exe
+            - --reboot-command="shutdown.exe /f /r /t 5 /c kured"
+#            - --force-reboot=false
+#            - --drain-grace-period=-1
+#            - --skip-wait-for-delete-timeout=0
+#            - --drain-timeout=0
+            - --period=1m
+#            - --ds-namespace=kube-system
+            - --ds-name=kured-win
+#            - --lock-annotation=weave.works/kured-node-lock
+#            - --lock-ttl=0
+#            - --prometheus-url=http://prometheus.monitoring.svc.cluster.local
+#            - --alert-filter-regexp=^RebootRequired$
+#            - --alert-firing-only=false
+#            - --reboot-sentinel=/var/run/reboot-required
+#            - --prefer-no-schedule-taint=""
+            - --reboot-sentinel-command="powershell.exe ./Test-PendingReboot.ps1"
+#            - --slack-hook-url=https://hooks.slack.com/...
+#            - --slack-username=prod
+#            - --slack-channel=alerting
+#            - --notify-url="" # See also shoutrrr url format
+#            - --message-template-drain=Draining node %s
+#            - --message-template-drain=Rebooting node %s
+#            - --blocking-pod-selector=runtime=long,cost=expensive
+#            - --blocking-pod-selector=name=temperamental
+#            - --blocking-pod-selector=...
+#            - --reboot-days=sun,mon,tue,wed,thu,fri,sat
+            - --reboot-delay=30s
+#            - --start-time=0:00
+#            - --end-time=23:59:59
+#            - --time-zone=UTC
+#            - --annotate-nodes=true
+#            - --lock-release-delay=30m
+
