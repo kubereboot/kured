@@ -64,6 +64,7 @@ var (
 	messageTemplateReboot           string
 	podSelectors                    []string
 	rebootCommand                   string
+	logFormat                       string
 
 	rebootDays    []string
 	rebootStart   string
@@ -163,6 +164,9 @@ func main() {
 
 	rootCmd.PersistentFlags().BoolVar(&annotateNodes, "annotate-nodes", false,
 		"if set, the annotations 'weave.works/kured-reboot-in-progress' and 'weave.works/kured-most-recent-reboot-needed' will be given to nodes undergoing kured reboots")
+
+	rootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "text",
+		"use text or json log format")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
@@ -623,6 +627,10 @@ func parseRebootCommand(rebootCommand string) []string {
 }
 
 func root(cmd *cobra.Command, args []string) {
+	if logFormat == "json" {
+		log.SetFormatter(&log.JSONFormatter{})
+	}
+
 	log.Infof("Kubernetes Reboot Daemon: %s", version)
 
 	nodeID := os.Getenv("KURED_NODE_ID")
