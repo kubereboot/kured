@@ -71,6 +71,7 @@ The following changes have been made compared to the stable chart:
 | `configuration.startTime` | cli-parameter `--start-time`                                              | `""`                      |
 | `configuration.timeZone` | cli-parameter `--time-zone`                                                | `""`                      |
 | `configuration.annotateNodes` | cli-parameter `--annotate-nodes`                                      | `false`                   |
+| `configuration.logFormat` | cli-parameter `--log-format`                                              | `""`                      |
 | `configuration.preferNoScheduleTaint` | Taint name applied during pending node reboot                 | `""`                   |
 | `rbac.create`           | Create RBAC roles                                                           | `true`                     |
 | `serviceAccount.create` | Create a service account                                                    | `true`                     |
