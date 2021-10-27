@@ -115,6 +115,7 @@ Flags:
       --slack-username string               slack username for reboot notfications (default "kured")
       --start-time string                   schedule reboot only after this time of day (default "0:00")
       --time-zone string                    use this timezone for schedule inputs (default "UTC")
+      --log-format string                   log format specified as text or json, defaults to "text"
 ```
 
 ### Reboot Sentinel File & Period

@@ -75,3 +75,4 @@ spec:
 #            - --time-zone=UTC
 #            - --annotate-nodes=false
 #            - --lock-release-delay=30m
+#            - --log-format=text
