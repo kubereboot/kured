@@ -284,7 +284,7 @@ func (pb PrometheusBlockingChecker) isBlocked() bool {
 }
 
 func (kb KubernetesBlockingChecker) isBlocked() bool {
-	fieldSelector := fmt.Sprintf("spec.nodeName=%s", kb.nodename)
+	fieldSelector := fmt.Sprintf("spec.nodeName=%s,status.phase!=Succeeded,status.phase!=Failed,status.phase!=Unknown", kb.nodename)
 	for _, labelSelector := range kb.filter {
 		podList, err := kb.client.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{
 			LabelSelector: labelSelector,
