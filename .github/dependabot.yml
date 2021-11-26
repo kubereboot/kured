@@ -15,3 +15,7 @@ updates:
       - dependency-name: "k8s.io/apimachinery"
       - dependency-name: "k8s.io/client-go"
       - dependency-name: "k8s.io/kubectl"
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "daily"
