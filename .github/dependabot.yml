@@ -16,6 +16,6 @@ updates:
       - dependency-name: "k8s.io/client-go"
       - dependency-name: "k8s.io/kubectl"
   - package-ecosystem: "docker"
-    directory: "/"
+    directory: "cmd/kured"
     schedule:
       interval: "daily"
