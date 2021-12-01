@@ -37,11 +37,6 @@ import (
 	"github.com/weaveworks/kured/pkg/timewindow"
 )
 
-const (
-	// The environment variable prefix of all environment variables bound to our command line flags.
-	envPrefix = "KURED"
-)
-
 var (
 	version = "unreleased"
 
@@ -95,6 +90,8 @@ const (
 	KuredRebootInProgressAnnotation string = "weave.works/kured-reboot-in-progress"
 	// KuredMostRecentRebootNeededAnnotation is the canonical string value for the kured most-recent-reboot-needed annotation
 	KuredMostRecentRebootNeededAnnotation string = "weave.works/kured-most-recent-reboot-needed"
+	// EnvPrefix The environment variable prefix of all environment variables bound to our command line flags.
+	EnvPrefix = "KURED"
 )
 
 func init() {
@@ -207,7 +204,7 @@ func flagCheck(cmd *cobra.Command, args []string) {
 func bindViper(cmd *cobra.Command, args []string) error {
 	v := viper.New()
 
-	v.SetEnvPrefix(envPrefix)
+	v.SetEnvPrefix(EnvPrefix)
 	v.AutomaticEnv()
 	bindFlags(cmd, v)
 
@@ -220,7 +217,7 @@ func bindFlags(cmd *cobra.Command, v *viper.Viper) {
 		// Environment variables can't have dashes in them, so bind them to their equivalent keys with underscores
 		if strings.Contains(f.Name, "-") {
 			envVarSuffix := strings.ToUpper(strings.ReplaceAll(f.Name, "-", "_"))
-			v.BindEnv(f.Name, fmt.Sprintf("%s_%s", envPrefix, envVarSuffix))
+			v.BindEnv(f.Name, fmt.Sprintf("%s_%s", EnvPrefix, envVarSuffix))
 		}
 
 		// Apply the viper config value to the flag when the flag is not set and viper has a value
