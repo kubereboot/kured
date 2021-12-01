@@ -105,12 +105,12 @@ func main() {
 	rootCmd := &cobra.Command{
 		Use:               "kured",
 		Short:             "Kubernetes Reboot Daemon",
-		PreRun:            flagCheck,
 		PersistentPreRunE: bindViper,
+		PreRun:            flagCheck,
 		Run:               root}
 
 	rootCmd.PersistentFlags().StringVar(&nodeID, "node-id", "",
-		"node name kured runs on, should be passed down from spec.nodeName via KURED_NODE_ID environmen variable.")
+		"node name kured runs on, should be passed down from spec.nodeName via KURED_NODE_ID environment variable")
 	rootCmd.PersistentFlags().BoolVar(&forceReboot, "force-reboot", false,
 		"force a reboot even if the drain fails or times out (default: false)")
 	rootCmd.PersistentFlags().IntVar(&drainGracePeriod, "drain-grace-period", -1,
@@ -193,10 +193,10 @@ func flagCheck(cmd *cobra.Command, args []string) {
 		log.Warnf("Deprecated flag(s). Please use --notify-url flag instead.")
 		trataURL, err := url.Parse(slackHookURL)
 		if err != nil {
-			log.Warnf("slack-hook-url is not properly formatted... no notification will be sent: %v\n", err)
+			log.Warnf("slack-hook-url is not properly formatted...no notification will be sent: %v\n", err)
 		}
 		if len(strings.Split(strings.Trim(trataURL.Path, "/services/"), "/")) != 3 {
-			log.Warnf("slack-hook-url is not properly formatted... no notification will be sent: unexpected number of / in URL\n")
+			log.Warnf("slack-hook-url is not properly formatted...no notification will be sent: %v\n", err)
 		} else {
 			notifyURL = fmt.Sprintf("slack://%s", strings.Trim(trataURL.Path, "/services/"))
 		}
