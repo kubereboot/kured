@@ -74,5 +74,6 @@ spec:
 #            - --end-time=23:59:59
 #            - --time-zone=UTC
 #            - --annotate-nodes=false
+#            - --label-with-exclude-from-external-lbs=false
 #            - --lock-release-delay=30m
 #            - --log-format=text

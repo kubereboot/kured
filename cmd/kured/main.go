@@ -71,6 +71,7 @@ var (
 	rebootEnd     string
 	timezone      string
 	annotateNodes bool
+	labelWithELBX bool
 
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -87,6 +88,15 @@ const (
 	KuredRebootInProgressAnnotation string = "weave.works/kured-reboot-in-progress"
 	// KuredMostRecentRebootNeededAnnotation is the canonical string value for the kured most-recent-reboot-needed annotation
 	KuredMostRecentRebootNeededAnnotation string = "weave.works/kured-most-recent-reboot-needed"
+)
+
+const (
+	// ExcludeFromELBsLabelKey is a label key that tells the K8S control plane to exclude a node from external load balancers
+	ExcludeFromELBsLabelKey = "node.kubernetes.io/exclude-from-external-load-balancers"
+	// ExcludeFromELBsLabelVal is a label value used to track label placement by kured
+	ExcludeFromELBsLabelVal = "kured-remove-after-reboot"
+	// ExcludeFromELBsLabelKeyEscaped is the escaped label key value passed to the Patch() function
+	ExcludeFromELBsLabelKeyEscaped = "node.kubernetes.io~1exclude-from-external-load-balancers"
 )
 
 func init() {
@@ -164,6 +174,8 @@ func main() {
 
 	rootCmd.PersistentFlags().BoolVar(&annotateNodes, "annotate-nodes", false,
 		"if set, the annotations 'weave.works/kured-reboot-in-progress' and 'weave.works/kured-most-recent-reboot-needed' will be given to nodes undergoing kured reboots")
+	rootCmd.PersistentFlags().BoolVar(&labelWithELBX, "label-with-exclude-from-external-lbs", false,
+		"if set, the label 'node.kubernetes.io/exclude-from-external-load-balancers' will be added to nodes undergoing kured reboots")
 
 	rootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "text",
 		"use text or json log format")
@@ -359,6 +371,54 @@ func release(lock *daemonsetlock.DaemonSetLock) {
 	}
 }
 
+func enableExcludeFromELBs(client kubernetes.Interface, nodeID string) error {
+	log.Infof("Adding ExcludeFromELBs label to node")
+
+	// Add ExcludeFromELBs node label
+	labelPatch := fmt.Sprintf(`[{"op":"add","path":"/metadata/labels/%s","value":"%s" }]`, ExcludeFromELBsLabelKeyEscaped, ExcludeFromELBsLabelVal)
+	_, err := client.CoreV1().Nodes().Patch(context.Background(), nodeID, types.JSONPatchType, []byte(labelPatch), metav1.PatchOptions{})
+	if err != nil {
+		log.Errorf("Unable to add ExcludeFromELBs label to node: %s", err.Error())
+		return err
+	}
+
+	return nil
+}
+
+func disableExcludeFromELBs(client kubernetes.Interface, nodeID string) error {
+	ctx := context.Background()
+
+	// Get node
+	node, err := client.CoreV1().Nodes().Get(ctx, nodeID, metav1.GetOptions{})
+	if err != nil {
+		log.Warnf("Unable to find node: %s", nodeID)
+		return err
+	}
+
+	// Check ExcludeFromELBs node label
+	labelVal, ok := node.Labels[ExcludeFromELBsLabelKey]
+	if !ok {
+		return nil
+	}
+
+	// Different label value found
+	if labelVal != ExcludeFromELBsLabelVal {
+		log.Debugf("Found ExcludeFromELBs label on node with value: '%s' (no action taken)", labelVal)
+		return nil
+	}
+
+	// Remove ExcludeFromELBs node label
+	labelPatch := fmt.Sprintf(`[{"op":"remove","path":"/metadata/labels/%s"}]`, ExcludeFromELBsLabelKeyEscaped)
+	_, err = client.CoreV1().Nodes().Patch(ctx, nodeID, types.JSONPatchType, []byte(labelPatch), metav1.PatchOptions{})
+	if err != nil {
+		log.Errorf("Unable to remove ExcludeFromELBs label from node: %s", err.Error())
+		return err
+	}
+
+	log.Infof("Removed ExcludeFromELBs label from node")
+	return nil
+}
+
 func drain(client *kubernetes.Clientset, node *v1.Node) {
 	nodename := node.GetName()
 
@@ -493,6 +553,12 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 		log.Fatal(err)
 	}
 
+	if labelWithELBX {
+		if err = disableExcludeFromELBs(client, nodeID); err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	lock := daemonsetlock.New(client, nodeID, dsNamespace, dsName, lockAnnotation)
 
 	nodeMeta := nodeMeta{}
@@ -501,6 +567,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 		if err != nil {
 			log.Fatalf("Error retrieving node object via k8s API: %v", err)
 		}
+
 		if !nodeMeta.Unschedulable {
 			uncordon(client, node)
 		}
@@ -514,6 +581,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 				deleteNodeAnnotation(client, nodeID, KuredRebootInProgressAnnotation)
 			}
 		}
+
 		throttle(releaseDelay)
 		release(lock)
 	}
@@ -584,6 +652,12 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 			continue
 		}
 
+		if labelWithELBX {
+			if err = enableExcludeFromELBs(client, nodeID); err != nil {
+				log.Fatal(err)
+			}
+		}
+		
 		drain(client, node)
 
 		if rebootDelay > 0 {

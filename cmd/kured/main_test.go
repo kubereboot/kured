@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -8,6 +9,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/weaveworks/kured/pkg/alerts"
 	assert "gotest.tools/v3/assert"
+	k8sv1 "k8s.io/api/core/v1"
+	k8smetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
 
 	papi "github.com/prometheus/client_golang/api"
 )
@@ -232,4 +236,61 @@ func Test_rebootRequired_fatals(t *testing.T) {
 		assert.Equal(t, c.expectFatal, fatal)
 	}
 
+}
+
+func newK8STestClient() *k8sfake.Clientset {
+	// Init test client and add a node
+	client := k8sfake.NewSimpleClientset()
+
+	node := &k8sv1.Node{
+		ObjectMeta: k8smetav1.ObjectMeta{
+			Name:   "test-node-id",
+			Labels: map[string]string{"key1": "val1"}, // seed map so patch `add` operation will work
+		},
+	}
+
+	_, err := client.CoreV1().Nodes().Create(context.TODO(), node, k8smetav1.CreateOptions{})
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	return client
+}
+
+func Test_enableExcludeFromELBs(t *testing.T) {
+	testclient := newK8STestClient()
+
+	// Test that method returns error if node doesn't exist
+	err := enableExcludeFromELBs(testclient, "doesnt-exist")
+	assert.Error(t, err, "nodes \"doesnt-exist\" not found")
+
+	// Test that method adds ExcludeFromELBs label if node exists
+	err = enableExcludeFromELBs(testclient, "test-node-id")
+	assert.Assert(t, err == nil)
+
+	nodes, err := testclient.CoreV1().Nodes().List(context.TODO(), k8smetav1.ListOptions{})
+	labels := nodes.Items[0].Labels
+	assert.Equal(t, labels[ExcludeFromELBsLabelKey], ExcludeFromELBsLabelVal)
+}
+
+func Test_disableExcludeFromELBs(t *testing.T) {
+	testclient := newK8STestClient()
+
+	// Test that method returns error if node doesn't exist
+	err := disableExcludeFromELBs(testclient, "doesnt-exist")
+	assert.Error(t, err, "nodes \"doesnt-exist\" not found")
+
+	// Test that method executes silently on existing node without pre-existing ExcludeFromELBs label
+	err = disableExcludeFromELBs(testclient, "test-node-id")
+	assert.Assert(t, err == nil)
+
+	// Add ExcludeFromELBs label and check that method removes it
+	enableExcludeFromELBs(testclient, "test-node-id")
+	err = disableExcludeFromELBs(testclient, "test-node-id")
+	assert.Assert(t, err == nil)
+
+	nodes, err := testclient.CoreV1().Nodes().List(context.TODO(), k8smetav1.ListOptions{})
+	labels := nodes.Items[0].Labels
+	_, ok := labels[ExcludeFromELBsLabelKey]
+	assert.Assert(t, !ok)
 }
