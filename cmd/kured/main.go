@@ -99,6 +99,15 @@ func init() {
 }
 
 func main() {
+	cmd := NewRootCommand()
+
+	if err := cmd.Execute(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// NewRootCommand construct the Cobra root command
+func NewRootCommand() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:               "kured",
 		Short:             "Kubernetes Reboot Daemon",
@@ -176,9 +185,7 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "text",
 		"use text or json log format")
 
-	if err := rootCmd.Execute(); err != nil {
-		log.Fatal(err)
-	}
+	return rootCmd
 }
 
 // temporary func that checks for deprecated slack-notification-related flags
@@ -216,16 +223,22 @@ func bindFlags(cmd *cobra.Command, v *viper.Viper) {
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		// Environment variables can't have dashes in them, so bind them to their equivalent keys with underscores
 		if strings.Contains(f.Name, "-") {
-			envVarSuffix := strings.ToUpper(strings.ReplaceAll(f.Name, "-", "_"))
-			v.BindEnv(f.Name, fmt.Sprintf("%s_%s", EnvPrefix, envVarSuffix))
+			v.BindEnv(f.Name, flagToEnvVar(f.Name))
 		}
 
 		// Apply the viper config value to the flag when the flag is not set and viper has a value
 		if !f.Changed && v.IsSet(f.Name) {
 			val := v.Get(f.Name)
+			log.Infof("Binding %s command flag to environment variable: %s=%s", f.Name, flagToEnvVar(f.Name), val)
 			cmd.Flags().Set(f.Name, fmt.Sprintf("%v", val))
 		}
 	})
+}
+
+// flagToEnvVar converts command flag name to equivalent environment variable name
+func flagToEnvVar(flag string) string {
+	envVarSuffix := strings.ToUpper(strings.ReplaceAll(flag, "-", "_"))
+	return fmt.Sprintf("%s_%s", EnvPrefix, envVarSuffix)
 }
 
 // newCommand creates a new Command with stdout/stderr wired to our standard logger
