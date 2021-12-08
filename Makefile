@@ -4,6 +4,7 @@
 DH_ORG=weaveworks
 VERSION=$(shell git symbolic-ref --short HEAD)-$(shell git rev-parse --short HEAD)
 SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
+WINDOWS_OS_VERSIONS="1809 ltsc2022"
 
 all: image
 
@@ -20,30 +21,22 @@ cmd/kured/kured: cmd/kured/*.go
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=$(VERSION)" -o $@ cmd/kured/*.go
 	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "-X main.version=$(VERSION)" -o $@.exe cmd/kured/*.go
 
-build/.image.done: cmd/kured/Dockerfile cmd/kured/kured
+build/.image.done: cmd/kured/*Dockerfile cmd/kured/kured* scripts/*
 	mkdir -p build
 	cp $^ build
-	$(SUDO) docker build -t docker.io/$(DH_ORG)/kured -f build/Dockerfile ./build
-	$(SUDO) docker tag docker.io/$(DH_ORG)/kured docker.io/$(DH_ORG)/kured:$(VERSION)
-	$(SUDO) docker tag docker.io/$(DH_ORG)/kured ghcr.io/$(DH_ORG)/kured:$(VERSION)
+	REGISTRY=docker.io/$(DH_ORG) VERSION=$(VERSION) WINDOWS_OS_VERSIONS=$(WINDOWS_OS_VERSIONS) $(SUDO) ./build/build-multiarch.sh
+	REGISTRY=ghcr.io/$(DH_ORG) VERSION=$(VERSION) WINDOWS_OS_VERSIONS=$(WINDOWS_OS_VERSIONS) $(SUDO) ./build/build-multiarch.sh
 	touch $@
 
 image: build/.image.done
 
-# TODO: figure out the story for building Windows container images.
-# We can either build on Windows machines which is simpler but does require a Windows machine
-# or use buildkit which is more complicated but then we can build on linux nodes.
-windows-image: cmd/kured/kured.exe cmd/kured/Windows.Dockerfile
-	mkdir -p build
-	cp $^ build
-	cp ./scripts/*.ps1 build
-	docker build --isolation=hyperv -f build/Windows.Dockerfile ./build
-
 publish-image: image
-	$(SUDO) docker push docker.io/$(DH_ORG)/kured:$(VERSION)
-	$(SUDO) docker push ghcr.io/$(DH_ORG)/kured:$(VERSION)
+	$(SUDO) docker manifest push docker.io/$(DH_ORG)/kured:$(VERSION)
+	$(SUDO) docker manifest push ghcr.io/$(DH_ORG)/kured:$(VERSION)
 
 minikube-publish: image
+	$(SUDO) docker image pull docker.io/$(DH_ORG)/kured:$(VERSION)-linux
+	$(SUDO) docker image tag docker.io/$(DH_ORG)/kured:$(VERSION)-linux docker.io/$(DH_ORG)/kured
 	$(SUDO) docker save docker.io/$(DH_ORG)/kured | (eval $$(minikube docker-env) && docker load)
 
 manifest:
