@@ -16,6 +16,8 @@ import (
 	papi "github.com/prometheus/client_golang/api"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -65,6 +67,7 @@ var (
 	podSelectors                    []string
 	rebootCommand                   string
 	logFormat                       string
+	nodeID                          string
 
 	rebootDays    []string
 	rebootStart   string
@@ -87,6 +90,8 @@ const (
 	KuredRebootInProgressAnnotation string = "weave.works/kured-reboot-in-progress"
 	// KuredMostRecentRebootNeededAnnotation is the canonical string value for the kured most-recent-reboot-needed annotation
 	KuredMostRecentRebootNeededAnnotation string = "weave.works/kured-most-recent-reboot-needed"
+	// EnvPrefix The environment variable prefix of all environment variables bound to our command line flags.
+	EnvPrefix = "KURED"
 )
 
 func init() {
@@ -94,12 +99,24 @@ func init() {
 }
 
 func main() {
-	rootCmd := &cobra.Command{
-		Use:    "kured",
-		Short:  "Kubernetes Reboot Daemon",
-		PreRun: flagCheck,
-		Run:    root}
+	cmd := NewRootCommand()
 
+	if err := cmd.Execute(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// NewRootCommand construct the Cobra root command
+func NewRootCommand() *cobra.Command {
+	rootCmd := &cobra.Command{
+		Use:               "kured",
+		Short:             "Kubernetes Reboot Daemon",
+		PersistentPreRunE: bindViper,
+		PreRun:            flagCheck,
+		Run:               root}
+
+	rootCmd.PersistentFlags().StringVar(&nodeID, "node-id", "",
+		"node name kured runs on, should be passed down from spec.nodeName via KURED_NODE_ID environment variable")
 	rootCmd.PersistentFlags().BoolVar(&forceReboot, "force-reboot", false,
 		"force a reboot even if the drain fails or times out (default: false)")
 	rootCmd.PersistentFlags().IntVar(&drainGracePeriod, "drain-grace-period", -1,
@@ -168,9 +185,7 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "text",
 		"use text or json log format")
 
-	if err := rootCmd.Execute(); err != nil {
-		log.Fatal(err)
-	}
+	return rootCmd
 }
 
 // temporary func that checks for deprecated slack-notification-related flags
@@ -190,6 +205,40 @@ func flagCheck(cmd *cobra.Command, args []string) {
 			notifyURL = fmt.Sprintf("slack://%s", strings.Trim(trataURL.Path, "/services/"))
 		}
 	}
+}
+
+// bindViper initializes viper and binds command flags with environment variables
+func bindViper(cmd *cobra.Command, args []string) error {
+	v := viper.New()
+
+	v.SetEnvPrefix(EnvPrefix)
+	v.AutomaticEnv()
+	bindFlags(cmd, v)
+
+	return nil
+}
+
+// bindFlags binds each cobra flag to its associated viper configuration (environment variable)
+func bindFlags(cmd *cobra.Command, v *viper.Viper) {
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		// Environment variables can't have dashes in them, so bind them to their equivalent keys with underscores
+		if strings.Contains(f.Name, "-") {
+			v.BindEnv(f.Name, flagToEnvVar(f.Name))
+		}
+
+		// Apply the viper config value to the flag when the flag is not set and viper has a value
+		if !f.Changed && v.IsSet(f.Name) {
+			val := v.Get(f.Name)
+			log.Infof("Binding %s command flag to environment variable: %s=%s", f.Name, flagToEnvVar(f.Name), fmt.Sprintf("%v", val))
+			cmd.Flags().Set(f.Name, fmt.Sprintf("%v", val))
+		}
+	})
+}
+
+// flagToEnvVar converts command flag name to equivalent environment variable name
+func flagToEnvVar(flag string) string {
+	envVarSuffix := strings.ToUpper(strings.ReplaceAll(flag, "-", "_"))
+	return fmt.Sprintf("%s_%s", EnvPrefix, envVarSuffix)
 }
 
 // newCommand creates a new Command with stdout/stderr wired to our standard logger
@@ -629,7 +678,6 @@ func root(cmd *cobra.Command, args []string) {
 
 	log.Infof("Kubernetes Reboot Daemon: %s", version)
 
-	nodeID := os.Getenv("KURED_NODE_ID")
 	if nodeID == "" {
 		log.Fatal("KURED_NODE_ID environment variable required")
 	}
