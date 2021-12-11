@@ -38,8 +38,10 @@ jobs:
 
       - name: Build image
         run: |
-          make DH_ORG="${{ github.repository_owner }}" image
+          make DH_ORG="${{ github.repository_owner }}" TARGETARCH="amd64" image
+          make DH_ORG="${{ github.repository_owner }}" TARGETARCH="arm64" image
 
       - name: Publish image
         run: |
-          make DH_ORG="${{ github.repository_owner }}" publish-image
+          make DH_ORG="${{ github.repository_owner }}" TARGETARCH="amd64" publish-image
+          make DH_ORG="${{ github.repository_owner }}" TARGETARCH="arm64" publish-image

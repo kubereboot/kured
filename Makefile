@@ -4,28 +4,35 @@
 DH_ORG=weaveworks
 VERSION=$(shell git symbolic-ref --short HEAD)-$(shell git rev-parse --short HEAD)
 SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
+TARGETOS=linux
+
+ifeq (,${TARGETARCH})
+TARGETARCH=$(shell go env GOARCH)
+endif
 
 all: image
 
 clean:
-	rm -f cmd/kured/kured
+	rm -f cmd/kured/kured*
 	rm -rf ./build
 
 godeps=$(shell go list -f '{{join .Deps "\n"}}' $1 | grep -v /vendor/ | xargs go list -f '{{if not .Standard}}{{ $$dep := . }}{{range .GoFiles}}{{$$dep.Dir}}/{{.}} {{end}}{{end}}')
 
 DEPS=$(call godeps,./cmd/kured)
 
-cmd/kured/kured: $(DEPS)
-cmd/kured/kured: cmd/kured/*.go
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=$(VERSION)" -o $@ cmd/kured/*.go
+cmd/kured/kured: cmd/kured/kured_$(TARGETOS)_$(TARGETARCH)
 
-build/.image.done: cmd/kured/Dockerfile cmd/kured/kured
+cmd/kured/kured_$(TARGETOS)_$(TARGETARCH): $(DEPS)
+cmd/kured/kured_$(TARGETOS)_$(TARGETARCH): cmd/kured/*.go
+	CGO_ENABLED=0 GOOS=$(TARGETOS) GOARCH=$(TARGETARCH) go build -ldflags "-X main.version=$(VERSION)" -o $@ cmd/kured/*.go
+
+build/.image.done: cmd/kured/Dockerfile cmd/kured/kured_$(TARGETOS)_$(TARGETARCH)
 	mkdir -p build
 	cp $^ build
-	$(SUDO) docker build -t docker.io/$(DH_ORG)/kured -f build/Dockerfile ./build
+	$(SUDO) docker buildx build --platform $(TARGETOS)/$(TARGETARCH) -t docker.io/$(DH_ORG)/kured -f build/Dockerfile ./build
 	$(SUDO) docker tag docker.io/$(DH_ORG)/kured docker.io/$(DH_ORG)/kured:$(VERSION)
 	$(SUDO) docker tag docker.io/$(DH_ORG)/kured ghcr.io/$(DH_ORG)/kured:$(VERSION)
-	touch $@
+	touch $@_$(TARGETOS)_$(TARGETARCH)
 
 image: build/.image.done
 

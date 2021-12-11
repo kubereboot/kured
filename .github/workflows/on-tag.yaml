@@ -26,7 +26,8 @@ jobs:
         run: echo "::set-output name=version::${GITHUB_REF#refs/tags/}"
         id: tags
       - run: |
-          make DH_ORG="${{ github.repository_owner }}" VERSION="${{ steps.tags.outputs.version }}" image
+          make DH_ORG="${{ github.repository_owner }}" VERSION="${{ steps.tags.outputs.version }}" TARGETARCH="amd64" image
+          make DH_ORG="${{ github.repository_owner }}" VERSION="${{ steps.tags.outputs.version }}" TARGETARCH="arm64" image
       - uses: Azure/container-scan@v0
         with:
           image-name: docker.io/${{ github.repository_owner }}/kured:${{ steps.tags.outputs.version }}
@@ -46,4 +47,6 @@ jobs:
 
       - name: Publish image
         run: |
-          make DH_ORG="${{ github.repository_owner }}" VERSION="${{ steps.tags.outputs.version }}" publish-image
+          make DH_ORG="${{ github.repository_owner }}" VERSION="${{ steps.tags.outputs.version }}" TARGETARCH="amd64" publish-image
+          make DH_ORG="${{ github.repository_owner }}" VERSION="${{ steps.tags.outputs.version }}" TARGETARCH="arm64" publish-image
+
