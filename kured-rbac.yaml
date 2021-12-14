@@ -45,7 +45,7 @@ rules:
 # Allow kured to lock/unlock itself
 - apiGroups:     ["apps"]
   resources:     ["daemonsets"]
-  resourceNames: ["kured"]
+  resourceNames: ["kured", "kured-win"]
   verbs:         ["update"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

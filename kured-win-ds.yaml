@@ -27,7 +27,7 @@ spec:
           effect: NoSchedule
         - key: node.kubernetes.io/unschedulable
           effect: NoSchedule
-      restartPolicy: Always # for testing
+      restartPolicy: Always
       nodeSelector:
         "kubernetes.io/os": windows
       securityContext:
@@ -41,8 +41,8 @@ spec:
             windowsOptions:
               hostProcess: true
               runAsUserName: "NT AUTHORITY\\SYSTEM"
-          image: mrosse3/kured-windows-nanoserver:latest
-          imagePullPolicy: Always # for testing
+          image: mrosse3/kured
+          imagePullPolicy: IfNotPresent
           env:
             - name: KURED_NODE_ID
               valueFrom:
@@ -51,14 +51,13 @@ spec:
           command:
             - powershell.exe
             - -File
-            - Register-StartupTask.ps1
+            - Kured-Init.ps1
       containers:
         - name: kured
-          image: mrosse3/kured-windows-nanoserver:latest
+          image: mrosse3/kured
             # If you find yourself here wondering why there is no
             # :latest tag on Docker Hub,see the FAQ in the README
-          imagePullPolicy: Always # for testing
-
+          imagePullPolicy: IfNotPresent
           env:
             # Pass in the name of the node on which this pod is scheduled
             # for use with drain/uncordon operations and lock acquisition

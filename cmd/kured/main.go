@@ -502,10 +502,12 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 	var err error
 
 	if runtime.GOOS == windows {
-		// Note: InClusterConfig does not currently work for host process containers.
+		// Note: InClusterConfig() does not currently work for host process containers.
 		// See https://github.com/kubernetes/kubernetes/pull/104490
-		// TODO: possibly make this an flag that gets passed in?
-		config, err = clientcmd.BuildConfigFromFlags("", "/k/config")
+		// Instead Kured-Init.ps1 creates kubeconfig.conf file which uses
+		// the ca.crt / token file for the current service account and we will load that here.
+		var kubeConfigPath = os.ExpandEnv("${CONTAINER_SANDBOX_MOUNT_POINT}\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\kubeconfig.conf")
+		config, err = clientcmd.BuildConfigFromFlags("", kubeConfigPath)
 		if err != nil {
 			log.Fatal(err)
 		}
