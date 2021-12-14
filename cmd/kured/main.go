@@ -98,8 +98,6 @@ func init() {
 
 func main() {
 	os.Stdout.WriteString(fmt.Sprintf("Command line args: %v\n", os.Args))
-	os.Stderr.WriteString(fmt.Sprintf("Command line args: %v\n", os.Args))
-	log.Warnf("Command line args: %v\n", os.Args)
 
 	rootCmd := &cobra.Command{
 		Use:    "kured",
@@ -220,7 +218,7 @@ func newCommand(name string, arg ...string) *exec.Cmd {
 func buildHostCommand(pid int, command []string, GOOS string) []string {
 
 	if GOOS == windows {
-		// On Windows kubed daemonset needs to run in a HostProcess container which
+		// On Windows kured daemonset needs to run in a HostProcess container which
 		// run all processes in the hosts process namespace.
 		return command
 	} else {
@@ -496,8 +494,6 @@ func deleteNodeAnnotation(client *kubernetes.Clientset, nodeID, key string) {
 }
 
 func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []string, window *timewindow.TimeWindow, TTL time.Duration, releaseDelay time.Duration) {
-
-	log.Infof("In rebootAsRequired")
 	var config *rest.Config
 	var err error
 
@@ -700,7 +696,6 @@ func root(cmd *cobra.Command, args []string) {
 	sentinelCommand := buildSentinelCommand(rebootSentinelFile, rebootSentinelCommand, runtime.GOOS)
 	restartCommand := parseRebootCommand(rebootCommand)
 
-	log.Infof("Command line args: %v", os.Args)
 	log.Infof("Node ID: %s", nodeID)
 	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
 	if lockTTL > 0 {
@@ -729,7 +724,7 @@ func root(cmd *cobra.Command, args []string) {
 	hostRestartCommand := buildHostCommand(1, restartCommand, runtime.GOOS)
 
 	go rebootAsRequired(nodeID, hostRestartCommand, hostSentinelCommand, window, lockTTL, lockReleaseDelay)
-	//go maintainRebootRequiredMetric(nodeID, hostSentinelCommand)
+	go maintainRebootRequiredMetric(nodeID, hostSentinelCommand)
 
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(":8080", nil))
