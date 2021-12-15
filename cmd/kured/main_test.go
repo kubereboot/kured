@@ -87,40 +87,57 @@ func Test_rebootBlocked(t *testing.T) {
 	}
 }
 
-func Test_buildHostCommand(t *testing.T) {
+func Test_getSentinelCommand_Linux(t *testing.T) {
 	type args struct {
-		pid     int
-		command []string
+		pid                   int
+		rebootSentinelFile    string
+		rebootSentinelCommand string
 	}
 	tests := []struct {
 		name string
 		args args
-		GOOS string
 		want []string
 	}{
 		{
-			name: "Ensure command will run with nsenter on Linux",
-			args: args{pid: 1, command: []string{"ls", "-Fal"}},
-			GOOS: "linux",
-			want: []string{"/usr/bin/nsenter", "-m/proc/1/ns/mnt", "--", "ls", "-Fal"},
+			name: "Ensure a sentinelFile generates a shell 'test' command with the right file",
+			args: args{
+				pid:                   1,
+				rebootSentinelFile:    "/test1",
+				rebootSentinelCommand: "",
+			},
+			want: []string{"/usr/bin/nsenter", "-m/proc/1/ns/mnt", "--", "test", "-f", "/test1"},
 		},
 		{
-			name: "Ensure command runs as specified on Windows",
-			args: args{pid: 1, command: []string{"powershell", "ls"}},
-			GOOS: "windows",
-			want: []string{"powershell", "ls"},
+			name: "Ensure a sentinelCommand has priority over a sentinelFile if both are provided (because sentinelFile is always provided)",
+			args: args{
+				pid:                   1,
+				rebootSentinelFile:    "/test1",
+				rebootSentinelCommand: "/sbin/reboot-required -r",
+			},
+			want: []string{"/usr/bin/nsenter", "-m/proc/1/ns/mnt", "--", "/sbin/reboot-required", "-r"},
+		},
+		{
+			name: "Ensure specified PID is used in commands",
+			args: args{
+				pid:                   5,
+				rebootSentinelFile:    "/foo",
+				rebootSentinelCommand: "",
+			},
+			want: []string{"/usr/bin/nsenter", "-m/proc/5/ns/mnt", "--", "test", "-f", "/foo"},
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := buildHostCommand(tt.args.pid, tt.args.command, tt.GOOS); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("buildHostCommand() = %v, want %v", got, tt.want)
+			linuxHelper := linuxHelper{pid: tt.args.pid}
+			if got := linuxHelper.getSentinelCommand(tt.args.rebootSentinelFile, tt.args.rebootSentinelCommand); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getSentinelCommand() for Linux = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_buildSentinelCommand(t *testing.T) {
+func Test_GetSentinelCommand_Windows(t *testing.T) {
 	type args struct {
 		rebootSentinelFile    string
 		rebootSentinelCommand string
@@ -128,63 +145,43 @@ func Test_buildSentinelCommand(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		GOOS string
 		want []string
 	}{
 		{
-			name: "Ensure a sentinelFile generates a shell 'test' command with the right file",
+			name: "Ensure Test-PendingReboot.ps1 is used regardless of sentinelFile",
 			args: args{
-				rebootSentinelFile:    "/test1",
+				rebootSentinelFile:    "/foo",
 				rebootSentinelCommand: "",
 			},
-			GOOS: "linux",
-			want: []string{"test", "-f", "/test1"},
+			want: []string{"powershell.exe", "./Test-PendingReboot.ps1"},
 		},
 		{
-			name: "Ensure a sentinelCommand has priority over a sentinelFile if both are provided (because sentinelFile is always provided)",
+			name: "Ensure Test-PendingReboot.ps1 is used regardless of sentinelCommand",
 			args: args{
 				rebootSentinelFile:    "/test1",
 				rebootSentinelCommand: "/sbin/reboot-required -r",
 			},
-			GOOS: "linux",
-			want: []string{"/sbin/reboot-required", "-r"},
-		},
-		{
-			name: "Ensure a sentinelFile on generates a powershell command with the right file on Windows",
-			args: args{
-				rebootSentinelFile:    "/test1",
-				rebootSentinelCommand: "",
-			},
-			GOOS: "windows",
-			want: []string{"powershell.exe", "/c", "if", "(Test-Path", "/test1)", "{exit", "0}", "else", "{exit", "1}"},
-		},
-		{
-			name: "Ensure a sentinelCommand has priority over sentinelFile if both are provided on Windows",
-			args: args{
-				rebootSentinelFile:    "/test1",
-				rebootSentinelCommand: "powershell.exe ./Test-RebootRequired",
-			},
-			GOOS: "windows",
-			want: []string{"powershell.exe", "./Test-RebootRequired"},
+			want: []string{"powershell.exe", "./Test-PendingReboot.ps1"},
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := buildSentinelCommand(tt.args.rebootSentinelFile, tt.args.rebootSentinelCommand, tt.GOOS); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("buildSentinelCommand() = %v, want %v", got, tt.want)
+			windowsHelper := windowsHelper{}
+			if got := windowsHelper.getSentinelCommand(tt.args.rebootSentinelFile, tt.args.rebootSentinelCommand); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getSentinelCommand() for Windows = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_parseRebootCommand(t *testing.T) {
+func Test_getRebootCommand_Linux(t *testing.T) {
 	type args struct {
 		rebootCommand string
 	}
 	tests := []struct {
 		name string
 		args args
-		GOOS string
 		want []string
 	}{
 		{
@@ -192,13 +189,41 @@ func Test_parseRebootCommand(t *testing.T) {
 			args: args{
 				rebootCommand: "/sbin/systemctl reboot",
 			},
-			want: []string{"/sbin/systemctl", "reboot"},
+			want: []string{"/usr/bin/nsenter", "-m/proc/1/ns/mnt", "--", "/sbin/systemctl", "reboot"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := parseRebootCommand(tt.args.rebootCommand); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("parseRebootCommand() = %v, want %v", got, tt.want)
+			linuxHelper := linuxHelper{pid: 1}
+			if got := linuxHelper.getRebootCommand(tt.args.rebootCommand); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parseRebootCommand() for Linux = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_getRebootCommand_Windows(t *testing.T) {
+	type args struct {
+		rebootCommand string
+	}
+	tests := []struct {
+		name string
+		args args
+		want []string
+	}{
+		{
+			name: "Ensure a correct reboot command is used for Windows",
+			args: args{
+				rebootCommand: "/sbin/systemctl reboot",
+			},
+			want: []string{"shutdown.exe", "/f", "/r", "/t", "5", "/c", "kured"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			windowsHelper := windowsHelper{}
+			if got := windowsHelper.getRebootCommand(tt.args.rebootCommand); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parseRebootCommand() for Windows = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -261,5 +286,4 @@ func Test_rebootRequired_fatals(t *testing.T) {
 		rebootRequired(c.param)
 		assert.Equal(t, c.expectFatal, fatal)
 	}
-
 }

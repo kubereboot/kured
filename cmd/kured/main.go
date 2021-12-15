@@ -21,11 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	kubectldrain "k8s.io/kubectl/pkg/drain"
-
-	"github.com/google/shlex"
 
 	shoutrrr "github.com/containrrr/shoutrrr"
 	"github.com/prometheus/client_golang/prometheus"
@@ -81,6 +77,9 @@ var (
 		Name:      "reboot_required",
 		Help:      "OS requires reboot due to software updates.",
 	}, []string{"node"})
+
+	// interface used to get OS-specific behaviors
+	osHelper osSpecificBehaviors
 )
 
 const (
@@ -173,6 +172,14 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "text",
 		"use text or json log format")
 
+	if runtime.GOOS == "windows" {
+		osHelper = new(windowsHelper)
+	} else {
+		// PID set to 1, until we have a better discovery mechanism.
+		// Note: Rancher based need different pid
+		osHelper = linuxHelper{pid: 1}
+	}
+
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
 	}
@@ -211,23 +218,6 @@ func newCommand(name string, arg ...string) *exec.Cmd {
 		WriterLevel(log.WarnLevel)
 
 	return cmd
-}
-
-// buildHostCommand writes a new command to run in the host namespace
-// Rancher based need different pid
-func buildHostCommand(pid int, command []string, GOOS string) []string {
-
-	if GOOS == windows {
-		// On Windows kured daemonset needs to run in a HostProcess container which
-		// run all processes in the hosts process namespace.
-		return command
-	} else {
-		// From the container, we nsenter into the proper PID to run the hostCommand.
-		// For this, kured daemonset need to be configured with hostPID:true and privileged:true
-		cmd := []string{"/usr/bin/nsenter", fmt.Sprintf("-m/proc/%d/ns/mnt", pid), "--"}
-		cmd = append(cmd, command...)
-		return cmd
-	}
 }
 
 func rebootRequired(sentinelCommand []string) bool {
@@ -494,24 +484,9 @@ func deleteNodeAnnotation(client *kubernetes.Clientset, nodeID, key string) {
 }
 
 func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []string, window *timewindow.TimeWindow, TTL time.Duration, releaseDelay time.Duration) {
-	var config *rest.Config
-	var err error
-
-	if runtime.GOOS == windows {
-		// Note: InClusterConfig() does not currently work for host process containers.
-		// See https://github.com/kubernetes/kubernetes/pull/104490
-		// Instead Kured-Init.ps1 creates kubeconfig.conf file which uses
-		// the ca.crt / token file for the current service account and we will load that here.
-		var kubeConfigPath = os.ExpandEnv("${CONTAINER_SANDBOX_MOUNT_POINT}\\var\\run\\secrets\\kubernetes.io\\serviceaccount\\kubeconfig.conf")
-		config, err = clientcmd.BuildConfigFromFlags("", kubeConfigPath)
-		if err != nil {
-			log.Fatal(err)
-		}
-	} else {
-		config, err = rest.InClusterConfig()
-		if err != nil {
-			log.Fatal(err)
-		}
+	config, err := osHelper.getClusterCofig()
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	client, err := kubernetes.NewForConfig(config)
@@ -625,57 +600,6 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 	}
 }
 
-// buildSentinelCommand creates the shell command line which will need wrapping to escape
-// the container boundaries
-func buildSentinelCommand(rebootSentinelFile string, rebootSentinelCommand string, GOOS string) []string {
-	if GOOS == windows {
-		return buildSentinelCommandWindows(rebootSentinelFile, rebootSentinelCommand)
-	} else {
-		return buildSentinelCommandLinux(rebootSentinelFile, rebootSentinelCommand)
-	}
-}
-
-func buildSentinelCommandWindows(rebootSentinelFile string, rebootSentinelCommand string) []string {
-	if rebootSentinelCommand != "" {
-		log.Warnf("buildSentinelCommandWindows got rebootSentinelCommand: %s", rebootSentinelCommand)
-		cmd, err := shlex.Split(strings.Trim(rebootSentinelCommand, "\""))
-		if err != nil {
-			log.Fatalf("Error parsing provided sentinel command: %v", err)
-		}
-		log.Warnf("Parsed to '%v', length %v", cmd, len(cmd))
-		return cmd
-	}
-	// Note: Use powershell because it understands forward-slashes in file paths
-	cmd, err := shlex.Split(fmt.Sprintf("powershell.exe /c if (Test-Path %s) {exit 0} else {exit 1}", rebootSentinelFile))
-	if err != nil {
-		log.Fatalf("Error parsing sentinal file check command: %v", err)
-	}
-	return cmd
-}
-
-func buildSentinelCommandLinux(rebootSentinelFile string, rebootSentinelCommand string) []string {
-	if rebootSentinelCommand != "" {
-		cmd, err := shlex.Split(rebootSentinelCommand)
-		if err != nil {
-			log.Fatalf("Error parsing provided sentinel command: %v", err)
-		}
-		return cmd
-	}
-	return []string{"test", "-f", rebootSentinelFile}
-}
-
-// parseRebootCommand creates the shell command line which will need wrapping to escape
-// the container boundaries
-func parseRebootCommand(rebootCommand string) []string {
-
-	command, err := shlex.Split(strings.Trim(rebootCommand, "\""))
-	if err != nil {
-		log.Fatalf("Error parsing provided reboot command: %v", err)
-	}
-	log.Warnf("Parsed rebootCommand to '%v', length %v", command, len(command))
-	return command
-}
-
 func root(cmd *cobra.Command, args []string) {
 	if logFormat == "json" {
 		log.SetFormatter(&log.JSONFormatter{})
@@ -693,8 +617,8 @@ func root(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to build time window: %v", err)
 	}
 
-	sentinelCommand := buildSentinelCommand(rebootSentinelFile, rebootSentinelCommand, runtime.GOOS)
-	restartCommand := parseRebootCommand(rebootCommand)
+	sentinelCommand := osHelper.getSentinelCommand(rebootSentinelFile, rebootSentinelCommand)
+	restartCommand := osHelper.getRebootCommand(rebootCommand)
 
 	log.Infof("Node ID: %s", nodeID)
 	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
@@ -717,14 +641,8 @@ func root(cmd *cobra.Command, args []string) {
 		log.Infof("Will annotate nodes during kured reboot operations")
 	}
 
-	// To run those commands as it was the host, we'll use nsenter
-	// Relies on hostPID:true and privileged:true to enter host mount space
-	// PID set to 1, until we have a better discovery mechanism.
-	hostSentinelCommand := buildHostCommand(1, sentinelCommand, runtime.GOOS)
-	hostRestartCommand := buildHostCommand(1, restartCommand, runtime.GOOS)
-
-	go rebootAsRequired(nodeID, hostRestartCommand, hostSentinelCommand, window, lockTTL, lockReleaseDelay)
-	go maintainRebootRequiredMetric(nodeID, hostSentinelCommand)
+	go rebootAsRequired(nodeID, restartCommand, sentinelCommand, window, lockTTL, lockReleaseDelay)
+	go maintainRebootRequiredMetric(nodeID, sentinelCommand)
 
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(":8080", nil))
