@@ -36,7 +36,7 @@ The following changes have been made compared to the stable chart:
 | Config                  | Description                                                                 | Default                    |
 | ------                  | -----------                                                                 | -------                    |
 | `image.repository`      | Image repository                                                            | `weaveworks/kured` |
-| `image.tag`             | Image tag                                                                   | `1.8.2`                    |
+| `image.tag`             | Image tag                                                                   | `1.9.0`                    |
 | `image.pullPolicy`      | Image pull policy                                                           | `IfNotPresent`             |
 | `image.pullSecrets`     | Image pull secrets                                                          | `[]`                       |
 | `updateStrategy`        | Daemonset update strategy                                                   | `RollingUpdate`            |
@@ -71,6 +71,7 @@ The following changes have been made compared to the stable chart:
 | `configuration.startTime` | cli-parameter `--start-time`                                              | `""`                      |
 | `configuration.timeZone` | cli-parameter `--time-zone`                                                | `""`                      |
 | `configuration.annotateNodes` | cli-parameter `--annotate-nodes`                                      | `false`                   |
+| `configuration.logFormat` | cli-parameter `--log-format`                                              | `"text"`                  |
 | `configuration.preferNoScheduleTaint` | Taint name applied during pending node reboot                 | `""`                   |
 | `rbac.create`           | Create RBAC roles                                                           | `true`                     |
 | `serviceAccount.create` | Create a service account                                                    | `true`                     |

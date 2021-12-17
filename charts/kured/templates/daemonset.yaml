@@ -136,6 +136,9 @@ spec:
           {{- if .Values.configuration.preferNoScheduleTaint }}
             - --prefer-no-schedule-taint={{ .Values.configuration.preferNoScheduleTaint }}
           {{- end }}
+          {{- if .Values.configuration.logFormat }}
+            - --log-format={{ .Values.configuration.logFormat }}
+          {{- end }}
           {{- range $key, $value := .Values.extraArgs }}
             {{- if $value }}
             - --{{ $key }}={{ $value }}
