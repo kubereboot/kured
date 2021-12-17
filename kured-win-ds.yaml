@@ -37,10 +37,6 @@ spec:
       hostNetwork: true # Required for HostProcess containers on Windows
       initContainers:
         - name: kured-init
-          securityContext:
-            windowsOptions:
-              hostProcess: true
-              runAsUserName: "NT AUTHORITY\\SYSTEM"
           image: mrosse3/kured
           imagePullPolicy: IfNotPresent
           env:
@@ -67,14 +63,12 @@ spec:
                   fieldPath: spec.nodeName
           command:
             - kured.exe
-            - --reboot-command="shutdown.exe /f /r /t 5 /c kured"
-#            - --force-reboot=false
+            - --ds-name=kured-win
 #            - --drain-grace-period=-1
 #            - --skip-wait-for-delete-timeout=0
 #            - --drain-timeout=0
-            - --period=1m
+#            - --period=1h
 #            - --ds-namespace=kube-system
-            - --ds-name=kured-win
 #            - --lock-annotation=weave.works/kured-node-lock
 #            - --lock-ttl=0
 #            - --prometheus-url=http://prometheus.monitoring.svc.cluster.local
@@ -82,7 +76,6 @@ spec:
 #            - --alert-firing-only=false
 #            - --reboot-sentinel=/var/run/reboot-required
 #            - --prefer-no-schedule-taint=""
-            - --reboot-sentinel-command="powershell.exe ./Test-PendingReboot.ps1"
 #            - --slack-hook-url=https://hooks.slack.com/...
 #            - --slack-username=prod
 #            - --slack-channel=alerting
@@ -93,10 +86,9 @@ spec:
 #            - --blocking-pod-selector=name=temperamental
 #            - --blocking-pod-selector=...
 #            - --reboot-days=sun,mon,tue,wed,thu,fri,sat
-            - --reboot-delay=30s
+#            - --reboot-delay=90s
 #            - --start-time=0:00
 #            - --end-time=23:59:59
 #            - --time-zone=UTC
 #            - --annotate-nodes=true
 #            - --lock-release-delay=30m
-

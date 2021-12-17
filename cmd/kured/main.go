@@ -35,7 +35,6 @@ import (
 
 var (
 	version = "unreleased"
-	windows = "windows"
 
 	// Command line flags
 	forceReboot                     bool
@@ -173,6 +172,7 @@ func main() {
 		"use text or json log format")
 
 	if runtime.GOOS == "windows" {
+		log.Warn("On Windows --reboot-sentinel, --reboot-sentinel--command, and --reboot-command are not used. Please refer to the project's documentation for more information.")
 		osHelper = new(windowsHelper)
 	} else {
 		// PID set to 1, until we have a better discovery mechanism.

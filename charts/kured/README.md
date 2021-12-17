@@ -83,7 +83,7 @@ The following changes have been made compared to the stable chart:
 | `metrics.interval`      | Interval prometheus should scrape the endpoint                              | `60s`                   |
 | `metrics.scrapeTimeout` | A custom scrapeTimeout for prometheus                                       | `""`                    |
 | `service.create`        | Create a Service for the metrics endpoint                                   | `false`                    |
-| `service.name  `        | Service name for the metrics endpoint                                       | `""`                       |
+| `service.name`          | Service name for the metrics endpoint                                       | `""`                       |
 | `service.port`          | Port of the service to expose                                               | `8080`                     |
 | `service.annotations`   | Annotations to apply to the service (eg to add Prometheus annotations)      | `{}`                       |
 | `podLabels`             | Additional labels for pods (e.g. CostCenter=IT)                             | `{}`                       |

@@ -15,7 +15,7 @@ spec:
     matchLabels:
       name: kured
   updateStrategy:
-   type: RollingUpdate
+    type: RollingUpdate
   template:
     metadata:
       labels:
@@ -27,11 +27,13 @@ spec:
           effect: NoSchedule
       hostPID: true # Facilitate entering the host mount namespace via init
       restartPolicy: Always
+      nodeSelector:
+        "kubernetes.io/os": linux
       containers:
         - name: kured
           image: docker.io/weaveworks/kured:1.8.2
-                 # If you find yourself here wondering why there is no
-                 # :latest tag on Docker Hub,see the FAQ in the README
+            # If you find yourself here wondering why there is no
+            # :latest tag on Docker Hub,see the FAQ in the README
           imagePullPolicy: IfNotPresent
           securityContext:
             privileged: true # Give permission to nsenter /proc/1/ns/mnt

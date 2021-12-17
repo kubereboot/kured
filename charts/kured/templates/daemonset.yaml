@@ -30,7 +30,16 @@ spec:
       {{- end }}
     spec:
       serviceAccountName: {{ template "kured.serviceAccountName" . }}
+      {{- if eq .Values.configuration.nodeOs "linux" }}
       hostPID: true
+      {{- end}}
+      {{- if eq .Values.configuration.nodeOs "windows"}}
+      hostNetwork: true
+      securityContext:
+        windowsOptions:
+          hostProcess: true
+          runAsUserName: "NT AUTHORITY\\SYSTEM"
+      {{- end}}
       restartPolicy: Always
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
@@ -39,16 +48,38 @@ spec:
       {{- if .Values.priorityClassName }}
       priorityClassName: {{ .Values.priorityClassName }}
       {{- end }}
+      {{- if eq .Values.configuration.nodeOs "windows" }}
+      initContainers:
+        - name: "{{ .Chart.Name }}-init"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: KURED_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          command:
+            - powershell.exe
+            - -File
+            - Kured-Init.ps1
+      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if eq .Values.configuration.nodeOs "linux" }}
           securityContext:
             privileged: true # Give permission to nsenter /proc/1/ns/mnt
+          {{- end }}
           resources:
 {{ toYaml .Values.resources | indent 12 }}
           command:
+              {{- if eq .Values.configuration.nodeOs "linux" }}
             - /usr/bin/kured
+            {{- end}}
+            {{- if eq .Values.configuration.nodeOs "windows" }}
+            - kured.exe
+            {{- end}}
           args:
             - --ds-name={{ template "kured.fullname" . }}
             - --ds-namespace={{ .Release.Namespace }}
@@ -86,7 +117,7 @@ spec:
             - --drain-timeout={{ .Values.configuration.drainTimeout }}
           {{- end }}
           {{- if .Values.configuration.skipWaitForDeleteTimeout }}
-             - --skip-wait-for-delete-timeout={{ .Values.configuration.skipWaitForDeleteTimeout }}
+            - --skip-wait-for-delete-timeout={{ .Values.configuration.skipWaitForDeleteTimeout }}
           {{- end }}
           {{- if .Values.configuration.prometheusUrl }}
             - --prometheus-url={{ .Values.configuration.prometheusUrl }}
@@ -164,9 +195,14 @@ spec:
       tolerations:
 {{ toYaml . | indent 8 }}
       {{- end }}
-      {{- with .Values.nodeSelector }}
       nodeSelector:
-{{ toYaml . | indent 8 }}
+      {{- if .Values.nodeSelector }}
+{{ toYaml .Values.nodeSelector | indent 8 }}
+      {{- end}}
+      {{- if eq .Values.configuration.nodeOs "linux" }}
+        "kubernetes.io/os": "linux"
+      {{- else if eq .Values.configuration.nodeOs "windows" }}
+        "kubernetes.io/os": "windows"
       {{- end }}
       {{- with .Values.affinity }}
       affinity:
