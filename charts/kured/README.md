@@ -42,6 +42,7 @@ The following changes have been made compared to the stable chart:
 | `updateStrategy`        | Daemonset update strategy                                                   | `RollingUpdate`            |
 | `maxUnavailable`        | The max pods unavailable during a rolling update                            | `1`                        |
 | `podAnnotations`        | Annotations to apply to pods (eg to add Prometheus annotations)             | `{}`                       |
+| `dsAnnotations`         | Annotations to apply to the kured DaemonSet                                 | `{}`                       |
 | `extraArgs`             | Extra arguments to pass to `/usr/bin/kured`. See below.                     | `{}`                       |
 | `extraEnvVars`          | Array of environment variables to pass to the daemonset.                    | `{}`                       |
 | `configuration.lockTtl` | cli-parameter `--lock-ttl`                                                  | `0`                       |

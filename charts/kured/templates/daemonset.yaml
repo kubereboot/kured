@@ -5,6 +5,12 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "kured.labels" . | nindent 4 }}
+  {{- if .Values.dsAnnotations }}
+  annotations:
+  {{- range $key, $value := .Values.dsAnnotations }}
+    {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- end }}
 spec:
   updateStrategy:
     type: {{ .Values.updateStrategy }}
