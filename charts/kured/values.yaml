@@ -9,6 +9,7 @@ updateStrategy: RollingUpdate
 maxUnavailable: 1
 
 podAnnotations: {}
+dsAnnotations: {}
 
 extraArgs: {}
 
