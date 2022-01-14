@@ -9,6 +9,8 @@ ENV GOARCH=$TARGETARCH
 ENV GOVARIANT=$TARGETVARIANT
 
 WORKDIR /src
+COPY go.mod go.sum .
+RUN go mod download
 COPY . .
 RUN go list -f '{{join .Deps "\n"}}' ./cmd/kured | grep -v /vendor/ | xargs go list -f '{{if not .Standard}}{{ $dep := . }}{{range .GoFiles}}{{$dep.Dir}}/{{.}} {{end}}{{end}}'
 RUN CGO_ENABLED=0 go build -o cmd/kured/kured cmd/kured/*.go
