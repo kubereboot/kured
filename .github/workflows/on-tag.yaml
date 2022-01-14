@@ -44,8 +44,8 @@ jobs:
           username: weave-ghcr-bot
           password: ${{ secrets.KURED_WEAVE_GHCR_BOT_TOKEN }}
 
-#      - name: Set up QEMU
-#        uses: docker/setup-qemu-action@v1
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
 
       - name: Set up Docker Buildx
         id: buildx
@@ -58,6 +58,8 @@ jobs:
           file: cmd/kured/Dockerfile.multi
           platforms: linux/arm64, linux/amd64, linux/arm/v7, linux/arm/v6, linux/386
           push: true
+#          cache-from: type=registry,ref=user/app:buildcache
+#          cache-to: type=inline
           tags: |
             docker.io/${{ GITHUB.REPOSITORY }}:${{ steps.tags.outputs.version }}
             ghcr.io/${{ GITHUB.REPOSITORY }}:${{ steps.tags.outputs.version }}
