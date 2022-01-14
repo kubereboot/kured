@@ -52,7 +52,7 @@ jobs:
         with:
           context: .
           file: cmd/kured/Dockerfile.multi
-          platforms: linux/arm64, linux/amd64
+          platforms: linux/arm64, linux/amd64, linux/arm/v7, linux/arm/v6, linux/386
           push: true
           tags: |
             docker.io/${{ GITHUB.REPOSITORY }}:main-${{ steps.tags.outputs.sha_short }}
