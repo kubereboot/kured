@@ -140,6 +140,11 @@ set the sentinel command to `sh -c "! needs-restarting --reboothint"`
 (by default the command will return `1` if a reboot is required,
 so we wrap it in `sh -c` and add `!` to negate the return value).
 
+```yaml
+configuration:
+  rebootSentinelCommand: sh -c "! needs-restarting --reboothint"
+```
+
 ### Setting a schedule
 
 By default, kured will reboot any time it detects the sentinel, but this
