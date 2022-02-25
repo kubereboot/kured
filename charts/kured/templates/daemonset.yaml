@@ -113,13 +113,13 @@ spec:
             - --reboot-delay={{ .Values.configuration.rebootDelay }}
           {{- end }}
           {{- if .Values.configuration.slackChannel }}
-            - --slack-channel={{ .Values.configuration.slackChannel }}
+            - --slack-channel={{ tpl .Values.configuration.slackChannel . }}
           {{- end }}
           {{- if .Values.configuration.slackHookUrl }}
-            - --slack-hook-url={{ .Values.configuration.slackHookUrl }}
+            - --slack-hook-url={{ tpl .Values.configuration.slackHookUrl . }}
           {{- end }}
           {{- if .Values.configuration.slackUsername }}
-            - --slack-username={{ .Values.configuration.slackUsername }}
+            - --slack-username={{ tpl .Values.configuration.slackUsername . }}
           {{- end }}
           {{- if .Values.configuration.notifyUrl }}
             - --notify-url={{ .Values.configuration.notifyUrl }}
