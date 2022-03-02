@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Find go version
         run: |
           GO_VERSION=$(awk '/^go/ {print $2};' go.mod)
@@ -31,7 +31,7 @@ jobs:
     name: Lint bash code with shellcheck
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Run ShellCheck
       uses: bewuethr/shellcheck-action@v2
 
@@ -39,7 +39,7 @@ jobs:
     name: Lint golang code
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Find go version
       run: |
         GO_VERSION=$(awk '/^go/ {print $2};' go.mod)
@@ -62,7 +62,7 @@ jobs:
     name: Check docs for incorrect links
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Link Checker
       id: lc
       uses: peter-evans/link-checker@v1
@@ -78,7 +78,7 @@ jobs:
     name: Build image and scan it against known vulnerabilities
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Find go version
         run: |
           GO_VERSION=$(awk '/^go/ {print $2};' go.mod)
@@ -110,7 +110,7 @@ jobs:
           - "1.22"
           - "1.23"
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Find go version
         run: |
           GO_VERSION=$(awk '/^go/ {print $2};' go.mod)
@@ -181,7 +181,7 @@ jobs:
         kubernetes:
           - "1.21"
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Find go version
         run: |
           GO_VERSION=$(awk '/^go/ {print $2};' go.mod)
@@ -272,7 +272,7 @@ jobs:
   #       kubernetes:
   #         - "1.20"
   #   steps:
-  #     - uses: actions/checkout@v2
+  #     - uses: actions/checkout@v3
   #     - name: Find go version
   #       run: |
   #         GO_VERSION=$(awk '/^go/ {print $2};' go.mod)
