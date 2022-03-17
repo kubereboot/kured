@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: run tests
         run: go test -json ./... > test.json
       - name: Annotate tests
@@ -39,7 +39,7 @@ jobs:
     name: Check docs for incorrect links
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Link Checker
       id: lc
       uses: peter-evans/link-checker@v1
@@ -52,7 +52,7 @@ jobs:
     name: Build image and scan it against known vulnerabilities
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Find go version
         run: |
           GO_VERSION=$(awk '/^go/ {print $2};' go.mod)
@@ -78,7 +78,7 @@ jobs:
           - "1.22"
           - "1.23"
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Find go version
         run: |
           GO_VERSION=$(awk '/^go/ {print $2};' go.mod)

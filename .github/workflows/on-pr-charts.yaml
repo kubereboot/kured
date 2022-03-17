@@ -22,17 +22,17 @@ jobs:
           - install
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: "0"
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v3
         with:
           python-version: 3.7
 
       # Helm is already present in github actions, so do not re-install it
       - name: Setup chart testing
-        uses: helm/chart-testing-action@v2.2.0
+        uses: helm/chart-testing-action@v2.2.1
 
       - name: Create default kind cluster
         uses: helm/kind-action@v1.2.0
@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: test-chart
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       
       # Default name for helm/kind-action kind clusters is "chart-testing"
       - name: Create 1 node kind cluster

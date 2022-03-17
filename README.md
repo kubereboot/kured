@@ -8,6 +8,7 @@
 - [Installation](#installation)
 - [Configuration](#configuration)
   - [Reboot Sentinel File & Period](#reboot-sentinel-file--period)
+  - [Reboot Sentinel Command](#reboot-sentinel-command)
   - [Setting a schedule](#setting-a-schedule)
   - [Blocking Reboots via Alerts](#blocking-reboots-via-alerts)
   - [Blocking Reboots via Pods](#blocking-reboots-via-pods)
@@ -127,9 +128,22 @@ values with `--reboot-sentinel` and `--period`. Each replica of the
 daemon uses a random offset derived from the period on startup so that
 nodes don't all contend for the lock simultaneously.
 
+### Reboot Sentinel Command
+
 Alternatively, a reboot sentinel command can be used. If a reboot
 sentinel command is used, the reboot sentinel file presence will be
-ignored.
+ignored. When the command exits with code `0`, kured will assume
+that a reboot is required.
+
+For example, if you're using RHEL or its derivatives, you can
+set the sentinel command to `sh -c "! needs-restarting --reboothint"`
+(by default the command will return `1` if a reboot is required,
+so we wrap it in `sh -c` and add `!` to negate the return value).
+
+```yaml
+configuration:
+  rebootSentinelCommand: sh -c "! needs-restarting --reboothint"
+```
 
 ### Setting a schedule
 

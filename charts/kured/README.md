@@ -29,7 +29,7 @@ The following changes have been made compared to the stable chart:
 - Added support for affinities.
 - Configuration of cli-flags can be made through a `configuration` object.
 - Added optional `Service` and `ServiceMonitor` support for metrics endpoint.
-
+- Previously static Slack channel, hook URL and username values are now made dynamic using `tpl` function.
 
 ## Configuration
 
@@ -63,9 +63,9 @@ The following changes have been made compared to the stable chart:
 | `configuration.rebootSentinelCommand` | cli-parameter `--reboot-sentinel-command`                     | `""`                      |
 | `configuration.rebootCommand` | cli-parameter `--reboot-command`                                      | `""`                      |
 | `configuration.rebootDelay` | cli-parameter `--reboot-delay`                                          | `""`                      |
-| `configuration.slackChannel` | cli-parameter `--slack-channel`                                        | `""`                      |
-| `configuration.slackHookUrl` | cli-parameter `--slack-hook-url`                                       | `""`                      |
-| `configuration.slackUsername` | cli-parameter `--slack-username`                                      | `""`                      |
+| `configuration.slackChannel` | cli-parameter `--slack-channel`. Passed through `tpl`                  | `""`                      |
+| `configuration.slackHookUrl` | cli-parameter `--slack-hook-url`. Passed through `tpl`                 | `""`                      |
+| `configuration.slackUsername` | cli-parameter `--slack-username`. Passed through `tpl`                | `""`                      |
 | `configuration.notifyUrl` | cli-parameter `--notify-url`                                              | `""`                      |
 | `configuration.messageTemplateDrain` | cli-parameter `--message-template-drain`                       | `""`                      |
 | `configuration.messageTemplateReboot` | cli-parameter `--message-template-reboot`                     | `""`                      |
