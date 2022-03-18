@@ -272,13 +272,11 @@ Here is the syntax:
 
 - rocketchat:      `rocketchat://[username@]rocketchat-host/token[/channel|@recipient]`
 
-- teams:           `teams://tName/token-a/token-b/token-c`
-
-   > **Attention** as the [format of the url has changed](https://github.com/containrrr/shoutrrr/issues/138) you also have to specify a `tName`
+- teams:           `teams://group@tenant/altId/groupOwner?host=organization.webhook.office.com`
 
 - Email:           `smtp://username:password@host:port/?fromAddress=fromAddress&toAddresses=recipient1[,recipient2,...]`
 
-More details here: [containrrr.dev/shoutrrr/v0.4/services/overview](https://containrrr.dev/shoutrrr/v0.4/services/overview)
+More details here: [containrrr.dev/shoutrrr/v0.5/services/overview](https://containrrr.dev/shoutrrr/v0.5/services/overview)
 
 ### Overriding Lock Configuration
 
