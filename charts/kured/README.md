@@ -77,7 +77,9 @@ The following changes have been made compared to the stable chart:
 | `rbac.create`           | Create RBAC roles                                                           | `true`                     |
 | `serviceAccount.create` | Create a service account                                                    | `true`                     |
 | `serviceAccount.name`   | Service account name to create (or use if `serviceAccount.create` is false) | (chart fullname)           |
-| `podSecurityPolicy.create` | Create podSecurityPolicy                                                 | `false`                     |
+| `podSecurityPolicy.create` | Create podSecurityPolicy                                                 | `false`                    |
+| `containerSecurityContext.privileged `| Enables `privileged` in container-specific security context   | `true`                     |
+| `containerSecurityContext.allowPrivilegeEscalation`| Enables `allowPrivilegeEscalation` in container-specific security context. If not set it won't be configured. |  |
 | `resources`             | Resources requests and limits.                                              | `{}`                       |
 | `metrics.create`        | Create a ServiceMonitor for prometheus-operator                             | `false`                    |
 | `metrics.namespace`     | The namespace to create the ServiceMonitor in                               | `""`                    |
