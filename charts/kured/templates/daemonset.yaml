@@ -50,7 +50,7 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
-            privileged: true # Give permission to nsenter /proc/1/ns/mnt
+{{ toYaml .Values.containerSecurityContext | indent 12 }}
           resources:
 {{ toYaml .Values.resources | indent 12 }}
           command:
