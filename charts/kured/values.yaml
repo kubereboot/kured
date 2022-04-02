@@ -64,7 +64,7 @@ podSecurityPolicy:
   create: false
 
 containerSecurityContext:
-  privileged: true # Give permission to nsenter /proc/1/ns/mnt
+  privileged: true  # Give permission to nsenter /proc/1/ns/mnt
 #  allowPrivilegeEscalation: true # Needed when using defaultAllowPrivilegedEscalation: false in psp
 
 resources: {}
