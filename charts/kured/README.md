@@ -92,7 +92,7 @@ The following changes have been made compared to the stable chart:
 | `service.annotations`   | Annotations to apply to the service (eg to add Prometheus annotations)      | `{}`                       |
 | `podLabels`             | Additional labels for pods (e.g. CostCenter=IT)                             | `{}`                       |
 | `priorityClassName`     | Priority Class to be used by the pods                                       | `""`                       |
-| `tolerations`           | Tolerations to apply to the daemonset (eg to allow running on master)       | `[{"key": "node-role.kubernetes.io/master", "effect": "NoSchedule"}]`|
+| `tolerations`           | Tolerations to apply to the daemonset (eg to allow running on master)       | `[{"key": "node-role.kubernetes.io/control-plane", "effect": "NoSchedule"}]` for Kubernetes 1.24.0 and greater, otherwise `[{"key": "node-role.kubernetes.io/master", "effect": "NoSchedule"}]`|
 | `affinity`              | Affinity for the daemonset (ie, restrict which nodes kured runs on)         | `{}`                       |
 | `nodeSelector`          | Node Selector for the daemonset (ie, restrict which nodes kured runs on)    | `{}`                       |
 | `volumeMounts`          | Maps of volumes mount to mount                                              | `{}`                       |
