@@ -67,6 +67,8 @@ var (
 	podSelectors                    []string
 	rebootCommand                   string
 	logFormat                       string
+	preRebootNodeLabels             []string
+	afterRebootNodeLabels           []string
 	nodeID                          string
 
 	rebootDays    []string
@@ -184,6 +186,11 @@ func NewRootCommand() *cobra.Command {
 
 	rootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "text",
 		"use text or json log format")
+
+	rootCmd.PersistentFlags().StringSliceVar(&preRebootNodeLabels, "pre-reboot-node-labels", nil,
+		"labels to add to nodes before cordoning")
+	rootCmd.PersistentFlags().StringSliceVar(&afterRebootNodeLabels, "after-reboot-node-labels", nil,
+		"labels to add to nodes after uncordoning")
 
 	return rootCmd
 }
@@ -427,6 +434,10 @@ func release(lock *daemonsetlock.DaemonSetLock) {
 func drain(client *kubernetes.Clientset, node *v1.Node) error {
 	nodename := node.GetName()
 
+	if preRebootNodeLabels != nil {
+		addNodeLabels(client, node, preRebootNodeLabels)
+	}
+
 	log.Infof("Draining node %s", nodename)
 
 	if notifyURL != "" {
@@ -472,6 +483,8 @@ func uncordon(client *kubernetes.Clientset, node *v1.Node) error {
 	if err := kubectldrain.RunCordonOrUncordon(drainer, node, false); err != nil {
 		log.Fatalf("Error uncordonning %s: %v", nodename, err)
 		return err
+	} else if afterRebootNodeLabels != nil {
+		addNodeLabels(client, node, afterRebootNodeLabels)
 	}
 	return nil
 }
@@ -548,6 +561,31 @@ func deleteNodeAnnotation(client *kubernetes.Clientset, nodeID, key string) erro
 		return err
 	}
 	return nil
+}
+
+func addNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []string) {
+	for _, label := range labels {
+		k := strings.Split(label, "=")[0]
+		v := strings.Split(label, "=")[1]
+		node.Labels[k] = v
+		log.Infof("Adding node %s label: %s=%s", node.GetName(), k, v)
+	}
+
+	bytes, err := json.Marshal(node)
+	if err != nil {
+		log.Fatalf("Error marshalling node object into JSON: %v", err)
+	}
+
+	_, err = client.CoreV1().Nodes().Patch(context.TODO(), node.GetName(), types.StrategicMergePatchType, bytes, metav1.PatchOptions{})
+	if err != nil {
+		var labelsErr string
+		for _, label := range labels {
+			k := strings.Split(label, "=")[0]
+			v := strings.Split(label, "=")[1]
+			labelsErr += fmt.Sprintf("%s=%s ", k, v)
+		}
+		log.Fatalf("Error adding node labels %s via k8s API: %v", labelsErr, err)
+	}
 }
 
 func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []string, window *timewindow.TimeWindow, TTL time.Duration, releaseDelay time.Duration) {
