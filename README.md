@@ -3,28 +3,30 @@
 
 <img src="https://github.com/weaveworks/kured/raw/main/img/logo.png" align="right"/>
 
-- [Introduction](#introduction)
-- [Kubernetes & OS Compatibility](#kubernetes--os-compatibility)
-- [Installation](#installation)
-- [Configuration](#configuration)
-  - [Reboot Sentinel File & Period](#reboot-sentinel-file--period)
-  - [Reboot Sentinel Command](#reboot-sentinel-command)
-  - [Setting a schedule](#setting-a-schedule)
-  - [Blocking Reboots via Alerts](#blocking-reboots-via-alerts)
-  - [Blocking Reboots via Pods](#blocking-reboots-via-pods)
-  - [Prometheus Metrics](#prometheus-metrics)
-  - [Notifications](#notifications)
-  - [Overriding Lock Configuration](#overriding-lock-configuration)
-- [Operation](#operation)
-  - [Testing](#testing)
-  - [Disabling Reboots](#disabling-reboots)
-  - [Manual Unlock](#manual-unlock)
-  - [Automatic Unlock](#automatic-unlock)
-  - [Delaying Lock Release](#delaying-lock-release)
-- [Building](#building)
-- [Frequently Asked/Anticipated Questions](#frequently-askedanticipated-questions)
-  - [Why is there no `latest` tag on Docker Hub?](#why-is-there-no-latest-tag-on-docker-hub)
-- [Getting Help](#getting-help)
+- [kured - Kubernetes Reboot Daemon](#kured---kubernetes-reboot-daemon)
+  - [Introduction](#introduction)
+  - [Kubernetes & OS Compatibility](#kubernetes--os-compatibility)
+  - [Installation](#installation)
+  - [Configuration](#configuration)
+    - [Reboot Sentinel File & Period](#reboot-sentinel-file--period)
+    - [Reboot Sentinel Command](#reboot-sentinel-command)
+    - [Setting a schedule](#setting-a-schedule)
+    - [Blocking Reboots via Alerts](#blocking-reboots-via-alerts)
+    - [Blocking Reboots via Pods](#blocking-reboots-via-pods)
+    - [Adding node labels before and after reboots](#adding-node-labels-before-and-after-reboots)
+    - [Prometheus Metrics](#prometheus-metrics)
+    - [Notifications](#notifications)
+    - [Overriding Lock Configuration](#overriding-lock-configuration)
+  - [Operation](#operation)
+    - [Testing](#testing)
+    - [Disabling Reboots](#disabling-reboots)
+    - [Manual Unlock](#manual-unlock)
+    - [Automatic Unlock](#automatic-unlock)
+    - [Delaying Lock Release](#delaying-lock-release)
+  - [Building](#building)
+  - [Frequently Asked/Anticipated Questions](#frequently-askedanticipated-questions)
+    - [Why is there no `latest` tag on Docker Hub?](#why-is-there-no-latest-tag-on-docker-hub)
+  - [Getting Help](#getting-help)
 
 ## Introduction
 
@@ -48,7 +50,7 @@ forwards and backwards compatibility of one minor version between client and
 server:
 
 | kured | kubectl | k8s.io/client-go | k8s.io/apimachinery | expected kubernetes compatibility |
-|-------|---------|------------------|---------------------|-----------------------------------|
+| ----- | ------- | ---------------- | ------------------- | --------------------------------- |
 | main  | 1.22.4  | v0.22.4          | v0.22.4             | 1.21.x, 1.22.x, 1.23.x            |
 | 1.9.2 | 1.22.4  | v0.22.4          | v0.22.4             | 1.21.x, 1.22.x, 1.23.x            |
 | 1.8.1 | 1.21.4  | v0.21.4          | v0.21.4             | 1.20.x, 1.21.x, 1.22.x            |
@@ -217,6 +219,17 @@ running job or a known temperamental pod on a node will stop it rebooting.
 > restartability where possible. If you do use it, make sure you set
 > up a RebootRequired alert as described in the next section so that
 > you can intervene manually if reboots are blocked for too long.
+
+### Adding node labels before and after reboots
+
+If you need to add node labels before and after the reboot process, you can use `--pre-reboot-node-labels` and `--after-reboot-node-labels`:
+
+```console
+      --pre-reboot-node-labels=zalando=notready
+      --after-reboot-node-labels=zalando=ready
+```
+
+Note that label keys specified by these two flags should match. If they do not match, a warning will be generated.
 
 ### Prometheus Metrics
 
