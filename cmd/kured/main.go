@@ -9,7 +9,9 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -195,7 +197,7 @@ func NewRootCommand() *cobra.Command {
 	return rootCmd
 }
 
-// temporary func that checks for deprecated slack-notification-related flags
+// func that checks for deprecated slack-notification-related flags and node labels that do not match
 func flagCheck(cmd *cobra.Command, args []string) {
 	if slackHookURL != "" && notifyURL != "" {
 		log.Warnf("Cannot use both --notify-url and --slack-hook-url flags. Kured will use --notify-url flag only...")
@@ -214,6 +216,19 @@ func flagCheck(cmd *cobra.Command, args []string) {
 		} else {
 			notifyURL = fmt.Sprintf("slack://%s", strings.Trim(trataURL.Path, "/services/"))
 		}
+	}
+	var preRebootNodeLabelKeys []string
+	var afterRebootNodeLabelKeys []string
+	for _, label := range preRebootNodeLabels {
+		preRebootNodeLabelKeys = append(preRebootNodeLabelKeys, strings.Split(label, "=")[0])
+	}
+	for _, label := range afterRebootNodeLabels {
+		afterRebootNodeLabelKeys = append(afterRebootNodeLabelKeys, strings.Split(label, "=")[0])
+	}
+	sort.Strings(preRebootNodeLabelKeys)
+	sort.Strings(afterRebootNodeLabelKeys)
+	if !reflect.DeepEqual(preRebootNodeLabelKeys, afterRebootNodeLabelKeys) {
+		log.Warnf("pre-reboot-node-labels keys and after-reboot-node-labels keys do not match. This may result in unexpected behaviour.")
 	}
 }
 
