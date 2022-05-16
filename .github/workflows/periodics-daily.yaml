@@ -61,7 +61,7 @@ jobs:
       - name: Ensure go version
         uses: actions/setup-go@v3
         with:
-          go-version: "${{ steps.awk_gomod.outputs.version }}".x
+          go-version: "${{ steps.awk_gomod.outputs.version }}.x"
       - run: make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" image
       - uses: Azure/container-scan@v0
         with:
@@ -87,7 +87,7 @@ jobs:
       - name: Ensure go version
         uses: actions/setup-go@v3
         with:
-          go-version: "${{ steps.awk_gomod.outputs.version }}".x
+          go-version: "${{ steps.awk_gomod.outputs.version }}.x"
 
       - name: "Workaround 'Failed to attach 1 to compat systemd cgroup /actions_job/...' on gh actions"
         run: |
