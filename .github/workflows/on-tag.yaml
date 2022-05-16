@@ -21,7 +21,7 @@ jobs:
       - name: Ensure go version
         uses: actions/setup-go@v3
         with:
-          go-version: "${{ steps.awk_gomod.outputs.version }}"
+          go-version: "${{ steps.awk_gomod.outputs.version }}".x
       - name: Find current tag version
         run: echo "::set-output name=version::${GITHUB_REF#refs/tags/}"
         id: tags
