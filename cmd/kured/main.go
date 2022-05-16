@@ -214,8 +214,7 @@ func flagCheck(cmd *cobra.Command, args []string) {
 			notifyURL = fmt.Sprintf("slack://%s", strings.Trim(trataURL.Path, "/services/"))
 		}
 	}
-	var preRebootNodeLabelKeys []string
-	var afterRebootNodeLabelKeys []string
+	var preRebootNodeLabelKeys, afterRebootNodeLabelKeys []string
 	for _, label := range preRebootNodeLabels {
 		preRebootNodeLabelKeys = append(preRebootNodeLabelKeys, strings.Split(label, "=")[0])
 	}
@@ -434,7 +433,7 @@ func drain(client *kubernetes.Clientset, node *v1.Node) error {
 	nodename := node.GetName()
 
 	if preRebootNodeLabels != nil {
-		addNodeLabels(client, node, preRebootNodeLabels)
+		updateNodeLabels(client, node, preRebootNodeLabels)
 	}
 
 	log.Infof("Draining node %s", nodename)
@@ -483,7 +482,7 @@ func uncordon(client *kubernetes.Clientset, node *v1.Node) error {
 		log.Fatalf("Error uncordonning %s: %v", nodename, err)
 		return err
 	} else if afterRebootNodeLabels != nil {
-		addNodeLabels(client, node, afterRebootNodeLabels)
+		updateNodeLabels(client, node, afterRebootNodeLabels)
 	}
 	return nil
 }
@@ -562,12 +561,12 @@ func deleteNodeAnnotation(client *kubernetes.Clientset, nodeID, key string) erro
 	return nil
 }
 
-func addNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []string) {
+func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []string) {
 	for _, label := range labels {
 		k := strings.Split(label, "=")[0]
 		v := strings.Split(label, "=")[1]
 		node.Labels[k] = v
-		log.Infof("Adding node %s label: %s=%s", node.GetName(), k, v)
+		log.Infof("Updating node %s label: %s=%s", node.GetName(), k, v)
 	}
 
 	bytes, err := json.Marshal(node)
@@ -583,7 +582,7 @@ func addNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []string)
 			v := strings.Split(label, "=")[1]
 			labelsErr += fmt.Sprintf("%s=%s ", k, v)
 		}
-		log.Fatalf("Error adding node labels %s via k8s API: %v", labelsErr, err)
+		log.Fatalf("Error updating node labels %s via k8s API: %v", labelsErr, err)
 	}
 }
 
