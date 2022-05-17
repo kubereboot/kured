@@ -582,7 +582,7 @@ func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []stri
 			v := strings.Split(label, "=")[1]
 			labelsErr += fmt.Sprintf("%s=%s ", k, v)
 		}
-		log.Fatalf("Error updating node labels %s via k8s API: %v", labelsErr, err)
+		log.Errorf("Error updating node labels %s via k8s API: %v", labelsErr, err)
 	}
 }
 
