@@ -193,7 +193,10 @@ func flagCheck(cmd *cobra.Command, args []string) {
 	if slackHookURL != "" && notifyURL != "" {
 		log.Warnf("Cannot use both --notify-url and --slack-hook-url flags. Kured will use --notify-url flag only...")
 	}
-	if slackHookURL != "" {
+	if notifyURL != "" {
+		notifyURL = stripQuotes(notifyURL)
+	} else if slackHookURL != "" {
+		slackHookURL = stripQuotes(slackHookURL)
 		log.Warnf("Deprecated flag(s). Please use --notify-url flag instead.")
 		trataURL, err := url.Parse(slackHookURL)
 		if err != nil {
@@ -205,6 +208,19 @@ func flagCheck(cmd *cobra.Command, args []string) {
 			notifyURL = fmt.Sprintf("slack://%s", strings.Trim(trataURL.Path, "/services/"))
 		}
 	}
+}
+
+// stripQuotes removes any literal single or double quote chars that surround a string
+func stripQuotes(str string) string {
+	if len(str) > 2 {
+		firstChar := str[0]
+		lastChar := str[len(str)-1]
+		if firstChar == lastChar && (firstChar == '"' || firstChar == '\'') {
+			return str[1 : len(str)-1]
+		}
+	}
+	// return the original string if it has a length of zero or one
+	return str
 }
 
 // bindViper initializes viper and binds command flags with environment variables
