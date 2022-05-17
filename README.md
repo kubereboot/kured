@@ -229,6 +229,8 @@ If you need to add node labels before and after the reboot process, you can use 
       --after-reboot-node-labels=zalando=ready
 ```
 
+Labels can be comma-delimited (e.g. `--pre-reboot-node-labels=zalando=notready,thisnode=disabled`) or you can supply the flags multiple times.
+
 Note that label keys specified by these two flags should match. If they do not match, a warning will be generated.
 
 ### Prometheus Metrics
