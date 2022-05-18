@@ -222,11 +222,11 @@ running job or a known temperamental pod on a node will stop it rebooting.
 
 ### Adding node labels before and after reboots
 
-If you need to add node labels before and after the reboot process, you can use `--pre-reboot-node-labels` and `--after-reboot-node-labels`:
+If you need to add node labels before and after the reboot process, you can use `--pre-reboot-node-labels` and `--post-reboot-node-labels`:
 
 ```console
       --pre-reboot-node-labels=zalando=notready
-      --after-reboot-node-labels=zalando=ready
+      --post-reboot-node-labels=zalando=ready
 ```
 
 Labels can be comma-delimited (e.g. `--pre-reboot-node-labels=zalando=notready,thisnode=disabled`) or you can supply the flags multiple times.

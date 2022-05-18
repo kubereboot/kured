@@ -70,7 +70,7 @@ var (
 	rebootCommand                   string
 	logFormat                       string
 	preRebootNodeLabels             []string
-	afterRebootNodeLabels           []string
+	postRebootNodeLabels            []string
 	nodeID                          string
 
 	rebootDays    []string
@@ -191,7 +191,7 @@ func NewRootCommand() *cobra.Command {
 
 	rootCmd.PersistentFlags().StringSliceVar(&preRebootNodeLabels, "pre-reboot-node-labels", nil,
 		"labels to add to nodes before cordoning")
-	rootCmd.PersistentFlags().StringSliceVar(&afterRebootNodeLabels, "after-reboot-node-labels", nil,
+	rootCmd.PersistentFlags().StringSliceVar(&postRebootNodeLabels, "post-reboot-node-labels", nil,
 		"labels to add to nodes after uncordoning")
 
 	return rootCmd
@@ -214,17 +214,17 @@ func flagCheck(cmd *cobra.Command, args []string) {
 			notifyURL = fmt.Sprintf("slack://%s", strings.Trim(trataURL.Path, "/services/"))
 		}
 	}
-	var preRebootNodeLabelKeys, afterRebootNodeLabelKeys []string
+	var preRebootNodeLabelKeys, postRebootNodeLabelKeys []string
 	for _, label := range preRebootNodeLabels {
 		preRebootNodeLabelKeys = append(preRebootNodeLabelKeys, strings.Split(label, "=")[0])
 	}
-	for _, label := range afterRebootNodeLabels {
-		afterRebootNodeLabelKeys = append(afterRebootNodeLabelKeys, strings.Split(label, "=")[0])
+	for _, label := range postRebootNodeLabels {
+		postRebootNodeLabelKeys = append(postRebootNodeLabelKeys, strings.Split(label, "=")[0])
 	}
 	sort.Strings(preRebootNodeLabelKeys)
-	sort.Strings(afterRebootNodeLabelKeys)
-	if !reflect.DeepEqual(preRebootNodeLabelKeys, afterRebootNodeLabelKeys) {
-		log.Warnf("pre-reboot-node-labels keys and after-reboot-node-labels keys do not match. This may result in unexpected behaviour.")
+	sort.Strings(postRebootNodeLabelKeys)
+	if !reflect.DeepEqual(preRebootNodeLabelKeys, postRebootNodeLabelKeys) {
+		log.Warnf("pre-reboot-node-labels keys and post-reboot-node-labels keys do not match. This may result in unexpected behaviour.")
 	}
 }
 
@@ -481,8 +481,8 @@ func uncordon(client *kubernetes.Clientset, node *v1.Node) error {
 	if err := kubectldrain.RunCordonOrUncordon(drainer, node, false); err != nil {
 		log.Fatalf("Error uncordonning %s: %v", nodename, err)
 		return err
-	} else if afterRebootNodeLabels != nil {
-		updateNodeLabels(client, node, afterRebootNodeLabels)
+	} else if postRebootNodeLabels != nil {
+		updateNodeLabels(client, node, postRebootNodeLabels)
 	}
 	return nil
 }
