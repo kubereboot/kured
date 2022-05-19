@@ -578,14 +578,19 @@ func deleteNodeAnnotation(client *kubernetes.Clientset, nodeID, key string) erro
 }
 
 func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []string) {
+	labelsMap := make(map[string]string)
 	for _, label := range labels {
 		k := strings.Split(label, "=")[0]
 		v := strings.Split(label, "=")[1]
-		node.Labels[k] = v
+		labelsMap[k] = v
 		log.Infof("Updating node %s label: %s=%s", node.GetName(), k, v)
 	}
 
-	bytes, err := json.Marshal(node)
+	bytes, err := json.Marshal(map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"labels": labelsMap,
+		},
+	})
 	if err != nil {
 		log.Fatalf("Error marshalling node object into JSON: %v", err)
 	}
