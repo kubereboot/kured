@@ -103,7 +103,7 @@ jobs:
         uses: helm/kind-action@v1.2.0
         with:
           config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
-          version: v0.13.0
+          version: v0.14.0
 
       - name: Deploy kured on default namespace with its helm chart
         run: |
