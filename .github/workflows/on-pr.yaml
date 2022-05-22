@@ -156,10 +156,14 @@ jobs:
         uses: nick-invision/retry@v2.7.0
         with:
           timeout_minutes: 10
-          max_attempts: 10
+          max_attempts: 2
           retry_wait_seconds: 60
           # DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE should all be = to cluster_size
           command: "kubectl get ds -n kube-system kured | grep -E 'kured.*5.*5.*5.*5.*5'"
+
+      - name: Describe Daemonset
+        if: always()
+        run: kubectl describe ds -n kube-system kured
 
       - name: Create reboot sentinel files
         run: |
