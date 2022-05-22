@@ -74,9 +74,9 @@ jobs:
     strategy:
       matrix:
         kubernetes:
-          - "1.21"
           - "1.22"
           - "1.23"
+          - "1.24"
     steps:
       - uses: actions/checkout@v3
       - name: Find go version
@@ -103,7 +103,7 @@ jobs:
         uses: helm/kind-action@v1.2.0
         with:
           config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
-          version: v0.11.0
+          version: v0.14.0
 
       - name: Deploy kured on default namespace with its helm chart
         run: |
