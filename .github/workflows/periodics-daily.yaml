@@ -114,6 +114,8 @@ jobs:
           helm install kured ./charts/kured/ --set configuration.period=1m
           kubectl config set-context kind-chart-testing
           kubectl get ds --all-namespaces
+          kubectl get nodes -o yaml
+          sleep 5
           kubectl describe ds kured
 
       - name: Ensure kured is ready
