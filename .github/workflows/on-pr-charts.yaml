@@ -47,16 +47,22 @@ jobs:
   deploy-chart:
     name: Functional test of helm chart in its current state (needs published image of the helm chart)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        kubernetes:
+          - "1.22"
+          - "1.23"
+          - "1.24"
     needs: test-chart
     steps:
       - uses: actions/checkout@v3
-      
       # Default name for helm/kind-action kind clusters is "chart-testing"
       - name: Create 1 node kind cluster
         uses: helm/kind-action@v1.2.0
         with:
+          config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
           version: v0.14.0
-
       - name: Deploy kured on default namespace with its helm chart
         run: |
           # Documented in official helm doc to live on the edge
@@ -67,7 +73,6 @@ jobs:
           kubectl config set-context kind-chart-testing
           kubectl get ds --all-namespaces
           kubectl describe ds kured
-
       - name: Test if successful deploy
         uses: nick-invision/retry@v2.7.0
         with:
