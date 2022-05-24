@@ -18,7 +18,6 @@ jobs:
         uses: guyarb/golang-test-annoations@v0.5.1
         with:
           test-results: test.json
-
   periodics-mark-stale:
     name: Mark stale issues and PRs
     runs-on: ubuntu-latest
@@ -34,7 +33,6 @@ jobs:
         stale-pr-label: 'no-pr-activity'
         exempt-issue-labels: 'good first issue,keep'
         days-before-close: 21
-
   check-docs-links:
     name: Check docs for incorrect links
     runs-on: ubuntu-latest
@@ -47,7 +45,6 @@ jobs:
         args: -r *.md *.yaml */*/*.go -x .cluster.local
     - name: Fail if there were link errors
       run: exit ${{ steps.lc.outputs.exit_code }}
-
   vuln-scan:
     name: Build image and scan it against known vulnerabilities
     runs-on: ubuntu-latest
@@ -66,7 +63,6 @@ jobs:
       - uses: Azure/container-scan@v0
         with:
           image-name: docker.io/${{ github.repository_owner }}/kured:${{ github.sha }}
-
   deploy-helm:
     name: Ensure our currently released helm chart works on all kubernetes versions
     runs-on: ubuntu-latest
@@ -88,23 +84,12 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: "${{ steps.awk_gomod.outputs.version }}.x"
-
-      - name: "Workaround 'Failed to attach 1 to compat systemd cgroup /actions_job/...' on gh actions"
-        run: |
-          sudo bash << EOF
-              cp /etc/docker/daemon.json /etc/docker/daemon.json.old
-              echo '{}' > /etc/docker/daemon.json
-              systemctl restart docker || journalctl --no-pager -n 500
-              systemctl status docker
-          EOF
-
       # Default name for helm/kind-action kind clusters is "chart-testing"
       - name: Create 5 node kind cluster
         uses: helm/kind-action@v1.2.0
         with:
           config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
           version: v0.14.0
-
       - name: Deploy kured on default namespace with its helm chart
         run: |
           # Documented in official helm doc to live on the edge
@@ -117,7 +102,6 @@ jobs:
           kubectl get nodes -o yaml
           sleep 5
           kubectl describe ds kured
-
       - name: Ensure kured is ready
         uses: nick-invision/retry@v2.7.0
         with:
@@ -126,11 +110,9 @@ jobs:
           retry_wait_seconds: 60
           # DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE should all be = 5
           command: "kubectl get ds kured | grep -E 'kured.*5.*5.*5.*5.*5' "
-
       - name: Create reboot sentinel files
         run: |
           ./tests/kind/create-reboot-sentinels.sh
-
       - name: Follow reboot until success
         env:
           DEBUG: true

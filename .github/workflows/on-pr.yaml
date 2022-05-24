@@ -124,34 +124,20 @@ jobs:
         run: |
           make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" image
           make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" manifest
-
-      - name: Workaround "Failed to attach 1 to compat systemd cgroup /actions_job/..." on gh actions
-        run: |
-          sudo bash << EOF
-              cp /etc/docker/daemon.json /etc/docker/daemon.json.old
-              echo '{}' > /etc/docker/daemon.json
-              systemctl restart docker || journalctl --no-pager -n 500
-              systemctl status docker
-          EOF
-
       # Default name for helm/kind-action kind clusters is "chart-testing"
       - name: Create kind cluster with 5 nodes
         uses: helm/kind-action@v1.2.0
         with:
           config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
           version: v0.14.0
-
       - name: Preload previously built images onto kind cluster
         run: kind load docker-image docker.io/${{ github.repository_owner }}/kured:${{ github.sha }} --name chart-testing
-
       - name: Do not wait for an hour before detecting the rebootSentinel
         run: |
           sed -i 's/#\(.*\)--period=1h/\1--period=30s/g' kured-ds.yaml
-
       - name: Install kured with kubectl
         run: |
           kubectl apply -f kured-rbac.yaml && kubectl apply -f kured-ds.yaml
-
       - name: Ensure kured is ready
         uses: nick-invision/retry@v2.7.0
         with:
@@ -159,8 +145,7 @@ jobs:
           max_attempts: 10
           retry_wait_seconds: 60
           # DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE should all be = to cluster_size
-          command: "kubectl get ds -n kube-system kured | grep -E 'kured.*5.*5.*5.*5.*5'"
-
+          command: "kubectl get ds kured | grep -E 'kured.*5.*5.*5.*5.*5'"
       - name: Create reboot sentinel files
         run: |
           ./tests/kind/create-reboot-sentinels.sh
@@ -170,7 +155,6 @@ jobs:
           DEBUG: true
         run: |
           ./tests/kind/follow-coordinated-reboot.sh
-
   scenario-prom-helm:
     name: Test prometheus with latest code from HEAD (=overrides image of the helm chart)
     runs-on: ubuntu-latest
@@ -204,16 +188,13 @@ jobs:
               systemctl restart docker || journalctl --no-pager -n 500
               systemctl status docker
           EOF
-
       # Default name for helm/kind-action kind clusters is "chart-testing"
       - name: Create 1 node kind cluster
         uses: helm/kind-action@v1.2.0
         with:
           version: v0.14.0
-
       - name: Preload previously built images onto kind cluster
         run: kind load docker-image docker.io/${{ github.repository_owner }}/kured:${{ github.sha }} --name chart-testing
-
       - name: Deploy kured on default namespace with its helm chart
         run: |
           # Documented in official helm doc to live on the edge
@@ -224,7 +205,6 @@ jobs:
           kubectl config set-context kind-chart-testing
           kubectl get ds --all-namespaces
           kubectl describe ds kured
-
       - name: Ensure kured is ready
         uses: nick-invision/retry@v2.7.0
         with:
