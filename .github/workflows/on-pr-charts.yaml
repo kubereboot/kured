@@ -80,4 +80,4 @@ jobs:
           max_attempts: 10
           retry_wait_seconds: 10
           # DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE should all be = to cluster_size
-          command: "kubectl get ds kured | grep -E 'kured.*1.*1.*1.*1.*1'"
+          command: "kubectl get ds kured | grep -E 'kured.*5.*5.*5.*5.*5'"
