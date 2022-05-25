@@ -84,6 +84,14 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: "${{ steps.awk_gomod.outputs.version }}.x"
+      - name: "Workaround 'Failed to attach 1 to compat systemd cgroup /actions_job/...' on gh actions"
+        run: |
+          sudo bash << EOF
+              cp /etc/docker/daemon.json /etc/docker/daemon.json.old
+              echo '{}' > /etc/docker/daemon.json
+              systemctl restart docker || journalctl --no-pager -n 500
+              systemctl status docker
+          EOF
       # Default name for helm/kind-action kind clusters is "chart-testing"
       - name: Create 5 node kind cluster
         uses: helm/kind-action@v1.2.0

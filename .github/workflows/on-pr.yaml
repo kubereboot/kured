@@ -124,6 +124,14 @@ jobs:
         run: |
           make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" image
           make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" manifest
+      - name: Workaround "Failed to attach 1 to compat systemd cgroup /actions_job/..." on gh actions
+        run: |
+          sudo bash << EOF
+              cp /etc/docker/daemon.json /etc/docker/daemon.json.old
+              echo '{}' > /etc/docker/daemon.json
+              systemctl restart docker || journalctl --no-pager -n 500
+              systemctl status docker
+          EOF
       # Default name for helm/kind-action kind clusters is "chart-testing"
       - name: Create kind cluster with 5 nodes
         uses: helm/kind-action@v1.2.0
