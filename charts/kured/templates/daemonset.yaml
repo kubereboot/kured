@@ -175,13 +175,10 @@ spec:
 {{ toYaml . | indent 8 }}
           {{- end }}
       {{- else }}
-          {{- if ge .Capabilities.KubeVersion.Minor "24" }}
         - key: node-role.kubernetes.io/control-plane
           effect: NoSchedule
-          {{- else }}
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
-          {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
