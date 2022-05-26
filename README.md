@@ -283,7 +283,10 @@ Alternatively you can use the `--message-template-drain` and `--message-template
 Here is the syntax:
 
 - slack:           `slack://tokenA/tokenB/tokenC`
-(`--slack-hook-url` is deprecated but possible to use)
+
+    (`slack://<USERNAME>@tokenA/tokenB/tokenC` - in case you want to [respect username](https://github.com/weaveworks/kured/issues/482))
+
+    (`--slack-hook-url` is deprecated but possible to use)
 
 - rocketchat:      `rocketchat://[username@]rocketchat-host/token[/channel|@recipient]`
 
