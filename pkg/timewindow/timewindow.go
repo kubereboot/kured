@@ -13,6 +13,18 @@ type TimeWindow struct {
 	endTime   time.Time
 }
 
+func ParseInputTime(schedTime string) (t time.Time, err error) {
+	timeFormats := []string{"Jan-02-06 15:04:05", "Jan-02-06 15:04:05 GMT+1", "January 2, 2006 15:04:05", "January 2, 2006 15:04:05 GMT+1", "01/02/06 15:04:05", "01/02/06 15:04:05 GMT+1",
+		"01/02/06 15:04:05 MST", "January 2, 2006 15:04:05 MST", time.Layout, time.ANSIC, time.UnixDate, time.RubyDate, time.RFC822, time.RFC822Z, time.RFC850,
+		time.RFC1123, time.RFC1123Z, time.RFC3339, time.RFC3339Nano, time.Kitchen}
+	for _, value := range timeFormats {
+		if t, err = time.Parse(value, schedTime); err == nil {
+			return
+		}
+	}
+	return
+}
+
 // New creates a TimeWindow instance based on string inputs specifying a schedule.
 func New(days []string, startTime, endTime, location string) (*TimeWindow, error) {
 	tw := &TimeWindow{}

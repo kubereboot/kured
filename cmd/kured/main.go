@@ -73,12 +73,13 @@ var (
 	postRebootNodeLabels            []string
 	nodeID                          string
 
-	rebootDays    []string
-	rebootStart   string
-	rebootEnd     string
-	timezone      string
-	annotateNodes bool
-
+	rebootDays         []string
+	rebootStart        string
+	rebootEnd          string
+	timezone           string
+	annotateNodes      bool
+	scheduleRebootTime string
+	scheduleRebootNode string
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Subsystem: "kured",
@@ -133,6 +134,8 @@ func NewRootCommand() *cobra.Command {
 		"delay reboot for this duration (default: 0, disabled)")
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
 		"sentinel check period")
+	rootCmd.PersistentFlags().StringVar(&scheduleRebootTime, "schedule-reboot-time", "", "schedule reboot for this time")
+	rootCmd.PersistentFlags().StringVar(&scheduleRebootNode, "schedule-reboot-node", "", "schedule reboot for this node")
 	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-namespace", "kube-system",
 		"namespace containing daemonset on which to place lock")
 	rootCmd.PersistentFlags().StringVar(&dsName, "ds-name", "kured",
@@ -678,6 +681,19 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 			// Remove taint outside the reboot time window to allow for normal operation.
 			preferNoScheduleTaint.Disable()
 			continue
+		}
+
+		rebootTime, _ := timewindow.ParseInputTime(stripQuotes(scheduleRebootTime))
+		timeDiff := time.Until(rebootTime)
+		if timeDiff < 0*time.Second {
+			timeDiff *= -1
+		}
+
+		if !rebootTime.IsZero() && scheduleRebootNode == os.Getenv("KURED_NODE_ID") && timeDiff <= period {
+			log.Printf("Reboot time for node: %s was scheduled at: %s\n", nodeID, stripQuotes(scheduleRebootTime))
+			log.Warnf("Sentinel command is about to be changed one single time on node: %s\n", nodeID)
+			sentinelCommand = buildHostCommand(1, []string{"test", "."})
+			time.Sleep(period + 1*time.Second)
 		}
 
 		if !rebootRequired(sentinelCommand) {
