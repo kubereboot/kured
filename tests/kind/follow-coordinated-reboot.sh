@@ -69,7 +69,7 @@ do
             if [ -n "$schedulable" ] && [ ! ${was_unschedulable["$schedulable"]+x} ]; then
                 echo "$schedulable never was unschedulable!"
                 KURED_POD=$("$KUBECTL_CMD" get pod -A -o custom-columns=NAME:.metadata.name,NODE:.spec.nodeName | grep kured | grep "$schedulable" | cut -f1 -d ' ')
-                "$KUBECTL_CMD" logs "${KURED_POD}"
+                "$KUBECTL_CMD" logs -n kube-system "${KURED_POD}"
             fi
         fi
     done < "$tmp_dir"/node_output
