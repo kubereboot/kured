@@ -68,7 +68,7 @@ do
         if [[ "${#has_recovered[@]}" == "4" ]]; then
             if [ -n "$schedulable" ] && [ ! ${was_unschedulable["$schedulable"]+x} ]; then
                 echo "$schedulable never was unschedulable!"
-                KURED_POD=$("$KUBECTL_CMD" get pod -o custom-columns=NAME:.metadata.name,NODE:.spec.nodeName | grep kured | grep $schedulable | cut -f1 -d ' ')
+                KURED_POD=$("$KUBECTL_CMD" get pod -A -o custom-columns=NAME:.metadata.name,NODE:.spec.nodeName | grep kured | grep "$schedulable" | cut -f1 -d ' ')
                 "$KUBECTL_CMD" logs "${KURED_POD}"
             fi
         fi
