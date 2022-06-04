@@ -3,28 +3,30 @@
 
 <img src="https://github.com/weaveworks/kured/raw/main/img/logo.png" align="right"/>
 
-- [Introduction](#introduction)
-- [Kubernetes & OS Compatibility](#kubernetes--os-compatibility)
-- [Installation](#installation)
-- [Configuration](#configuration)
-  - [Reboot Sentinel File & Period](#reboot-sentinel-file--period)
-  - [Reboot Sentinel Command](#reboot-sentinel-command)
-  - [Setting a schedule](#setting-a-schedule)
-  - [Blocking Reboots via Alerts](#blocking-reboots-via-alerts)
-  - [Blocking Reboots via Pods](#blocking-reboots-via-pods)
-  - [Prometheus Metrics](#prometheus-metrics)
-  - [Notifications](#notifications)
-  - [Overriding Lock Configuration](#overriding-lock-configuration)
-- [Operation](#operation)
-  - [Testing](#testing)
-  - [Disabling Reboots](#disabling-reboots)
-  - [Manual Unlock](#manual-unlock)
-  - [Automatic Unlock](#automatic-unlock)
-  - [Delaying Lock Release](#delaying-lock-release)
-- [Building](#building)
-- [Frequently Asked/Anticipated Questions](#frequently-askedanticipated-questions)
-  - [Why is there no `latest` tag on Docker Hub?](#why-is-there-no-latest-tag-on-docker-hub)
-- [Getting Help](#getting-help)
+- [kured - Kubernetes Reboot Daemon](#kured---kubernetes-reboot-daemon)
+  - [Introduction](#introduction)
+  - [Kubernetes & OS Compatibility](#kubernetes--os-compatibility)
+  - [Installation](#installation)
+  - [Configuration](#configuration)
+    - [Reboot Sentinel File & Period](#reboot-sentinel-file--period)
+    - [Reboot Sentinel Command](#reboot-sentinel-command)
+    - [Setting a schedule](#setting-a-schedule)
+    - [Blocking Reboots via Alerts](#blocking-reboots-via-alerts)
+    - [Blocking Reboots via Pods](#blocking-reboots-via-pods)
+    - [Adding node labels before and after reboots](#adding-node-labels-before-and-after-reboots)
+    - [Prometheus Metrics](#prometheus-metrics)
+    - [Notifications](#notifications)
+    - [Overriding Lock Configuration](#overriding-lock-configuration)
+  - [Operation](#operation)
+    - [Testing](#testing)
+    - [Disabling Reboots](#disabling-reboots)
+    - [Manual Unlock](#manual-unlock)
+    - [Automatic Unlock](#automatic-unlock)
+    - [Delaying Lock Release](#delaying-lock-release)
+  - [Building](#building)
+  - [Frequently Asked/Anticipated Questions](#frequently-askedanticipated-questions)
+    - [Why is there no `latest` tag on Docker Hub?](#why-is-there-no-latest-tag-on-docker-hub)
+  - [Getting Help](#getting-help)
 
 ## Introduction
 
@@ -48,9 +50,9 @@ forwards and backwards compatibility of one minor version between client and
 server:
 
 | kured | kubectl | k8s.io/client-go | k8s.io/apimachinery | expected kubernetes compatibility |
-|-------|---------|------------------|---------------------|-----------------------------------|
-| main  | 1.22.4  | v0.22.4          | v0.22.4             | 1.21.x, 1.22.x, 1.23.x            |
-| 1.9.1 | 1.22.4  | v0.22.4          | v0.22.4             | 1.21.x, 1.22.x, 1.23.x            |
+| ----- | ------- | ---------------- | ------------------- | --------------------------------- |
+| main  | 1.23.6  | v0.23.6          | v0.23.6             | 1.22.x, 1.23.x, 1.24.x            |
+| 1.9.2 | 1.22.4  | v0.22.4          | v0.22.4             | 1.21.x, 1.22.x, 1.23.x            |
 | 1.8.1 | 1.21.4  | v0.21.4          | v0.21.4             | 1.20.x, 1.21.x, 1.22.x            |
 | 1.7.0 | 1.20.5  | v0.20.5          | v0.20.5             | 1.19.x, 1.20.x, 1.21.x            |
 | 1.6.1 | 1.19.4  | v0.19.4          | v0.19.4             | 1.18.x, 1.19.x, 1.20.x            |
@@ -218,6 +220,19 @@ running job or a known temperamental pod on a node will stop it rebooting.
 > up a RebootRequired alert as described in the next section so that
 > you can intervene manually if reboots are blocked for too long.
 
+### Adding node labels before and after reboots
+
+If you need to add node labels before and after the reboot process, you can use `--pre-reboot-node-labels` and `--post-reboot-node-labels`:
+
+```console
+      --pre-reboot-node-labels=zalando=notready
+      --post-reboot-node-labels=zalando=ready
+```
+
+Labels can be comma-delimited (e.g. `--pre-reboot-node-labels=zalando=notready,thisnode=disabled`) or you can supply the flags multiple times.
+
+Note that label keys specified by these two flags should match. If they do not match, a warning will be generated.
+
 ### Prometheus Metrics
 
 Each kured pod exposes a single gauge metric (`:8080/metrics`) that
@@ -268,17 +283,18 @@ Alternatively you can use the `--message-template-drain` and `--message-template
 Here is the syntax:
 
 - slack:           `slack://tokenA/tokenB/tokenC`
-(`--slack-hook-url` is deprecated but possible to use)
+
+    (`slack://<USERNAME>@tokenA/tokenB/tokenC` - in case you want to [respect username](https://github.com/weaveworks/kured/issues/482))
+
+    (`--slack-hook-url` is deprecated but possible to use)
 
 - rocketchat:      `rocketchat://[username@]rocketchat-host/token[/channel|@recipient]`
 
-- teams:           `teams://tName/token-a/token-b/token-c`
-
-   > **Attention** as the [format of the url has changed](https://github.com/containrrr/shoutrrr/issues/138) you also have to specify a `tName`
+- teams:           `teams://group@tenant/altId/groupOwner?host=organization.webhook.office.com`
 
 - Email:           `smtp://username:password@host:port/?fromAddress=fromAddress&toAddresses=recipient1[,recipient2,...]`
 
-More details here: [containrrr.dev/shoutrrr/v0.4/services/overview](https://containrrr.dev/shoutrrr/v0.4/services/overview)
+More details here: [containrrr.dev/shoutrrr/v0.5/services/overview](https://containrrr.dev/shoutrrr/v0.5/services/overview)
 
 ### Overriding Lock Configuration
 

@@ -15,7 +15,7 @@ jobs:
         run: go test -json ./... > test.json
       - name: Annotate tests
         if: always()
-        uses: guyarb/golang-test-annoations@v0.5.0
+        uses: guyarb/golang-test-annoations@v0.5.1
         with:
           test-results: test.json
 
@@ -25,7 +25,7 @@ jobs:
     steps:
     # Stale by default waits for 60 days before marking PR/issues as stale, and closes them after 21 days.
     # Do not expire the first issues that would allow the community to grow.
-    - uses: actions/stale@v4
+    - uses: actions/stale@v5
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         stale-issue-message: 'This issue was automatically considered stale due to lack of activity. Please update it and/or join our slack channels to promote it, before it automatically closes (in 7 days).'
@@ -59,9 +59,9 @@ jobs:
           echo "::set-output name=version::${GO_VERSION}"
         id: awk_gomod
       - name: Ensure go version
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
-          go-version: "${{ steps.awk_gomod.outputs.version }}"
+          go-version: "${{ steps.awk_gomod.outputs.version }}.x"
       - run: make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" image
       - uses: Azure/container-scan@v0
         with:
@@ -74,9 +74,9 @@ jobs:
     strategy:
       matrix:
         kubernetes:
-          - "1.21"
           - "1.22"
           - "1.23"
+          - "1.24"
     steps:
       - uses: actions/checkout@v3
       - name: Find go version
@@ -85,9 +85,9 @@ jobs:
           echo "::set-output name=version::${GO_VERSION}"
         id: awk_gomod
       - name: Ensure go version
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
-          go-version: "${{ steps.awk_gomod.outputs.version }}"
+          go-version: "${{ steps.awk_gomod.outputs.version }}.x"
 
       - name: "Workaround 'Failed to attach 1 to compat systemd cgroup /actions_job/...' on gh actions"
         run: |
@@ -103,7 +103,7 @@ jobs:
         uses: helm/kind-action@v1.2.0
         with:
           config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
-          version: v0.11.0
+          version: v0.14.0
 
       - name: Deploy kured on default namespace with its helm chart
         run: |
@@ -114,10 +114,12 @@ jobs:
           helm install kured ./charts/kured/ --set configuration.period=1m
           kubectl config set-context kind-chart-testing
           kubectl get ds --all-namespaces
+          kubectl get nodes -o yaml
+          sleep 5
           kubectl describe ds kured
 
       - name: Ensure kured is ready
-        uses: nick-invision/retry@v2.6.0
+        uses: nick-invision/retry@v2.7.0
         with:
           timeout_minutes: 10
           max_attempts: 10

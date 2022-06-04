@@ -16,14 +16,14 @@ jobs:
           echo "::set-output name=version::${GO_VERSION}"
         id: awk_gomod
       - name: Ensure go version
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
-          go-version: "${{ steps.awk_gomod.outputs.version }}"
+          go-version: "${{ steps.awk_gomod.outputs.version }}.x"
       - name: run tests
         run: go test -json ./... > test.json
       - name: Annotate tests
         if: always()
-        uses: guyarb/golang-test-annoations@v0.5.0
+        uses: guyarb/golang-test-annoations@v0.5.1
         with:
           test-results: test.json
 
@@ -46,9 +46,9 @@ jobs:
         echo "::set-output name=version::${GO_VERSION}"
       id: awk_gomod
     - name: Ensure go version
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
-        go-version: "${{ steps.awk_gomod.outputs.version }}"
+        go-version: "${{ steps.awk_gomod.outputs.version }}.x"
     - name: Lint cmd folder
       uses: Jerome1337/golint-action@v1.0.2
       with:
@@ -85,9 +85,9 @@ jobs:
           echo "::set-output name=version::${GO_VERSION}"
         id: awk_gomod
       - name: Ensure go version
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
-          go-version: "${{ steps.awk_gomod.outputs.version }}"
+          go-version: "${{ steps.awk_gomod.outputs.version }}.x"
       - run: make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" image
       - uses: Azure/container-scan@v0
         with:
@@ -106,9 +106,9 @@ jobs:
       fail-fast: false
       matrix:
         kubernetes:
-          - "1.21"
           - "1.22"
           - "1.23"
+          - "1.24"
     steps:
       - uses: actions/checkout@v3
       - name: Find go version
@@ -117,9 +117,9 @@ jobs:
           echo "::set-output name=version::${GO_VERSION}"
         id: awk_gomod
       - name: Ensure go version
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
-          go-version: "${{ steps.awk_gomod.outputs.version }}"
+          go-version: "${{ steps.awk_gomod.outputs.version }}.x"
       - name: Build artifacts
         run: |
           make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" image
@@ -139,7 +139,7 @@ jobs:
         uses: helm/kind-action@v1.2.0
         with:
           config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
-          version: v0.11.0
+          version: v0.14.0
 
       - name: Preload previously built images onto kind cluster
         run: kind load docker-image docker.io/${{ github.repository_owner }}/kured:${{ github.sha }} --name chart-testing
@@ -153,7 +153,7 @@ jobs:
           kubectl apply -f kured-rbac.yaml && kubectl apply -f kured-ds.yaml
 
       - name: Ensure kured is ready
-        uses: nick-invision/retry@v2.6.0
+        uses: nick-invision/retry@v2.7.0
         with:
           timeout_minutes: 10
           max_attempts: 10
@@ -179,7 +179,7 @@ jobs:
       fail-fast: false
       matrix:
         kubernetes:
-          - "1.21"
+          - "1.22"
     steps:
       - uses: actions/checkout@v3
       - name: Find go version
@@ -188,9 +188,9 @@ jobs:
           echo "::set-output name=version::${GO_VERSION}"
         id: awk_gomod
       - name: Ensure go version
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
-          go-version: "${{ steps.awk_gomod.outputs.version }}"
+          go-version: "${{ steps.awk_gomod.outputs.version }}.x"
       - name: Build artifacts
         run: |
           make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" image
@@ -209,7 +209,7 @@ jobs:
       - name: Create 1 node kind cluster
         uses: helm/kind-action@v1.2.0
         with:
-          version: v0.11.0
+          version: v0.14.0
 
       - name: Preload previously built images onto kind cluster
         run: kind load docker-image docker.io/${{ github.repository_owner }}/kured:${{ github.sha }} --name chart-testing
@@ -226,7 +226,7 @@ jobs:
           kubectl describe ds kured
 
       - name: Ensure kured is ready
-        uses: nick-invision/retry@v2.6.0
+        uses: nick-invision/retry@v2.7.0
         with:
           timeout_minutes: 10
           max_attempts: 10
@@ -235,7 +235,7 @@ jobs:
           command: "kubectl get ds kured | grep -E 'kured.*1.*1.*1.*1.*1' "
 
       - name: Get metrics (healthy)
-        uses: nick-invision/retry@v2.6.0
+        uses: nick-invision/retry@v2.7.0
         with:
           timeout_minutes: 2
           max_attempts: 12
@@ -247,7 +247,7 @@ jobs:
           ./tests/kind/create-reboot-sentinels.sh
 
       - name: Get metrics (need reboot)
-        uses: nick-invision/retry@v2.6.0
+        uses: nick-invision/retry@v2.7.0
         with:
           timeout_minutes: 15
           max_attempts: 10
@@ -279,9 +279,9 @@ jobs:
   #         echo "::set-output name=version::${GO_VERSION}"
   #       id: awk_gomod
   #     - name: Ensure go version
-  #       uses: actions/setup-go@v2
+  #       uses: actions/setup-go@v3
   #       with:
-  #         go-version: "${{ steps.awk_gomod.outputs.version }}"
+  #         go-version: "${{ steps.awk_gomod.outputs.version }}.x"
   #     - name: Build artifacts
   #       run: |
   #         make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" image
@@ -317,7 +317,7 @@ jobs:
   #         kubectl describe ds kured
   #
   #     - name: Ensure kured is ready
-  #       uses: nick-invision/retry@v2.6.0
+  #       uses: nick-invision/retry@v2.7.0
   #       with:
   #         timeout_minutes: 10
   #         max_attempts: 10

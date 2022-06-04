@@ -50,7 +50,7 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
-            privileged: true # Give permission to nsenter /proc/1/ns/mnt
+{{ toYaml .Values.containerSecurityContext | indent 12 }}
           resources:
 {{ toYaml .Values.resources | indent 12 }}
           command:
@@ -169,9 +169,16 @@ spec:
             {{- if .Values.extraEnvVars }}
               {{ toYaml .Values.extraEnvVars | nindent 12 }}
             {{- end }}
-      {{- with .Values.tolerations }}
       tolerations:
+      {{- if .Values.tolerations }}
+          {{- with .Values.tolerations }}
 {{ toYaml . | indent 8 }}
+          {{- end }}
+      {{- else }}
+        - key: node-role.kubernetes.io/control-plane
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

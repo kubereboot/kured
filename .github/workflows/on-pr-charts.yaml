@@ -37,7 +37,7 @@ jobs:
       - name: Create default kind cluster
         uses: helm/kind-action@v1.2.0
         with:
-          version: v0.11.0
+          version: v0.14.0
         if: ${{ matrix.test-action == 'install' }}
 
       - name: Run chart tests
@@ -55,7 +55,7 @@ jobs:
       - name: Create 1 node kind cluster
         uses: helm/kind-action@v1.2.0
         with:
-          version: v0.11.0
+          version: v0.14.0
 
       - name: Deploy kured on default namespace with its helm chart
         run: |
@@ -69,7 +69,7 @@ jobs:
           kubectl describe ds kured
 
       - name: Test if successful deploy
-        uses: nick-invision/retry@v2.6.0
+        uses: nick-invision/retry@v2.7.0
         with:
           timeout_minutes: 10
           max_attempts: 10

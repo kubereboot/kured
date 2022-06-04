@@ -19,9 +19,9 @@ jobs:
           echo "::set-output name=version::${GO_VERSION}"
         id: awk_gomod
       - name: Ensure go version
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
-          go-version: "${{ steps.awk_gomod.outputs.version }}"
+          go-version: "${{ steps.awk_gomod.outputs.version }}.x"
       - name: Find current tag version
         run: echo "::set-output name=version::${GITHUB_REF#refs/tags/}"
         id: tags
@@ -32,13 +32,13 @@ jobs:
           image-name: docker.io/${{ github.repository_owner }}/kured:${{ steps.tags.outputs.version }}
 
       - name: Login to DockerHub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME_WEAVEWORKSKUREDCI }}
           password: ${{ secrets.DOCKERHUB_TOKEN_WEAVEWORKSKUREDCI }}
 
       - name: Login to ghcr.io
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: weave-ghcr-bot

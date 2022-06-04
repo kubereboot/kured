@@ -36,7 +36,7 @@ The following changes have been made compared to the stable chart:
 | Config                  | Description                                                                 | Default                    |
 | ------                  | -----------                                                                 | -------                    |
 | `image.repository`      | Image repository                                                            | `weaveworks/kured` |
-| `image.tag`             | Image tag                                                                   | `1.9.1`                    |
+| `image.tag`             | Image tag                                                                   | `1.9.2`                    |
 | `image.pullPolicy`      | Image pull policy                                                           | `IfNotPresent`             |
 | `image.pullSecrets`     | Image pull secrets                                                          | `[]`                       |
 | `updateStrategy`        | Daemonset update strategy                                                   | `RollingUpdate`            |
@@ -77,7 +77,9 @@ The following changes have been made compared to the stable chart:
 | `rbac.create`           | Create RBAC roles                                                           | `true`                     |
 | `serviceAccount.create` | Create a service account                                                    | `true`                     |
 | `serviceAccount.name`   | Service account name to create (or use if `serviceAccount.create` is false) | (chart fullname)           |
-| `podSecurityPolicy.create` | Create podSecurityPolicy                                                 | `false`                     |
+| `podSecurityPolicy.create` | Create podSecurityPolicy                                                 | `false`                    |
+| `containerSecurityContext.privileged `| Enables `privileged` in container-specific security context   | `true`                     |
+| `containerSecurityContext.allowPrivilegeEscalation`| Enables `allowPrivilegeEscalation` in container-specific security context. If not set it won't be configured. |  |
 | `resources`             | Resources requests and limits.                                              | `{}`                       |
 | `metrics.create`        | Create a ServiceMonitor for prometheus-operator                             | `false`                    |
 | `metrics.namespace`     | The namespace to create the ServiceMonitor in                               | `""`                    |
@@ -90,7 +92,7 @@ The following changes have been made compared to the stable chart:
 | `service.annotations`   | Annotations to apply to the service (eg to add Prometheus annotations)      | `{}`                       |
 | `podLabels`             | Additional labels for pods (e.g. CostCenter=IT)                             | `{}`                       |
 | `priorityClassName`     | Priority Class to be used by the pods                                       | `""`                       |
-| `tolerations`           | Tolerations to apply to the daemonset (eg to allow running on master)       | `[{"key": "node-role.kubernetes.io/master", "effect": "NoSchedule"}]`|
+| `tolerations`           | Tolerations to apply to the daemonset (eg to allow running on master)       | `[{"key": "node-role.kubernetes.io/control-plane", "effect": "NoSchedule"}]` for Kubernetes 1.24.0 and greater, otherwise `[{"key": "node-role.kubernetes.io/master", "effect": "NoSchedule"}]`|
 | `affinity`              | Affinity for the daemonset (ie, restrict which nodes kured runs on)         | `{}`                       |
 | `nodeSelector`          | Node Selector for the daemonset (ie, restrict which nodes kured runs on)    | `{}`                       |
 | `volumeMounts`          | Maps of volumes mount to mount                                              | `{}`                       |
