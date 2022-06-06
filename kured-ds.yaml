@@ -23,8 +23,6 @@ spec:
     spec:
       serviceAccountName: kured
       tolerations:
-        - key: node-role.kubernetes.io/control-plane
-          effect: NoSchedule
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
       hostPID: true # Facilitate entering the host mount namespace via init
