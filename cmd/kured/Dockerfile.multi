@@ -14,7 +14,7 @@ RUN go mod download
 COPY . .
 RUN make kured-multi
 
-FROM --platform=$TARGETPLATFORM alpine:3.15.1 as bin
+FROM --platform=$TARGETPLATFORM alpine:3.16.0 as bin
 RUN apk update --no-cache && apk upgrade --no-cache && apk add --no-cache ca-certificates tzdata
 COPY --from=build /src/cmd/kured/kured /usr/bin/kured
 ENTRYPOINT ["/usr/bin/kured"]
