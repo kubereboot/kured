@@ -52,6 +52,9 @@ configuration:
   lockReleaseDelay: 0        # hold lock after reboot by this amount of time (default 0, disabled)
   preferNoScheduleTaint: ""  # Taint name applied during pending node reboot (to prevent receiving additional pods from other rebooting nodes). Disabled by default. Set e.g. to "weave.works/kured-node-reboot" to enable tainting.
   logFormat: "text"          # log format specified as text or json, defaults to text
+  preRebootNodeLabels: []    # labels to add to nodes before cordoning (default [])
+  postRebootNodeLabels: []   # labels to add to nodes after uncordoning (default [])
+
 
 rbac:
   create: true
