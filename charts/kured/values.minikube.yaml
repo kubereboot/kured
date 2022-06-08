@@ -29,3 +29,5 @@ configuration:
   # annotateNodes: false      # enable 'weave.works/kured-reboot-in-progress' and 'weave.works/kured-most-recent-reboot-needed' node annotations to signify kured reboot operations
   # lockReleaseDelay: "5m"    # hold lock after reboot by this amount of time (default 0, disabled)
   # logFormat: "text"         # log format specified as text or json, defaults to text
+  # preRebootNodeLabels: []   # labels to add to nodes before cordoning (default [])
+  # postRebootNodeLabels: []   # labels to add to nodes after uncordoning (default [])

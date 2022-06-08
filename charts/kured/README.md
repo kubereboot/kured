@@ -36,7 +36,7 @@ The following changes have been made compared to the stable chart:
 | Config                  | Description                                                                 | Default                    |
 | ------                  | -----------                                                                 | -------                    |
 | `image.repository`      | Image repository                                                            | `weaveworks/kured` |
-| `image.tag`             | Image tag                                                                   | `1.9.2`                    |
+| `image.tag`             | Image tag                                                                   | `1.10.0`                   |
 | `image.pullPolicy`      | Image pull policy                                                           | `IfNotPresent`             |
 | `image.pullSecrets`     | Image pull secrets                                                          | `[]`                       |
 | `updateStrategy`        | Daemonset update strategy                                                   | `RollingUpdate`            |
@@ -74,6 +74,8 @@ The following changes have been made compared to the stable chart:
 | `configuration.annotateNodes` | cli-parameter `--annotate-nodes`                                      | `false`                   |
 | `configuration.logFormat` | cli-parameter `--log-format`                                              | `"text"`                  |
 | `configuration.preferNoScheduleTaint` | Taint name applied during pending node reboot                 | `""`                   |
+| `configuration.preRebootNodeLabels` | Array of key-value-pairs to add to nodes before cordoning for multiple cli-parameters `--pre-reboot-node-labels` | `[]` |
+| `configuration.postRebootNodeLabels` | Array of key-value-pairs to add to nodes after uncordoning for multiple cli-parameters `--post-reboot-node-labels` | `[]` |
 | `rbac.create`           | Create RBAC roles                                                           | `true`                     |
 | `serviceAccount.create` | Create a service account                                                    | `true`                     |
 | `serviceAccount.name`   | Service account name to create (or use if `serviceAccount.create` is false) | (chart fullname)           |

@@ -100,6 +100,12 @@ spec:
           {{- range .Values.configuration.rebootDays }}
             - --reboot-days={{ . }}
           {{- end }}
+          {{- range .Values.configuration.preRebootNodeLabels }}
+            - --pre-reboot-node-labels={{ . }}
+          {{- end }}
+          {{- range .Values.configuration.postRebootNodeLabels }}
+            - --post-reboot-node-labels={{ . }}
+          {{- end }}
           {{- if .Values.configuration.rebootSentinel }}
             - --reboot-sentinel={{ .Values.configuration.rebootSentinel }}
           {{- end }}
