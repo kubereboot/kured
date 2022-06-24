@@ -66,6 +66,7 @@ var (
 	slackChannel                    string
 	messageTemplateDrain            string
 	messageTemplateReboot           string
+	messageTemplateUncordon         string
 	podSelectors                    []string
 	rebootCommand                   string
 	logFormat                       string
@@ -166,6 +167,8 @@ func NewRootCommand() *cobra.Command {
 		"slack channel for reboot notfications")
 	rootCmd.PersistentFlags().StringVar(&notifyURL, "notify-url", "",
 		"notify URL for reboot notfications")
+	rootCmd.PersistentFlags().StringVar(&messageTemplateUncordon, "message-template-uncordon", "Node %s rebooted & uncordoned successfully!",
+		"message template used to notify about a node being successfully uncordoned")
 	rootCmd.PersistentFlags().StringVar(&messageTemplateDrain, "message-template-drain", "Draining node %s",
 		"message template used to notify about a node being drained")
 	rootCmd.PersistentFlags().StringVar(&messageTemplateReboot, "message-template-reboot", "Rebooting node %s",
@@ -637,7 +640,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 					continue
 				} else {
 					if notifyURL != "" {
-						if err := shoutrrr.Send(notifyURL, fmt.Sprintf("Node: %s rebooted & uncordoned successfully!", nodeID)); err != nil {
+						if err := shoutrrr.Send(notifyURL, fmt.Sprintf(messageTemplateUncordon, nodeID)); err != nil {
 							log.Warnf("Error notifying: %v", err)
 						}
 					}
