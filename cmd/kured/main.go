@@ -635,6 +635,12 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 				if err != nil {
 					log.Errorf("Unable to uncordon %s: %v, will continue to hold lock and retry uncordon", node.GetName(), err)
 					continue
+				} else {
+					if notifyURL != "" {
+						if err := shoutrrr.Send(notifyURL, fmt.Sprintf("Node: %s rebooted & uncordoned successfully!", nodeID)); err != nil {
+							log.Warnf("Error notifying: %v", err)
+						}
+					}
 				}
 			}
 			// If we're holding the lock we know we've tried, in a prior run, to reboot
