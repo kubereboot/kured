@@ -104,6 +104,7 @@ Flags:
       --lock-annotation string              annotation in which to record locking node (default "weave.works/kured-node-lock")
       --lock-release-delay duration         hold lock after reboot by this duration (default: 0, disabled)
       --lock-ttl duration                   expire lock annotation after this duration (default: 0, disabled)
+      --message-template-uncordon string    message template used to notify about a node being successfully uncordoned (default "Node %s rebooted & uncordoned successfully!")
       --message-template-drain string       message template used to notify about a node being drained (default "Draining node %s")
       --message-template-reboot string      message template used to notify about a node being rebooted (default "Rebooting node %s")
       --notify-url                          url for reboot notifications (cannot use with --slack-hook-url flags)
@@ -275,7 +276,7 @@ about draining and rebooting nodes across a list of technologies.
 
 ![Notification](img/slack-notification.png)
 
-Alternatively you can use the `--message-template-drain` and `--message-template-reboot` to customize the text of the message, e.g.
+Alternatively you can use the `--message-template-drain`, `--message-template-reboot` and `--message-template-uncordon` to customize the text of the message, e.g.
 
 ```cli
 --message-template-drain="Draining node %s part of *my-cluster* in region *xyz*"
