@@ -66,7 +66,8 @@ spec:
 #            - --slack-channel=alerting
 #            - --notify-url="" # See also shoutrrr url format
 #            - --message-template-drain=Draining node %s
-#            - --message-template-drain=Rebooting node %s
+#            - --message-template-reboot=Rebooting node %s
+#            - --message-template-uncordon=Node %s rebooted & uncordoned successfully!
 #            - --blocking-pod-selector=runtime=long,cost=expensive
 #            - --blocking-pod-selector=name=temperamental
 #            - --blocking-pod-selector=...

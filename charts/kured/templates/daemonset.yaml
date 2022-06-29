@@ -136,6 +136,9 @@ spec:
           {{- if .Values.configuration.messageTemplateReboot }}
             - --message-template-reboot={{ .Values.configuration.messageTemplateReboot }}
           {{- end }}
+          {{- if .Values.configuration.messageTemplateUncordon }}
+            - --message-template-uncordon={{ .Values.configuration.messageTemplateUncordon }}
+          {{- end }}
           {{- if .Values.configuration.startTime }}
             - --start-time={{ .Values.configuration.startTime }}
           {{- end }}
