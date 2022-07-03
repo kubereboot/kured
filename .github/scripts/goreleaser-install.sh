@@ -4,18 +4,14 @@ set -e
 RELEASES_URL="https://github.com/goreleaser/goreleaser/releases"
 FILE_BASENAME="goreleaser"
 
-test -z "$VERSION" && VERSION="$(curl -sfL -o /dev/null -w %{url_effective} "$RELEASES_URL/latest" |
-        rev |
-        cut -f1 -d'/'|
-        rev)"
-
 test -z "$VERSION" && {
     echo "Unable to get goreleaser version." >&2
     exit 1
 }
 
 test -z "$TMPDIR" && TMPDIR="$(mktemp -d)"
-export TAR_FILE="$TMPDIR/${FILE_BASENAME}_$(uname -s)_$(uname -m).tar.gz"
+TAR_FILE="$TMPDIR/${FILE_BASENAME}_$(uname -s)_$(uname -m).tar.gz"
+export $TAR_FILE
 
 (
     echo "Downloading GoReleaser $VERSION..."
