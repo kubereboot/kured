@@ -17,7 +17,7 @@ bootstrap-tools: $(TEMPDIR)
 	VERSION=v1.9.2 TMPDIR=.tmp bash .github/scripts/goreleaser-install.sh
 	curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b .tmp v0.49.0
 	curl -sSfL https://github.com/sigstore/cosign/releases/download/v1.9.0/cosign-linux-amd64 -o .tmp/cosign
-	chmod +x .tmp/cosign
+	chmod +x .tmp/goreleaser .tmp/cosign .tmp/syft
 
 clean:
 	rm -rf ./dist
