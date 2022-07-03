@@ -11,7 +11,7 @@ test -z "$VERSION" && {
 
 test -z "$TMPDIR" && TMPDIR="$(mktemp -d)"
 TAR_FILE="$TMPDIR/${FILE_BASENAME}_$(uname -s)_$(uname -m).tar.gz"
-export $TAR_FILE
+export TAR_FILE
 
 (
     echo "Downloading GoReleaser $VERSION..."
