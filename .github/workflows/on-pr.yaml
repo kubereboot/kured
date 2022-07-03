@@ -101,7 +101,7 @@ jobs:
         run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
         id: tags
       - name: Build image
-        run: VERSION="main-${{ steps.tags.outputs.sha_short }}" make image
+        run: VERSION="${{ steps.tags.outputs.sha_short }}" make image
       - uses: Azure/container-scan@v0
         env:
           # See https://github.com/goodwithtech/dockle/issues/188
@@ -148,8 +148,8 @@ jobs:
         id: tags
       - name: Build artifacts
         run: |
-          VERSION="main-${{ steps.tags.outputs.sha_short }}" make image
-          VERSION="main-${{ steps.tags.outputs.sha_short }}" make manifest
+          VERSION="${{ steps.tags.outputs.sha_short }}" make image
+          VERSION="${{ steps.tags.outputs.sha_short }}" make manifest
 
       - name: Workaround "Failed to attach 1 to compat systemd cgroup /actions_job/..." on gh actions
         run: |

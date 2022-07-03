@@ -73,7 +73,7 @@ jobs:
         run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
         id: tags
       - name: Build artifacts
-        run: VERSION="main-${{ steps.tags.outputs.sha_short }}" make image
+        run: VERSION="${{ steps.tags.outputs.sha_short }}" make image
       - uses: Azure/container-scan@v0
         env:
           # See https://github.com/goodwithtech/dockle/issues/188
