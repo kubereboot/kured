@@ -21,8 +21,31 @@ $ helm delete my-release
 
 The command removes all the Kubernetes components associated with the chart and deletes the release.
 
+## Upgrade Notes
+
+### From 2.x to 3.x
+
+The Helm chart labels have been realigned to conform with the [standard labels](https://helm.sh/docs/chart_best_practices/labels/#standard-labels) in the current Helm Chart Best Practices guide, so this upgrade will fail unless the DaemonSet is deleted and recreated. The only way that Helm supports delete and recreate is by uninstalling, so please uninstall the Kured Helm chart before installing again with `v3.x`.
+
+If you use any GitOps tool, please check and understand how to do a reinstall beforehand.
+
+Supposing users want to enable metrics and use a `ServiceMonitor` with the `kube-prometheus-stack` chart's default `prometheus` instance. Starting with a chart that has values:
+
+```
+metrics:
+  create: true
+  labels:
+    release: kube-prometheus-stack
+```
+
+A "ServiceMonitor" needs a "release" label to be discovered by the Prometheus-Operator with the default configuration of `kube-prometheus-stack` and this chart (in the prior `v2.x` chart) already sets a `release` label hardcoded. This is changed by applying the best-practise labels in the chart `v3.x`. Now the user can decide which `release` label-value should be used.
+
+With this update, it's more readily possible to make use of the Kured chart with `kube-prometheus-stack`'s default `ServiceMonitor` selector configuration.
 
 ## Migrate from stable Helm-Chart
+
+### From 1.x to 2.x
+
 The following changes have been made compared to the stable chart:
 - **[BREAKING CHANGE]** The `autolock` feature was removed. Use `configuration.startTime` and `configuration.endTime` instead.
 - Role inconsistencies have been fixed (allowed verbs for modifying the `DaemonSet`, apiGroup of `PodSecurityPolicy`)
