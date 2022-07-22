@@ -123,11 +123,11 @@ func NewRootCommand() *cobra.Command {
 	rootCmd.PersistentFlags().StringVar(&nodeID, "node-id", "",
 		"node name kured runs on, should be passed down from spec.nodeName via KURED_NODE_ID environment variable")
 	rootCmd.PersistentFlags().BoolVar(&forceReboot, "force-reboot", false,
-		"force a reboot even if the drain fails or times out (default: false)")
+		"force a reboot even if the drain fails or times out")
 	rootCmd.PersistentFlags().IntVar(&drainGracePeriod, "drain-grace-period", -1,
-		"time in seconds given to each pod to terminate gracefully, if negative, the default value specified in the pod will be used (default: -1)")
+		"time in seconds given to each pod to terminate gracefully, if negative, the default value specified in the pod will be used")
 	rootCmd.PersistentFlags().IntVar(&skipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", 0,
-		"when seconds is greater than zero, skip waiting for the pods whose deletion timestamp is older than N seconds while draining a node (default: 0)")
+		"when seconds is greater than zero, skip waiting for the pods whose deletion timestamp is older than N seconds while draining a node")
 	rootCmd.PersistentFlags().DurationVar(&drainTimeout, "drain-timeout", 0,
 		"timeout after which the drain is aborted (default: 0, infinite time)")
 	rootCmd.PersistentFlags().DurationVar(&rebootDelay, "reboot-delay", 0,
@@ -149,7 +149,7 @@ func NewRootCommand() *cobra.Command {
 	rootCmd.PersistentFlags().Var(&regexpValue{&alertFilter}, "alert-filter-regexp",
 		"alert names to ignore when checking for active alerts")
 	rootCmd.PersistentFlags().BoolVar(&alertFiringOnly, "alert-firing-only", false,
-		"only consider firing alerts when checking for active alerts (default: false)")
+		"only consider firing alerts when checking for active alerts")
 	rootCmd.PersistentFlags().StringVar(&rebootSentinelFile, "reboot-sentinel", "/var/run/reboot-required",
 		"path to file whose existence triggers the reboot command")
 	rootCmd.PersistentFlags().StringVar(&preferNoScheduleTaintName, "prefer-no-schedule-taint", "",
@@ -160,13 +160,13 @@ func NewRootCommand() *cobra.Command {
 		"command to run when a reboot is required")
 
 	rootCmd.PersistentFlags().StringVar(&slackHookURL, "slack-hook-url", "",
-		"slack hook URL for notifications")
+		"slack hook URL for reboot notifications [deprecated in favor of --notify-url]")
 	rootCmd.PersistentFlags().StringVar(&slackUsername, "slack-username", "kured",
-		"slack username for notifications")
+		"slack username for reboot notifications")
 	rootCmd.PersistentFlags().StringVar(&slackChannel, "slack-channel", "",
-		"slack channel for reboot notfications")
+		"slack channel for reboot notifications")
 	rootCmd.PersistentFlags().StringVar(&notifyURL, "notify-url", "",
-		"notify URL for reboot notfications")
+		"notify URL for reboot notifications (cannot use with --slack-hook-url flags)")
 	rootCmd.PersistentFlags().StringVar(&messageTemplateUncordon, "message-template-uncordon", "Node %s rebooted & uncordoned successfully!",
 		"message template used to notify about a node being successfully uncordoned")
 	rootCmd.PersistentFlags().StringVar(&messageTemplateDrain, "message-template-drain", "Draining node %s",
