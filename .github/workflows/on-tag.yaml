@@ -28,6 +28,9 @@ jobs:
       - run: |
           make DH_ORG="${{ github.repository_owner }}" VERSION="${{ steps.tags.outputs.version }}" image
       - uses: Azure/container-scan@v0
+        env:
+          # See https://github.com/goodwithtech/dockle/issues/188
+          DOCKLE_HOST: "unix:///var/run/docker.sock"
         with:
           image-name: docker.io/${{ github.repository_owner }}/kured:${{ steps.tags.outputs.version }}
 
