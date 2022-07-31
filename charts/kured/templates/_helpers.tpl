@@ -57,16 +57,16 @@ Return the appropriate apiVersion for podsecuritypolicy.
 Returns a set of labels applied to each resource.
 */}}
 {{- define "kured.labels" -}}
-app: {{ template "kured.name" . }}
-chart: {{ template "kured.chart" . }}
-release: {{ .Release.Name }}
-heritage: {{ .Release.Service }}
+app.kubernetes.io/name: {{ template "kured.name" . }}
+helm.sh/chart: {{ template "kured.chart" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 
 {{/*
 Returns a set of matchLabels applied.
 */}}
 {{- define "kured.matchLabels" -}}
-app: {{ template "kured.name" . }}
-release: {{ .Release.Name }}
+app.kubernetes.io/name: {{ template "kured.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
