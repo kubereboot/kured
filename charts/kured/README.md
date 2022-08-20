@@ -59,7 +59,7 @@ The following changes have been made compared to the stable chart:
 | Config                                  | Description                                                                 | Default                   |
 | ------                                  | -----------                                                                 | -------                   |
 | `image.repository`                      | Image repository                                                            | `weaveworks/kured`        |
-| `image.tag`                             | Image tag                                                                   | `1.10.1`                  |
+| `image.tag`                             | Image tag                                                                   | `1.10.2`                  |
 | `image.pullPolicy`                      | Image pull policy                                                           | `IfNotPresent`            |
 | `image.pullSecrets`                     | Image pull secrets                                                          | `[]`                      |
 | `updateStrategy`                        | Daemonset update strategy                                                   | `RollingUpdate`           |
