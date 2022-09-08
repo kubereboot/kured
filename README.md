@@ -245,10 +245,13 @@ Note that label keys specified by these two flags should match. If they do not m
 
 ### Prometheus Metrics
 
-Each kured pod exposes a single gauge metric (`:8080/metrics`) that
-indicates the presence of the sentinel file:
+Each kured pod exposes a two gauge metrics (`:8080/metrics`) that
+indicates the presence of the sentinel file, and when the node is in the process of rebooting.
 
 ```console
+# HELP kured_reboot_in_progress Node in progress of rebooting for software updates.
+# TYPE kured_reboot_in_progress gauge
+kured_reboot_in_progress{node="ip-xxx-xxx-xxx-xxx.ec2.internal"} 0
 # HELP kured_reboot_required OS requires reboot due to software updates.
 # TYPE kured_reboot_required gauge
 kured_reboot_required{node="ip-xxx-xxx-xxx-xxx.ec2.internal"} 0
