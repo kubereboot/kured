@@ -86,6 +86,12 @@ var (
 		Name:      "reboot_required",
 		Help:      "OS requires reboot due to software updates.",
 	}, []string{"node"})
+
+	rebootInProgressGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Subsystem: "kured",
+		Name:      "reboot_in_progress",
+		Help:      "Node in progress of rebooting for software updates.",
+	}, []string{"node"})
 )
 
 const (
@@ -101,6 +107,7 @@ const (
 
 func init() {
 	prometheus.MustRegister(rebootRequiredGauge)
+	prometheus.MustRegister(rebootInProgressGauge)
 }
 
 func main() {
@@ -531,6 +538,31 @@ func maintainRebootRequiredMetric(nodeID string, sentinelCommand []string) {
 	}
 }
 
+func maintainRestartInProgressMetric(nodeID string) {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	lock := daemonsetlock.New(client, nodeID, dsNamespace, dsName, lockAnnotation)
+
+	nodeMeta := nodeMeta{}
+
+	for {
+		if holding(lock, &nodeMeta) {
+			rebootInProgressGauge.WithLabelValues(nodeID).Set(1)
+		} else {
+			rebootInProgressGauge.WithLabelValues(nodeID).Set(0)
+		}
+		time.Sleep(30 * time.Second)
+	}
+}
+
 // nodeMeta is used to remember information across reboots
 type nodeMeta struct {
 	Unschedulable bool `json:"unschedulable"`
@@ -831,6 +863,7 @@ func root(cmd *cobra.Command, args []string) {
 
 	go rebootAsRequired(nodeID, hostRestartCommand, hostSentinelCommand, window, lockTTL, lockReleaseDelay)
 	go maintainRebootRequiredMetric(nodeID, hostSentinelCommand)
+	go maintainRestartInProgressMetric(nodeID)
 
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(":8080", nil))
