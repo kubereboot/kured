@@ -18,7 +18,8 @@ jobs:
       - name: Ensure go version
         uses: actions/setup-go@v3
         with:
-          go-version: "${{ steps.awk_gomod.outputs.version }}.x"
+          go-version: "${{ steps.awk_gomod.outputs.version }}"
+          check-latest: true
       - name: run tests
         run: go test -json ./... > test.json
       - name: Annotate tests
@@ -48,7 +49,8 @@ jobs:
     - name: Ensure go version
       uses: actions/setup-go@v3
       with:
-        go-version: "${{ steps.awk_gomod.outputs.version }}.x"
+        go-version: "${{ steps.awk_gomod.outputs.version }}"
+        check-latest: true
     - name: Lint cmd folder
       uses: Jerome1337/golint-action@v1.0.2
       with:
@@ -87,7 +89,8 @@ jobs:
       - name: Ensure go version
         uses: actions/setup-go@v3
         with:
-          go-version: "${{ steps.awk_gomod.outputs.version }}.x"
+          go-version: "${{ steps.awk_gomod.outputs.version }}"
+          check-latest: true
       - run: make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" image
       - uses: Azure/container-scan@v0
         env:
@@ -122,7 +125,8 @@ jobs:
       - name: Ensure go version
         uses: actions/setup-go@v3
         with:
-          go-version: "${{ steps.awk_gomod.outputs.version }}.x"
+          go-version: "${{ steps.awk_gomod.outputs.version }}"
+          check-latest: true
       - name: Build artifacts
         run: |
           make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" image
@@ -193,7 +197,8 @@ jobs:
       - name: Ensure go version
         uses: actions/setup-go@v3
         with:
-          go-version: "${{ steps.awk_gomod.outputs.version }}.x"
+          go-version: "${{ steps.awk_gomod.outputs.version }}"
+          check-latest: true
       - name: Build artifacts
         run: |
           make DH_ORG="${{ github.repository_owner }}" VERSION="${{ github.sha }}" image
