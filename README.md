@@ -33,12 +33,12 @@ Kured (KUbernetes REboot Daemon) is a Kubernetes daemonset that
 performs safe automatic node reboots when the need to do so is
 indicated by the package management system of the underlying OS.
 
-* Watches for the presence of a reboot sentinel file e.g. `/var/run/reboot-required`
+- Watches for the presence of a reboot sentinel file e.g. `/var/run/reboot-required`
   or the successful run of a sentinel command.
-* Utilises a lock in the API server to ensure only one node reboots at
+- Utilises a lock in the API server to ensure only one node reboots at
   a time
-* Optionally defers reboots in the presence of active Prometheus alerts or selected pods
-* Cordons & drains worker nodes before reboot, uncordoning them after
+- Optionally defers reboots in the presence of active Prometheus alerts or selected pods
+- Cordons & drains worker nodes before reboot, uncordoning them after
 
 ## Kubernetes & OS Compatibility
 
@@ -198,6 +198,7 @@ will block reboots, however you can ignore specific alerts:
 ```
 
 You can also only block reboots for firing alerts:
+
 ```console
 --alert-firing-only=true
 ```
@@ -207,7 +208,7 @@ filter.
 
 ### Blocking Reboots via Pods
 
-You can also block reboots of an _individual node_ when specific pods
+You can also block reboots of an *individual node* when specific pods
 are scheduled on it:
 
 ```console
@@ -368,7 +369,6 @@ Using `--lock-ttl=30m` will allow other nodes to take over if TTL has expired (i
 
 ### Delaying Lock Release
 
-
 Using `--lock-release-delay=30m` will cause nodes to hold the lock for the specified time frame (in this case 30min) before it is released and the reboot process continues. This can be used to throttle reboots across the cluster.
 
 ## Building
@@ -411,10 +411,10 @@ versioned manifest from the [release page](https://github.com/weaveworks/kured/r
 
 If you have any questions about, feedback for or problems with `kured`:
 
-* Invite yourself to the <a href="https://slack.weave.works/" target="_blank">Weave Users Slack</a>.
-* Ask a question on the [#kured](https://weave-community.slack.com/messages/kured/) slack channel.
-* [File an issue](https://github.com/weaveworks/kured/issues/new).
-* Join us in [our monthly meeting](https://docs.google.com/document/d/1bsHTjHhqaaZ7yJnXF6W8c89UB_yn-OoSZEmDnIP34n8/edit#),
+- Invite yourself to the <a href="https://slack.cncf.io/" target="_blank">CNCF Slack</a>.
+- Ask a question on the [#kured](https://cloud-native.slack.com/archives/kured) slack channel.
+- [File an issue](https://github.com/weaveworks/kured/issues/new).
+- Join us in [our monthly meeting](https://docs.google.com/document/d/1bsHTjHhqaaZ7yJnXF6W8c89UB_yn-OoSZEmDnIP34n8/edit#),
   every fourth Wednesday of the month at 16:00 UTC.
 
 We follow the [CNCF Code of Conduct](CODE_OF_CONDUCT.md).
