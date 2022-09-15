@@ -667,10 +667,13 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 		}
 	}
 
-	preferNoScheduleTaint := taints.New(client, nodeID, preferNoScheduleTaintName, v1.TaintEffectPreferNoSchedule)
+	var preferNoScheduleTaint *taints.Taint
+	if preferNoScheduleTaintName != "" {
+		preferNoScheduleTaint = taints.New(client, nodeID, preferNoScheduleTaintName, v1.TaintEffectPreferNoSchedule)
+	}
 
 	// Remove taint immediately during startup to quickly allow scheduling again.
-	if !rebootRequired(sentinelCommand) {
+	if preferNoScheduleTaint != nil && !rebootRequired(sentinelCommand) {
 		preferNoScheduleTaint.Disable()
 	}
 
@@ -684,14 +687,18 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 	tick = delaytick.New(source, period)
 	for range tick {
 		if !window.Contains(time.Now()) {
-			// Remove taint outside the reboot time window to allow for normal operation.
-			preferNoScheduleTaint.Disable()
+			if preferNoScheduleTaint != nil {
+				// Remove taint outside the reboot time window to allow for normal operation.
+				preferNoScheduleTaint.Disable()
+			}
 			continue
 		}
 
 		if !rebootRequired(sentinelCommand) {
 			log.Infof("Reboot not required")
-			preferNoScheduleTaint.Disable()
+			if preferNoScheduleTaint != nil {
+				preferNoScheduleTaint.Disable()
+			}
 			continue
 		}
 		log.Infof("Reboot required")
@@ -731,8 +738,10 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 		}
 
 		if !holding(lock, &nodeMeta) && !acquire(lock, &nodeMeta, TTL) {
-			// Prefer to not schedule pods onto this node to avoid draing the same pod multiple times.
-			preferNoScheduleTaint.Enable()
+			if preferNoScheduleTaint != nil {
+				// Prefer to not schedule pods onto this node to avoid draing the same pod multiple times.
+				preferNoScheduleTaint.Enable()
+			}
 			continue
 		}
 
@@ -814,7 +823,9 @@ func root(cmd *cobra.Command, args []string) {
 	} else {
 		log.Info("Lock release delay not set, lock will be released immediately after rebooting")
 	}
-	log.Infof("PreferNoSchedule taint: %s", preferNoScheduleTaintName)
+	if preferNoScheduleTaintName != "" {
+		log.Infof("PreferNoSchedule taint: %s", preferNoScheduleTaintName)
+	}
 	log.Infof("Blocking Pod Selectors: %v", podSelectors)
 	log.Infof("Reboot schedule: %v", window)
 	log.Infof("Reboot check command: %s every %v", sentinelCommand, period)
