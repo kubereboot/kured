@@ -13,6 +13,24 @@ you are planning to contribute code.
 [issues]: https://github.com/weaveworks/kured/issues
 [readme]: README.md
 
+## Certificate of Origin
+
+By contributing to this project you agree to the Developer Certificate of
+Origin (DCO). This document was created by the Linux Kernel community and is a
+simple statement that you, as a contributor, have the legal right to make the
+contribution.
+
+We require all commits to be signed. By signing off with your signature, you
+certify that you wrote the patch or otherwise have the right to contribute the
+material by the rules of the [DCO](DCO):
+
+`Signed-off-by: Jane Doe <jane.doe@example.com>`
+
+The signature must contain your real name
+(sorry, no pseudonyms or anonymous contributions)
+If your `user.name` and `user.email` are configured in your Git config,
+you can sign your commit automatically with `git commit -s`.
+
 ## Regular development activities
 
 ### Updating k8s support
@@ -89,6 +107,7 @@ Our CI is covered by github actions.
 You can see their contents in .github/workflows.
 
 We currently run:
+
 - go tests and lint
 - shellcheck
 - a check for dead links in our docs
@@ -192,7 +211,6 @@ new version you want to release.
 Before going further, we should freeze the code for a release, by
 tagging the code. The Github-Action should start a new job and push
 the new image to the registry.
-
 
 ### Create the combined manifest
 
