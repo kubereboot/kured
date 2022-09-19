@@ -1,3 +1,8 @@
+:exclamation: We are currently in the middle of the move to a different github organisation.
+If you have an issue with downloading kured images, helm charts, or other information, please
+do not hesitate to contact us in slack (see link below) or in the
+[Migration issue](https://github.com/weaveworks/kured/issues/633).
+
 # kured - Kubernetes Reboot Daemon
 
 <img src="https://github.com/weaveworks/kured/raw/main/img/logo.png" align="right"/>
