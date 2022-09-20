@@ -77,15 +77,17 @@ If your change involves a user facing change (change in flags of kured for examp
 please include expose your new feature in our default manifest (`kured-ds.yaml`),
 as a comment.
 
-Do not update the helm chart directly.
-Helm charts and our release manifests (see below) are our stable interfaces.
-Any user facing changes will therefore have to wait for a while before being
+Our release manifests and helm charts are our stable interfaces.
+Any user facing changes will therefore have to wait for a release before being
 exposed to our users.
 
 This also means that when you expose a new feature, you should create another PR
-for your changes in `charts/` to make your feature available for our next kured version.
-In this change, you can directly bump the appVersion to the next minor version.
-(for example, if current appVersion is 1.6.x, make sure you update your appVersion
+for your changes in https://github.com/kubereboot/charts to make your feature
+available at the next kured version for helm users.
+
+In the charts PR, you can directly bump the appVersion to the next minor version
+(you are introducing a new feature, which requires a bump of the minor number.
+For example, if current appVersion is 1.6.x, make sure you update your appVersion
 to 1.7.0). It allows us to have an easy view of what we land each release.
 
 Do not hesitate to increase the test coverage for your feature, whether it's unit
@@ -95,11 +97,6 @@ testing to full functional testing (even using helm charts)
 
 We are welcoming any change to increase our test coverage.
 See also our github issues for the label `testing`.
-
-### Updating helm charts
-
-Helm charts are continuously published. Any change in `charts/` will be immediately
-pushed in production.
 
 ## Automated testing
 
@@ -113,11 +110,6 @@ We currently run:
 - a check for dead links in our docs
 - a security check against our base image (alpine)
 - a deep functional test using our manifests on all supported k8s versions
-- basic deployment using our helm chart on any chart change
-
-Changes in helm charts are not functionally tested on PRs. We assume that
-the PRs to implement the feature are properly tested by our users and
-contributors before merge.
 
 To test your code manually, follow the section Manual testing.
 
@@ -160,10 +152,6 @@ make image minikube-publish
 minikube kubectl -- apply -f kured-rbac.yaml
 minikube kubectl -- apply -f kured-ds.yaml
 minikube kubectl -- logs daemonset.apps/kured -n kube-system -f
-
-# Alternatively use helm to install the chart
-# edit values-local.yaml to change any chart parameters
-helm install kured ./charts/kured --namespace kube-system -f ./charts/kured/values.minikube.yaml
 
 # In separate terminal
 minikube ssh
@@ -234,20 +222,3 @@ that landed and give a shout-out to everyone who contributed.
 
 Please also note down on which releases the upcoming `kured` release was
 tested on. (Check old release notes if you're unsure.)
-
-### Update the Helm chart
-
-You can automatically bump the helm chart's application version
-with the latest image tag by running:
-
-```sh
-make DH_ORG="weaveworks" VERSION="1.3.0" helm-chart
-```
-
-A change in the helm chart requires a bump of the `version`
-in `charts/kured/Chart.yaml` (following the versioning rules).
-Update it, and issue a PR. Upon merge, that PR will automatically
-publish the chart to the gh-pages branch.
-
-When there are open helm-chart PRs which are on hold until the helm-chart has been updated
-with the new kured version, they can be merged now (unless a rebase is needed from the contributor).
