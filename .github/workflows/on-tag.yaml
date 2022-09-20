@@ -39,8 +39,8 @@ jobs:
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
-          username: weave-ghcr-bot
-          password: ${{ secrets.KURED_WEAVE_GHCR_BOT_TOKEN }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
