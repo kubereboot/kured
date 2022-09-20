@@ -24,12 +24,6 @@ jobs:
           go-version: "${{ steps.awk_gomod.outputs.version }}"
           check-latest: true
 
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME_WEAVEWORKSKUREDCI }}
-          password: ${{ secrets.DOCKERHUB_TOKEN_WEAVEWORKSKUREDCI }}
-
       - name: Login to ghcr.io
         uses: docker/login-action@v2
         with:
@@ -56,5 +50,4 @@ jobs:
           platforms: linux/arm64, linux/amd64, linux/arm/v7, linux/arm/v6, linux/386
           push: true
           tags: |
-            docker.io/${{ GITHUB.REPOSITORY }}:main-${{ steps.tags.outputs.sha_short }}
             ghcr.io/${{ GITHUB.REPOSITORY }}:main-${{ steps.tags.outputs.sha_short }}

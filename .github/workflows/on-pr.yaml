@@ -97,7 +97,7 @@ jobs:
           # See https://github.com/goodwithtech/dockle/issues/188
           DOCKLE_HOST: "unix:///var/run/docker.sock"
         with:
-          image-name: docker.io/${{ github.repository_owner }}/kured:${{ github.sha }}
+          image-name: ghcr.io/${{ github.repository_owner }}/kured:${{ github.sha }}
 
   # This ensures the latest code works with the manifests built from tree.
   # It is useful for two things:
@@ -149,7 +149,7 @@ jobs:
           version: v0.14.0
 
       - name: Preload previously built images onto kind cluster
-        run: kind load docker-image docker.io/${{ github.repository_owner }}/kured:${{ github.sha }} --name chart-testing
+        run: kind load docker-image ghcr.io/${{ github.repository_owner }}/kured:${{ github.sha }} --name chart-testing
 
       - name: Do not wait for an hour before detecting the rebootSentinel
         run: |

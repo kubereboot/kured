@@ -25,19 +25,17 @@ kured-multi:
 build/.image.done: cmd/kured/Dockerfile cmd/kured/kured
 	mkdir -p build
 	cp $^ build
-	$(SUDO) docker build -t docker.io/$(DH_ORG)/kured -f build/Dockerfile ./build
-	$(SUDO) docker tag docker.io/$(DH_ORG)/kured docker.io/$(DH_ORG)/kured:$(VERSION)
-	$(SUDO) docker tag docker.io/$(DH_ORG)/kured ghcr.io/$(DH_ORG)/kured:$(VERSION)
+	$(SUDO) docker build -t ghcr.io/$(DH_ORG)/kured -f build/Dockerfile ./build
+	$(SUDO) docker tag ghcr.io/$(DH_ORG)/kured ghcr.io/$(DH_ORG)/kured:$(VERSION)
 	touch $@
 
 image: build/.image.done
 
 publish-image: image
-	$(SUDO) docker push docker.io/$(DH_ORG)/kured:$(VERSION)
 	$(SUDO) docker push ghcr.io/$(DH_ORG)/kured:$(VERSION)
 
 minikube-publish: image
-	$(SUDO) docker save docker.io/$(DH_ORG)/kured | (eval $$(minikube docker-env) && docker load)
+	$(SUDO) docker save ghcr.io/$(DH_ORG)/kured | (eval $$(minikube docker-env) && docker load)
 
 manifest:
 	sed -i "s#image: docker.io/.*kured.*#image: docker.io/$(DH_ORG)/kured:$(VERSION)#g" kured-ds.yaml
