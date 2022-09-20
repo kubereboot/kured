@@ -1,4 +1,4 @@
-module github.com/weaveworks/kured
+module github.com/kubereboot/kured
 
 go 1.18
 

@@ -32,11 +32,11 @@ import (
 	shoutrrr "github.com/containrrr/shoutrrr"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/weaveworks/kured/pkg/alerts"
-	"github.com/weaveworks/kured/pkg/daemonsetlock"
-	"github.com/weaveworks/kured/pkg/delaytick"
-	"github.com/weaveworks/kured/pkg/taints"
-	"github.com/weaveworks/kured/pkg/timewindow"
+	"github.com/kubereboot/kured/pkg/alerts"
+	"github.com/kubereboot/kured/pkg/daemonsetlock"
+	"github.com/kubereboot/kured/pkg/delaytick"
+	"github.com/kubereboot/kured/pkg/taints"
+	"github.com/kubereboot/kured/pkg/timewindow"
 )
 
 var (
