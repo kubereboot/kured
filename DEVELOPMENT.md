@@ -10,7 +10,7 @@ helpful for testing. The "building" section in particular makes sense if
 you are planning to contribute code.
 
 [slack]: README.md#getting-help
-[issues]: https://github.com/weaveworks/kured/issues
+[issues]: https://github.com/kubereboot/kured/issues
 [readme]: README.md
 
 ## Certificate of Origin
@@ -39,10 +39,10 @@ Whenever we want to update e.g. the `kubectl` or `client-go` dependencies,
 some RBAC changes might be necessary too.
 
 This is what it took to support Kubernetes 1.14:
-<https://github.com/weaveworks/kured/pull/75>
+<https://github.com/kubereboot/kured/pull/75>
 
 That the process can be more involved that that can be seen in
-<https://github.com/weaveworks/kured/commits/support-k8s-1.10>
+<https://github.com/kubereboot/kured/commits/support-k8s-1.10>
 
 Please update our .github/workflows with the new k8s images, starting by
 the creation of a .github/kind-cluster-<version>.yaml, then updating
@@ -207,7 +207,7 @@ Now create the `kured-<release>-dockerhub.yaml` for e.g. `1.3.0`:
 ```sh
 VERSION=1.3.0
 MANIFEST="kured-$VERSION-dockerhub.yaml"
-make DH_ORG="weaveworks" VERSION="${VERSION}" manifest
+make DH_ORG="kubereboot" VERSION="${VERSION}" manifest
 cat kured-rbac.yaml > "$MANIFEST"
 cat kured-ds.yaml >> "$MANIFEST"
 ```

@@ -6,7 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/weaveworks/kured/pkg/alerts"
+	"github.com/kubereboot/kured/pkg/alerts"
 	assert "gotest.tools/v3/assert"
 
 	papi "github.com/prometheus/client_golang/api"

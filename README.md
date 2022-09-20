@@ -1,11 +1,11 @@
 :exclamation: We are currently in the middle of the move to a different github organisation.
 If you have an issue with downloading kured images, helm charts, or other information, please
 do not hesitate to contact us in slack (see link below) or in the
-[Migration issue](https://github.com/weaveworks/kured/issues/633).
+[Migration issue](https://github.com/kubereboot/kured/issues/633).
 
 # kured - Kubernetes Reboot Daemon
 
-<img src="https://github.com/weaveworks/kured/raw/main/img/logo.png" align="right"/>
+<img src="https://github.com/kubereboot/kured/raw/main/img/logo.png" align="right"/>
 
 - [kured - Kubernetes Reboot Daemon](#kured---kubernetes-reboot-daemon)
   - [Introduction](#introduction)
@@ -68,7 +68,7 @@ server:
 | 1.1.0 | 1.12.1  | v9.0.0           | release-1.12        | 1.11.x, 1.12.x, 1.13.x            |
 | 1.0.0 | 1.7.6   | v4.0.0           | release-1.7         | 1.6.x, 1.7.x, 1.8.x               |
 
-See the [release notes](https://github.com/weaveworks/kured/releases)
+See the [release notes](https://github.com/kubereboot/kured/releases)
 for specific version compatibility information, including which
 combination have been formally tested.
 
@@ -81,8 +81,8 @@ To obtain a default installation without Prometheus alerting interlock
 or Slack notifications:
 
 ```console
-latest=$(curl -s https://api.github.com/repos/weaveworks/kured/releases | jq -r .[0].tag_name)
-kubectl apply -f "https://github.com/weaveworks/kured/releases/download/$latest/kured-$latest-dockerhub.yaml"
+latest=$(curl -s https://api.github.com/repos/kubereboot/kured/releases | jq -r .[0].tag_name)
+kubectl apply -f "https://github.com/kubereboot/kured/releases/download/$latest/kured-$latest-dockerhub.yaml"
 ```
 
 If you want to customise the installation, download the manifest and
@@ -300,7 +300,7 @@ Here is the syntax:
 
 - slack:           `slack://tokenA/tokenB/tokenC`
 
-    (`slack://<USERNAME>@tokenA/tokenB/tokenC` - in case you want to [respect username](https://github.com/weaveworks/kured/issues/482))
+    (`slack://<USERNAME>@tokenA/tokenB/tokenC` - in case you want to [respect username](https://github.com/kubereboot/kured/issues/482))
 
     (`--slack-hook-url` is deprecated but possible to use)
 
@@ -410,7 +410,7 @@ Use of `latest` for production deployments is bad practice - see
 [here](https://kubernetes.io/docs/concepts/configuration/overview) for
 details. The manifest on `main` refers to `latest` for local
 development testing with minikube only; for production use choose a
-versioned manifest from the [release page](https://github.com/weaveworks/kured/releases/).
+versioned manifest from the [release page](https://github.com/kubereboot/kured/releases/).
 
 ## Getting Help
 
@@ -418,7 +418,7 @@ If you have any questions about, feedback for or problems with `kured`:
 
 - Invite yourself to the <a href="https://slack.cncf.io/" target="_blank">CNCF Slack</a>.
 - Ask a question on the [#kured](https://cloud-native.slack.com/archives/kured) slack channel.
-- [File an issue](https://github.com/weaveworks/kured/issues/new).
+- [File an issue](https://github.com/kubereboot/kured/issues/new).
 - Join us in [our monthly meeting](https://docs.google.com/document/d/1bsHTjHhqaaZ7yJnXF6W8c89UB_yn-OoSZEmDnIP34n8/edit#),
   every fourth Wednesday of the month at 16:00 UTC.
 

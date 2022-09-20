@@ -1,7 +1,7 @@
 .DEFAULT: all
 .PHONY: all clean image publish-image minikube-publish manifest test tests kured-multi
 
-DH_ORG=weaveworks
+DH_ORG=kubereboot
 VERSION=$(shell git symbolic-ref --short HEAD)-$(shell git rev-parse --short HEAD)
 SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
 
