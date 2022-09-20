@@ -425,3 +425,11 @@ If you have any questions about, feedback for or problems with `kured`:
 We follow the [CNCF Code of Conduct](CODE_OF_CONDUCT.md).
 
 Your feedback is always welcome!
+
+## Trademarks
+
+**Kured is a [Cloud Native Computing Foundation](https://cncf.io/) Sandbox project.**
+
+![Cloud Native Computing Foundation logo](img/cncf-color.png)
+
+The Linux Foundation® (TLF) has registered trademarks and uses trademarks. For a list of TLF trademarks, see [Trademark Usage](https://www.linuxfoundation.org/trademark-usage/).
