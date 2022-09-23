@@ -76,6 +76,7 @@ var (
 	preRebootNodeLabels             []string
 	postRebootNodeLabels            []string
 	nodeID                          string
+	concurrency                     int
 
 	rebootDays    []string
 	rebootStart   string
@@ -167,6 +168,8 @@ func NewRootCommand() *cobra.Command {
 		"command for which a zero return code will trigger a reboot command")
 	rootCmd.PersistentFlags().StringVar(&rebootCommand, "reboot-command", "/bin/systemctl reboot",
 		"command to run when a reboot is required")
+	rootCmd.PersistentFlags().IntVar(&concurrency, "concurrency", 1,
+		"amount of nodes to concurrently reboot. Defaults to 1")
 
 	rootCmd.PersistentFlags().StringVar(&slackHookURL, "slack-hook-url", "",
 		"slack hook URL for reboot notifications [deprecated in favor of --notify-url]")
@@ -432,6 +435,17 @@ func holding(lock *daemonsetlock.DaemonSetLock, metadata interface{}) bool {
 	return holding
 }
 
+func holdingMultiple(lock *daemonsetlock.DaemonSetLock) bool {
+	holding, err := lock.TestMultiple()
+	if err != nil {
+		log.Fatalf("Error testing lock: %v", err)
+	}
+	if holding {
+		log.Infof("Holding lock")
+	}
+	return holding
+}
+
 func acquire(lock *daemonsetlock.DaemonSetLock, metadata interface{}, TTL time.Duration) bool {
 	holding, holder, err := lock.Acquire(metadata, TTL)
 	switch {
@@ -440,6 +454,21 @@ func acquire(lock *daemonsetlock.DaemonSetLock, metadata interface{}, TTL time.D
 		return false
 	case !holding:
 		log.Warnf("Lock already held: %v", holder)
+		return false
+	default:
+		log.Infof("Acquired reboot lock")
+		return true
+	}
+}
+
+func acquireMultiple(lock *daemonsetlock.DaemonSetLock, metadata interface{}, TTL time.Duration, maxOwners int) bool {
+	holding, holders, err := lock.AcquireMultiple(metadata, TTL, maxOwners)
+	switch {
+	case err != nil:
+		log.Fatalf("Error acquiring lock: %v", err)
+		return false
+	case !holding:
+		log.Warnf("Lock already held: %v", holders)
 		return false
 	default:
 		log.Infof("Acquired reboot lock")
@@ -458,6 +487,13 @@ func release(lock *daemonsetlock.DaemonSetLock) {
 	log.Infof("Releasing lock")
 	if err := lock.Release(); err != nil {
 		log.Fatalf("Error releasing lock: %v", err)
+	}
+}
+
+func releaseMultiple(lock *daemonsetlock.DaemonSetLock) {
+	log.Infof("Releasing multi lock")
+	if err := lock.ReleaseMultiple(); err != nil {
+		log.Fatalf("Error releasing multi lock: %v", err)
 	}
 }
 
@@ -641,7 +677,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 	source := rand.NewSource(time.Now().UnixNano())
 	tick := delaytick.New(source, 1*time.Minute)
 	for range tick {
-		if holding(lock, &nodeMeta) {
+		if (concurrency == 1 && holding(lock, &nodeMeta)) || (concurrency > 1 && holdingMultiple(lock)) {
 			node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 			if err != nil {
 				log.Errorf("Error retrieving node object via k8s API: %v", err)
@@ -674,7 +710,11 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 				}
 			}
 			throttle(releaseDelay)
-			release(lock)
+			if concurrency == 1 {
+				release(lock)
+			} else {
+				releaseMultiple(lock)
+			}
 			break
 		} else {
 			break
@@ -732,7 +772,8 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 			}
 		}
 
-		if !holding(lock, &nodeMeta) && !acquire(lock, &nodeMeta, TTL) {
+		if (concurrency == 1 && !holding(lock, &nodeMeta) && !acquire(lock, &nodeMeta, TTL)) ||
+			(concurrency > 1 && !holdingMultiple(lock) && !acquireMultiple(lock, &nodeMeta, TTL, concurrency)) {
 			// Prefer to not schedule pods onto this node to avoid draing the same pod multiple times.
 			preferNoScheduleTaint.Enable()
 			continue
@@ -754,7 +795,11 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 		if err != nil {
 			if !forceReboot {
 				log.Errorf("Unable to cordon or drain %s: %v, will release lock and retry cordon and drain before rebooting when lock is next acquired", node.GetName(), err)
-				release(lock)
+				if concurrency == 1 {
+					release(lock)
+				} else {
+					releaseMultiple(lock)
+				}
 				log.Infof("Performing a best-effort uncordon after failed cordon and drain")
 				uncordon(client, node)
 				continue
