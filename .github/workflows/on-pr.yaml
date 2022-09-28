@@ -112,9 +112,9 @@ jobs:
       fail-fast: false
       matrix:
         kubernetes:
-          - "1.22"
           - "1.23"
           - "1.24"
+          - "1.25"
     steps:
       - uses: actions/checkout@v3
       - name: Find go version
