@@ -1,3 +1,5 @@
 cmd/kured/kured
 vendor
 build
+dist
+.tmp

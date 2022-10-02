@@ -1,38 +1,41 @@
 .DEFAULT: all
-.PHONY: all clean image publish-image minikube-publish manifest test tests kured-multi
+.PHONY: all clean image minikube-publish manifest test kured-all
 
+TEMPDIR=./.tmp
+GORELEASER_CMD=$(TEMPDIR)/goreleaser
 DH_ORG=kubereboot
-VERSION=$(shell git symbolic-ref --short HEAD)-$(shell git rev-parse --short HEAD)
+VERSION=$(shell git rev-parse --short HEAD)
 SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
 
 all: image
 
+$(TEMPDIR):
+	mkdir -p $(TEMPDIR)
+
+.PHONY: bootstrap-tools
+bootstrap-tools: $(TEMPDIR)
+	VERSION=v1.11.4 TMPDIR=.tmp bash .github/scripts/goreleaser-install.sh
+	curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b .tmp v0.58.0
+	curl -sSfL https://github.com/sigstore/cosign/releases/download/v1.12.1/cosign-linux-amd64 -o .tmp/cosign
+	chmod +x .tmp/goreleaser .tmp/cosign .tmp/syft
+
 clean:
-	rm -f cmd/kured/kured
-	rm -rf ./build
+	rm -rf ./dist
 
-godeps=$(shell go list -f '{{join .Deps "\n"}}' $1 | grep -v /vendor/ | xargs go list -f '{{if not .Standard}}{{ $$dep := . }}{{range .GoFiles}}{{$$dep.Dir}}/{{.}} {{end}}{{end}}')
+kured:
+	$(GORELEASER_CMD) build --rm-dist --single-target --snapshot
 
-DEPS=$(call godeps,./cmd/kured)
+kured-all:
+	$(GORELEASER_CMD) build --rm-dist --snapshot
 
-cmd/kured/kured: $(DEPS)
-cmd/kured/kured: cmd/kured/*.go
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=$(VERSION)" -o $@ cmd/kured/*.go
+kured-release-tag:
+	$(GORELEASER_CMD) release --rm-dist
 
-kured-multi: 
-	CGO_ENABLED=0 go build -ldflags "-X main.version=$(VERSION)" -o cmd/kured/kured cmd/kured/*.go
+kured-release-snapshot:
+	$(GORELEASER_CMD) release --rm-dist --snapshot
 
-build/.image.done: cmd/kured/Dockerfile cmd/kured/kured
-	mkdir -p build
-	cp $^ build
-	$(SUDO) docker build -t ghcr.io/$(DH_ORG)/kured -f build/Dockerfile ./build
-	$(SUDO) docker tag ghcr.io/$(DH_ORG)/kured ghcr.io/$(DH_ORG)/kured:$(VERSION)
-	touch $@
-
-image: build/.image.done
-
-publish-image: image
-	$(SUDO) docker push ghcr.io/$(DH_ORG)/kured:$(VERSION)
+image: kured
+	$(SUDO) docker buildx build --load -t ghcr.io/$(DH_ORG)/kured:$(VERSION) .
 
 minikube-publish: image
 	$(SUDO) docker save ghcr.io/$(DH_ORG)/kured | (eval $$(minikube docker-env) && docker load)
@@ -41,7 +44,7 @@ manifest:
 	sed -i "s#image: ghcr.io/.*kured.*#image: ghcr.io/$(DH_ORG)/kured:$(VERSION)#g" kured-ds.yaml
 	echo "Please generate combined manifest if necessary"
 
-test: tests
+test:
 	echo "Running go tests"
 	go test ./...
 	echo "Running golint on pkg"

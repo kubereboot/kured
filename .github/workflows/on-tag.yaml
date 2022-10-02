@@ -16,6 +16,10 @@ jobs:
   tag-scan-and-push-final-image:
     name: "Build, scan, and publish tagged image"
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      packages: write
     steps:
       - uses: actions/checkout@v3
       - name: Find go version
@@ -31,14 +35,33 @@ jobs:
       - name: Find current tag version
         run: echo "::set-output name=version::${GITHUB_REF#refs/tags/}"
         id: tags
-      - run: |
-          make DH_ORG="${{ github.repository_owner }}" VERSION="${{ steps.tags.outputs.version }}" image
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Setup GoReleaser
+        run: make bootstrap-tools
+      - name: Build binaries
+        run: make kured-release-tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COSIGN_EXPERIMENTAL: 1
+      - name: Build single image for scan
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
+
       - uses: Azure/container-scan@v0
         env:
           # See https://github.com/goodwithtech/dockle/issues/188
           DOCKLE_HOST: "unix:///var/run/docker.sock"
         with:
-          image-name: ghcr.io/${{ github.repository_owner }}/kured:${{ steps.tags.outputs.version }}
+          image-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
 
       - name: Login to ghcr.io
         uses: docker/login-action@v2
@@ -53,23 +76,27 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Build image
+      - name: Build release images
         uses: docker/build-push-action@v3
         with:
           context: .
-          file: cmd/kured/Dockerfile.multi
           platforms: linux/arm64, linux/amd64, linux/arm/v7, linux/arm/v6, linux/386
           push: true
-#          cache-from: type=registry,ref=user/app:buildcache
-#          cache-to: type=inline
+          labels: ${{ steps.meta.outputs.labels }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
-          labels: ${{ steps.meta.outputs.labels }}
 
+      - name: Generate SBOM
+        run: |
+          .tmp/syft ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }} -o spdx | jq --compact-output > kured.sbom
+
+      - name: Sign and attest artifacts
+        run: |
+          .tmp/cosign sign -f -r ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
+
+          .tmp/cosign sign-blob --output-signature kured.sbom.sig kured.sbom
+
+          .tmp/cosign attest -f --type spdx --predicate kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
+          .tmp/cosign attach sbom --type syft --sbom kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
+        env:
+          COSIGN_EXPERIMENTAL: 1

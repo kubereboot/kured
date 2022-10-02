@@ -33,6 +33,11 @@ you can sign your commit automatically with `git commit -s`.
 
 ## Regular development activities
 
+### Prepare environment
+
+Please run `make bootstrap-tools` once on a fresh repository clone to download several needed tools, e.g. GoReleaser.
+
+
 ### Updating k8s support
 
 Whenever we want to update e.g. the `kubectl` or `client-go` dependencies,
