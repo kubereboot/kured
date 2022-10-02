@@ -73,19 +73,19 @@ jobs:
           push: true
           labels: ${{ steps.meta.outputs.labels }}
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ steps.tags.outputs.sha_short }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.sha_short }}
 
       - name: Generate SBOM
         run: |
-          .tmp/syft ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ steps.tags.outputs.sha_short }} -o spdx | jq --compact-output > kured.sbom
+          .tmp/syft ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.sha_short }} -o spdx | jq --compact-output > kured.sbom
 
       - name: Sign and attest artifacts
         run: |
-          .tmp/cosign sign -f -r ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ steps.tags.outputs.sha_short }}
+          .tmp/cosign sign -f -r ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.sha_short }}
 
           .tmp/cosign sign-blob --output-signature kured.sbom.sig --output-certificate kured.sbom.pem kured.sbom
 
-          .tmp/cosign attest -f --type spdx --predicate kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ steps.tags.outputs.sha_short }}
-          .tmp/cosign attach sbom --type syft --sbom kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ steps.tags.outputs.sha_short }}
+          .tmp/cosign attest -f --type spdx --predicate kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.sha_short }}
+          .tmp/cosign attach sbom --type syft --sbom kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.sha_short }}
         env:
           COSIGN_EXPERIMENTAL: 1
