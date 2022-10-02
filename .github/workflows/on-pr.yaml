@@ -101,13 +101,13 @@ jobs:
         run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
         id: tags
       - name: Build image
-        run: VERSION="${{ steps.tags.outputs.sha_short }}" make image
+        run: VERSION="main-${{ steps.tags.outputs.sha_short }}" make image
       - uses: Azure/container-scan@v0
         env:
           # See https://github.com/goodwithtech/dockle/issues/188
           DOCKLE_HOST: "unix:///var/run/docker.sock"
         with:
-          image-name: ghcr.io/${{ github.repository_owner }}/kured:main-${{ steps.tags.outputs.sha_short }}
+          image-name: ghcr.io/${{ github.repository }}:main-${{ steps.tags.outputs.sha_short }}
 
   # This ensures the latest code works with the manifests built from tree.
   # It is useful for two things:
@@ -148,8 +148,8 @@ jobs:
         id: tags
       - name: Build artifacts
         run: |
-          VERSION="${{ steps.tags.outputs.sha_short }}" make image
-          VERSION="${{ steps.tags.outputs.sha_short }}" make manifest
+          VERSION="main-${{ steps.tags.outputs.sha_short }}" make image
+          VERSION="main-${{ steps.tags.outputs.sha_short }}" make manifest
 
       - name: Workaround "Failed to attach 1 to compat systemd cgroup /actions_job/..." on gh actions
         run: |
@@ -168,7 +168,7 @@ jobs:
           version: v0.14.0
 
       - name: Preload previously built images onto kind cluster
-        run: kind load docker-image ghcr.io/${{ github.repository_owner }}/kured:main-${{ steps.tags.outputs.sha_short }} --name chart-testing
+        run: kind load docker-image ghcr.io/${{ github.repository }}:main-${{ steps.tags.outputs.sha_short }} --name chart-testing
 
       - name: Do not wait for an hour before detecting the rebootSentinel
         run: |

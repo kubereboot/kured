@@ -54,14 +54,14 @@ jobs:
           push: false
           load: true
           tags: |
-            docker.io/${{ GITHUB.REPOSITORY }}:${{ steps.tags.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
 
       - uses: Azure/container-scan@v0
         env:
           # See https://github.com/goodwithtech/dockle/issues/188
           DOCKLE_HOST: "unix:///var/run/docker.sock"
         with:
-          image-name: ghcr.io/${{ github.repository_owner }}/kured:${{ steps.tags.outputs.version }}
+          image-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
 
       - name: Login to ghcr.io
         uses: docker/login-action@v2
