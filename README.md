@@ -420,7 +420,7 @@ If you have any questions about, feedback for or problems with `kured`:
 - Ask a question on the [#kured](https://cloud-native.slack.com/archives/kured) slack channel.
 - [File an issue](https://github.com/kubereboot/kured/issues/new).
 - Join us in [our monthly meeting](https://docs.google.com/document/d/1bsHTjHhqaaZ7yJnXF6W8c89UB_yn-OoSZEmDnIP34n8/edit#),
-  every fourth Wednesday of the month at 16:00 UTC.
+  every first Wednesday of the month at 16:00 UTC.
 
 We follow the [CNCF Code of Conduct](CODE_OF_CONDUCT.md).
 
