@@ -424,8 +424,14 @@ func rebootBlocked(blockers ...RebootBlocker) bool {
 	return false
 }
 
-func holding(lock *daemonsetlock.DaemonSetLock, metadata interface{}) bool {
-	holding, err := lock.Test(metadata)
+func holding(lock *daemonsetlock.DaemonSetLock, metadata interface{}, isMultiLock bool) bool {
+	var holding bool
+	var err error
+	if isMultiLock {
+		holding, err = lock.TestMultiple()
+	} else {
+		holding, err = lock.Test(metadata)
+	}
 	if err != nil {
 		log.Fatalf("Error testing lock: %v", err)
 	}
@@ -435,40 +441,23 @@ func holding(lock *daemonsetlock.DaemonSetLock, metadata interface{}) bool {
 	return holding
 }
 
-func holdingMultiple(lock *daemonsetlock.DaemonSetLock) bool {
-	holding, err := lock.TestMultiple()
-	if err != nil {
-		log.Fatalf("Error testing lock: %v", err)
+func acquire(lock *daemonsetlock.DaemonSetLock, metadata interface{}, TTL time.Duration, maxOwners int) bool {
+	var holding bool
+	var holder string
+	var err error
+	if maxOwners > 1 {
+		var holders []string
+		holding, holders, err = lock.AcquireMultiple(metadata, TTL, maxOwners)
+		holder = strings.Join(holders, ",")
+	} else {
+		holding, holder, err = lock.Acquire(metadata, TTL)
 	}
-	if holding {
-		log.Infof("Holding lock")
-	}
-	return holding
-}
-
-func acquire(lock *daemonsetlock.DaemonSetLock, metadata interface{}, TTL time.Duration) bool {
-	holding, holder, err := lock.Acquire(metadata, TTL)
 	switch {
 	case err != nil:
 		log.Fatalf("Error acquiring lock: %v", err)
 		return false
 	case !holding:
 		log.Warnf("Lock already held: %v", holder)
-		return false
-	default:
-		log.Infof("Acquired reboot lock")
-		return true
-	}
-}
-
-func acquireMultiple(lock *daemonsetlock.DaemonSetLock, metadata interface{}, TTL time.Duration, maxOwners int) bool {
-	holding, holders, err := lock.AcquireMultiple(metadata, TTL, maxOwners)
-	switch {
-	case err != nil:
-		log.Fatalf("Error acquiring lock: %v", err)
-		return false
-	case !holding:
-		log.Warnf("Lock already held: %v", holders)
 		return false
 	default:
 		log.Infof("Acquired reboot lock")
@@ -483,17 +472,17 @@ func throttle(releaseDelay time.Duration) {
 	}
 }
 
-func release(lock *daemonsetlock.DaemonSetLock) {
+func release(lock *daemonsetlock.DaemonSetLock, isMultiLock bool) {
 	log.Infof("Releasing lock")
-	if err := lock.Release(); err != nil {
-		log.Fatalf("Error releasing lock: %v", err)
-	}
-}
 
-func releaseMultiple(lock *daemonsetlock.DaemonSetLock) {
-	log.Infof("Releasing multi lock")
-	if err := lock.ReleaseMultiple(); err != nil {
-		log.Fatalf("Error releasing multi lock: %v", err)
+	var err error
+	if isMultiLock {
+		err = lock.ReleaseMultiple()
+	} else {
+		err = lock.Release()
+	}
+	if err != nil {
+		log.Fatalf("Error releasing lock: %v", err)
 	}
 }
 
@@ -677,7 +666,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 	source := rand.NewSource(time.Now().UnixNano())
 	tick := delaytick.New(source, 1*time.Minute)
 	for range tick {
-		if (concurrency == 1 && holding(lock, &nodeMeta)) || (concurrency > 1 && holdingMultiple(lock)) {
+		if holding(lock, &nodeMeta, concurrency > 1) {
 			node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 			if err != nil {
 				log.Errorf("Error retrieving node object via k8s API: %v", err)
@@ -710,11 +699,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 				}
 			}
 			throttle(releaseDelay)
-			if concurrency == 1 {
-				release(lock)
-			} else {
-				releaseMultiple(lock)
-			}
+			release(lock, concurrency > 1)
 			break
 		} else {
 			break
@@ -772,8 +757,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 			}
 		}
 
-		if (concurrency == 1 && !holding(lock, &nodeMeta) && !acquire(lock, &nodeMeta, TTL)) ||
-			(concurrency > 1 && !holdingMultiple(lock) && !acquireMultiple(lock, &nodeMeta, TTL, concurrency)) {
+		if holding(lock, &nodeMeta, concurrency > 1) && !acquire(lock, &nodeMeta, TTL, concurrency) {
 			// Prefer to not schedule pods onto this node to avoid draing the same pod multiple times.
 			preferNoScheduleTaint.Enable()
 			continue
@@ -795,11 +779,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 		if err != nil {
 			if !forceReboot {
 				log.Errorf("Unable to cordon or drain %s: %v, will release lock and retry cordon and drain before rebooting when lock is next acquired", node.GetName(), err)
-				if concurrency == 1 {
-					release(lock)
-				} else {
-					releaseMultiple(lock)
-				}
+				release(lock, concurrency > 1)
 				log.Infof("Performing a best-effort uncordon after failed cordon and drain")
 				uncordon(client, node)
 				continue
