@@ -2,8 +2,13 @@ module github.com/kubereboot/kured
 
 go 1.18
 
-// Fix CVE-2022-1996 (for v2, Go Modules incompatible)
-replace github.com/emicklei/go-restful => github.com/emicklei/go-restful v2.16.0+incompatible
+replace (
+	// Fix CVE-2022-1996 (for v2, Go Modules incompatible)
+	github.com/emicklei/go-restful => github.com/emicklei/go-restful v2.16.0+incompatible
+
+	golang.org/x/net => golang.org/x/net v0.0.0-20220906165146-f3363e06e74c
+	golang.org/x/text => golang.org/x/text v0.3.8
+)
 
 require (
 	github.com/containrrr/shoutrrr v0.6.1
@@ -17,10 +22,10 @@ require (
 	github.com/spf13/viper v1.13.0
 	github.com/stretchr/testify v1.8.0
 	gotest.tools/v3 v3.4.0
-	k8s.io/api v0.24.6
-	k8s.io/apimachinery v0.24.6
-	k8s.io/client-go v0.24.6
-	k8s.io/kubectl v0.24.6
+	k8s.io/api v0.24.7
+	k8s.io/apimachinery v0.24.7
+	k8s.io/client-go v0.24.7
+	k8s.io/kubectl v0.24.7
 )
 
 require (
@@ -82,11 +87,11 @@ require (
 	github.com/subosito/gotenv v1.4.1 // indirect
 	github.com/xlab/treeprint v0.0.0-20181112141820-a009c3971eca // indirect
 	go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5 // indirect
-	golang.org/x/net v0.0.0-20220909164309-bea034e7d591 // indirect
+	golang.org/x/net v0.0.0-20220906165146-f3363e06e74c // indirect
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
 	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10 // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/text v0.3.8 // indirect
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
@@ -94,8 +99,8 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/cli-runtime v0.24.6 // indirect
-	k8s.io/component-base v0.24.6 // indirect
+	k8s.io/cli-runtime v0.24.7 // indirect
+	k8s.io/component-base v0.24.7 // indirect
 	k8s.io/klog/v2 v2.60.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42 // indirect
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9 // indirect
