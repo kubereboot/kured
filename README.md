@@ -1,7 +1,4 @@
-:exclamation: We are currently in the middle of the move to a different github organisation.
-If you have an issue with downloading kured images, helm charts, or other information, please
-do not hesitate to contact us in slack (see link below) or in the
-[Migration issue](https://github.com/kubereboot/kured/issues/633).
+[![Artifact HUB](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/kured)](https://artifacthub.io/packages/helm/kured/kured)
 
 # kured - Kubernetes Reboot Daemon
 
