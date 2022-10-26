@@ -46,8 +46,16 @@ some RBAC changes might be necessary too.
 This is what it took to support Kubernetes 1.14:
 <https://github.com/kubereboot/kured/pull/75>
 
-That the process can be more involved that that can be seen in
-<https://github.com/kubereboot/kured/commits/support-k8s-1.10>
+That the process can be more involved based on kubernetes changes.
+For example, k8s 1.10 changes to apps triggered the following commits: 
+
+b3f9ddf: Bump client-go for optimum k8s 1.10 compatibility
+bc3f28d: Move deployment manifest to apps/v1
+908998a: Update RBAC permissions for kubectl v1.10.3
+efbb0c3: Document version compatibility in release notes
+5731b98: Add warning to Dockerfile re: upgrading kubectl
+
+Search the git log for inspiration for your cases.
 
 Please update our .github/workflows with the new k8s images, starting by
 the creation of a .github/kind-cluster-<version>.yaml, then updating
