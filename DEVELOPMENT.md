@@ -1,1 +1,1 @@
-This file was moved to `CONTRIBUTING.md`.
+This file was moved to [CONTRIBUTING.md](CONTRIBUTING.md).
