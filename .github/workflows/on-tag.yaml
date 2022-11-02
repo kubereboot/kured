@@ -28,7 +28,7 @@ jobs:
           go-version-file: 'go.mod'
           check-latest: true
       - name: Find current tag version
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
         id: tags
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
