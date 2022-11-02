@@ -83,7 +83,7 @@ jobs:
       - name: Setup GoReleaser
         run: make bootstrap-tools
       - name: Find current tag version
-        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         id: tags
       - name: Build image
         run: VERSION="${{ steps.tags.outputs.sha_short }}" make image
@@ -124,7 +124,7 @@ jobs:
       - name: Setup GoReleaser
         run: make bootstrap-tools
       - name: Find current tag version
-        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         id: tags
       - name: Build artifacts
         run: |

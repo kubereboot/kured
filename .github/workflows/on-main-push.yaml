@@ -47,7 +47,7 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Find current tag version
-        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         id: tags
 
       - name: Setup GoReleaser
