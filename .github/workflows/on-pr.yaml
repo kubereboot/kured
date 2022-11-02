@@ -10,15 +10,10 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v3
-      - name: Find go version
-        run: |
-          GO_VERSION=$(awk '/^go/ {print $2};' go.mod)
-          echo "::set-output name=version::${GO_VERSION}"
-        id: awk_gomod
       - name: Ensure go version
         uses: actions/setup-go@v3
         with:
-          go-version: "${{ steps.awk_gomod.outputs.version }}"
+          go-version-file: 'go.mod'
           check-latest: true
       - name: run tests
         run: go test -json ./... > test.json
@@ -41,15 +36,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Find go version
-      run: |
-        GO_VERSION=$(awk '/^go/ {print $2};' go.mod)
-        echo "::set-output name=version::${GO_VERSION}"
-      id: awk_gomod
     - name: Ensure go version
       uses: actions/setup-go@v3
       with:
-        go-version: "${{ steps.awk_gomod.outputs.version }}"
+        go-version-file: 'go.mod'
         check-latest: true
     - name: Lint cmd folder
       uses: Jerome1337/golint-action@v1.0.2
@@ -81,15 +71,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Find go version
-        run: |
-          GO_VERSION=$(awk '/^go/ {print $2};' go.mod)
-          echo "::set-output name=version::${GO_VERSION}"
-        id: awk_gomod
       - name: Ensure go version
         uses: actions/setup-go@v3
         with:
-          go-version: "${{ steps.awk_gomod.outputs.version }}"
+          go-version-file: 'go.mod'
           check-latest: true
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -127,15 +112,10 @@ jobs:
           - "1.25"
     steps:
       - uses: actions/checkout@v3
-      - name: Find go version
-        run: |
-          GO_VERSION=$(awk '/^go/ {print $2};' go.mod)
-          echo "::set-output name=version::${GO_VERSION}"
-        id: awk_gomod
       - name: Ensure go version
         uses: actions/setup-go@v3
         with:
-          go-version: "${{ steps.awk_gomod.outputs.version }}"
+          go-version-file: 'go.mod'
           check-latest: true
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2

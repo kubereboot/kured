@@ -22,15 +22,10 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v3
-      - name: Find go version
-        run: |
-          GO_VERSION=$(awk '/^go/ {print $2};' go.mod)
-          echo "::set-output name=version::${GO_VERSION}"
-        id: awk_gomod
       - name: Ensure go version
         uses: actions/setup-go@v3
         with:
-          go-version: "${{ steps.awk_gomod.outputs.version }}"
+          go-version-file: 'go.mod'
           check-latest: true
       - name: Find current tag version
         run: echo "::set-output name=version::${GITHUB_REF#refs/tags/}"
