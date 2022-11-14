@@ -30,13 +30,13 @@ import (
 	"github.com/google/shlex"
 
 	shoutrrr "github.com/containrrr/shoutrrr"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/kubereboot/kured/pkg/alerts"
 	"github.com/kubereboot/kured/pkg/daemonsetlock"
 	"github.com/kubereboot/kured/pkg/delaytick"
 	"github.com/kubereboot/kured/pkg/taints"
 	"github.com/kubereboot/kured/pkg/timewindow"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
@@ -81,6 +81,7 @@ var (
 	annotateNodes bool
 
 	// Metrics
+	metricsPort         uint16
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Subsystem: "kured",
 		Name:      "reboot_required",
@@ -196,7 +197,7 @@ func NewRootCommand() *cobra.Command {
 		"labels to add to nodes before cordoning")
 	rootCmd.PersistentFlags().StringSliceVar(&postRebootNodeLabels, "post-reboot-node-labels", nil,
 		"labels to add to nodes after uncordoning")
-
+	rootCmd.PersistentFlags().Uint16Var(&metricsPort, "metrics-port", 8080, "port where the /metrics endpoint is served")
 	return rootCmd
 }
 
@@ -833,5 +834,5 @@ func root(cmd *cobra.Command, args []string) {
 	go maintainRebootRequiredMetric(nodeID, hostSentinelCommand)
 
 	http.Handle("/metrics", promhttp.Handler())
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", metricsPort), nil))
 }
