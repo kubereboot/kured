@@ -30,6 +30,8 @@
   - [Frequently Asked/Anticipated Questions](#frequently-askedanticipated-questions)
     - [Why is there no `latest` tag on Docker Hub?](#why-is-there-no-latest-tag-on-docker-hub)
   - [Getting Help](#getting-help)
+  - [Trademarks](#trademarks)
+  - [License](#license)
 
 ## Introduction
 
@@ -135,6 +137,7 @@ Flags:
       --slack-username string               slack username for reboot notifications (default "kured")
       --start-time string                   schedule reboot only after this time of day (default "0:00")
       --time-zone string                    use this timezone for schedule inputs (default "UTC")
+      --metrics-port uint                   port where the /metrics endpoint is served. (default 8080)
 ```
 
 ### Reboot Sentinel File & Period
@@ -282,6 +285,8 @@ ALERT RebootRequired
 If you choose to employ such an alert and have configured kured to
 probe for active alerts before rebooting, be sure to specify
 `--alert-filter-regexp=^RebootRequired$` to avoid deadlock!
+
+The default port, 8080, can be customized by passing in the `--metrics-port` flag. This is generally required only if there is a port conflict.
 
 ### Notifications
 

@@ -197,7 +197,7 @@ func NewRootCommand() *cobra.Command {
 		"labels to add to nodes before cordoning")
 	rootCmd.PersistentFlags().StringSliceVar(&postRebootNodeLabels, "post-reboot-node-labels", nil,
 		"labels to add to nodes after uncordoning")
-	rootCmd.PersistentFlags().Uint16Var(&metricsPort, "metrics-port", 8080, "port where the /metrics endpoint is served")
+	rootCmd.PersistentFlags().Uint16Var(&metricsPort, "metrics-port", 8080, "port where the /metrics endpoint is served. Defaults to 8080")
 	return rootCmd
 }
 
