@@ -421,6 +421,7 @@ If you have any questions about, feedback for or problems with `kured`:
 - [File an issue](https://github.com/kubereboot/kured/issues/new).
 - Join us in [our monthly meeting](https://docs.google.com/document/d/1bsHTjHhqaaZ7yJnXF6W8c89UB_yn-OoSZEmDnIP34n8/edit#),
   every first Wednesday of the month at 16:00 UTC.
+- You might want to [join the kured-dev mailing list](https://lists.cncf.io/g/cncf-kured-dev) as well.
 
 We follow the [CNCF Code of Conduct](CODE_OF_CONDUCT.md).
 
