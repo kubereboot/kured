@@ -1,4 +1,4 @@
-FROM --platform=$TARGETPLATFORM alpine:3.16.3 as bin
+FROM --platform=$TARGETPLATFORM alpine:3.17.0 as bin
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -19,7 +19,7 @@ RUN set -ex \
     esac \
   && cp /dist/kured_${TARGETOS}_${TARGETARCH}${SUFFIX}/kured /dist/kured;
 
-FROM --platform=$TARGETPLATFORM alpine:3.16.3
+FROM --platform=$TARGETPLATFORM alpine:3.17.0
 RUN apk update --no-cache && apk upgrade --no-cache && apk add --no-cache ca-certificates tzdata
 COPY --from=bin /dist/kured /usr/bin/kured
 ENTRYPOINT ["/usr/bin/kured"]
