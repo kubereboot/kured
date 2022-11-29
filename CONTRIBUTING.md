@@ -31,6 +31,16 @@ The signature must contain your real name
 If your `user.name` and `user.email` are configured in your Git config,
 you can sign your commit automatically with `git commit -s`.
 
+## Kured Repositories
+
+All Kured repositories are kept under <https://github.com/kubereboot>. To find the code and work on the individual pieces that make Kured, here is our overview:
+
+| Repositories                            | Contents                  |
+| --------------------------------------- | ------------------------- |
+| <https://github.com/kubereboot/kured>   | Kured operator itself     |
+| <https://github.com/kubereboot/charts>  | Helm chart                |
+| <https://github.com/kubereboot/website> | website and documentation |
+
 ## Regular development activities
 
 ### Prepare environment
