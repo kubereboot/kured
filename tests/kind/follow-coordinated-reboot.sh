@@ -12,6 +12,7 @@ function gather_logs_and_cleanup {
     fi
     rmdir "$tmp_dir"
 
+
     # The next commands are useful regardless of success or failures.
     if [[ "$DEBUG" == "true" ]]; then
         echo "############################################################"
