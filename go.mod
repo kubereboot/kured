@@ -6,7 +6,7 @@ replace (
 	// Fix CVE-2022-1996 (for v2, Go Modules incompatible)
 	github.com/emicklei/go-restful => github.com/emicklei/go-restful v2.16.0+incompatible
 
-	golang.org/x/net => golang.org/x/net v0.0.0-20220906165146-f3363e06e74c
+	golang.org/x/net => golang.org/x/net v0.4.0
 	golang.org/x/text => golang.org/x/text v0.3.8
 )
 
