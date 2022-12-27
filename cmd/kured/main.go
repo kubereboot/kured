@@ -30,13 +30,13 @@ import (
 	"github.com/google/shlex"
 
 	shoutrrr "github.com/containrrr/shoutrrr"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/kubereboot/kured/pkg/alerts"
 	"github.com/kubereboot/kured/pkg/daemonsetlock"
 	"github.com/kubereboot/kured/pkg/delaytick"
 	"github.com/kubereboot/kured/pkg/taints"
 	"github.com/kubereboot/kured/pkg/timewindow"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
@@ -95,6 +95,8 @@ const (
 	KuredRebootInProgressAnnotation string = "weave.works/kured-reboot-in-progress"
 	// KuredMostRecentRebootNeededAnnotation is the canonical string value for the kured most-recent-reboot-needed annotation
 	KuredMostRecentRebootNeededAnnotation string = "weave.works/kured-most-recent-reboot-needed"
+	// KuredRebootRequiredAnnotation is the canonical string value for the kured reboot-required annotation
+	KuredRebootRequiredAnnotation string = "weave.works/reboot-required"
 	// EnvPrefix The environment variable prefix of all environment variables bound to our command line flags.
 	EnvPrefix = "KURED"
 )
@@ -520,12 +522,37 @@ func invokeReboot(nodeID string, rebootCommand []string) {
 	}
 }
 
-func maintainRebootRequiredMetric(nodeID string, sentinelCommand []string) {
+func maintainRebootRequiredMetricAndAnnotation(nodeID string, sentinelCommand []string) {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	for {
 		if rebootRequired(sentinelCommand) {
 			rebootRequiredGauge.WithLabelValues(nodeID).Set(1)
+			if annotateNodes {
+				// Annotate this node to indicate that "I want to be rebooted!"
+				// so that other node maintenance tools can move stateful workloads(in their respective maintenance windows) away
+				annotations := map[string]string{KuredRebootRequiredAnnotation: "true"}
+				err := addNodeAnnotations(client, nodeID, annotations)
+				if err != nil {
+					continue
+				}
+			}
 		} else {
 			rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
+			if annotateNodes {
+				err := deleteNodeAnnotation(client, nodeID, KuredRebootRequiredAnnotation)
+				if err != nil {
+					continue
+				}
+			}
 		}
 		time.Sleep(time.Minute)
 	}
@@ -542,9 +569,20 @@ func addNodeAnnotations(client *kubernetes.Clientset, nodeID string, annotations
 		log.Errorf("Error retrieving node object via k8s API: %s", err)
 		return err
 	}
+	changes := false
 	for k, v := range annotations {
+		if value, exists := node.Annotations[k]; exists {
+			if value == v {
+				continue
+			}
+		}
+		changes = true
 		node.Annotations[k] = v
 		log.Infof("Adding node %s annotation: %s=%s", node.GetName(), k, v)
+	}
+
+	if !changes {
+		return nil
 	}
 
 	bytes, err := json.Marshal(node)
@@ -566,13 +604,23 @@ func addNodeAnnotations(client *kubernetes.Clientset, nodeID string, annotations
 }
 
 func deleteNodeAnnotation(client *kubernetes.Clientset, nodeID, key string) error {
+
+	node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
+	if err != nil {
+		log.Errorf("Error deleting node annotation %s via k8s API: %v", key, err)
+		return err
+	}
+	if _, exists := node.Annotations[key]; !exists {
+		return nil
+	}
+
 	log.Infof("Deleting node %s annotation %s", nodeID, key)
 
 	// JSON Patch takes as path input a JSON Pointer, defined in RFC6901
 	// So we replace all instances of "/" with "~1" as per:
 	// https://tools.ietf.org/html/rfc6901#section-3
 	patch := []byte(fmt.Sprintf("[{\"op\":\"remove\",\"path\":\"/metadata/annotations/%s\"}]", strings.ReplaceAll(key, "/", "~1")))
-	_, err := client.CoreV1().Nodes().Patch(context.TODO(), nodeID, types.JSONPatchType, patch, metav1.PatchOptions{})
+	_, err = client.CoreV1().Nodes().Patch(context.TODO(), nodeID, types.JSONPatchType, patch, metav1.PatchOptions{})
 	if err != nil {
 		log.Errorf("Error deleting node annotation %s via k8s API: %v", key, err)
 		return err
@@ -830,7 +878,7 @@ func root(cmd *cobra.Command, args []string) {
 	hostRestartCommand := buildHostCommand(1, restartCommand)
 
 	go rebootAsRequired(nodeID, hostRestartCommand, hostSentinelCommand, window, lockTTL, lockReleaseDelay)
-	go maintainRebootRequiredMetric(nodeID, hostSentinelCommand)
+	go maintainRebootRequiredMetricAndAnnotation(nodeID, hostSentinelCommand)
 
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(":8080", nil))
