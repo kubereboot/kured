@@ -11,7 +11,7 @@ replace (
 )
 
 require (
-	github.com/containrrr/shoutrrr v0.7.0
+	github.com/containrrr/shoutrrr v0.7.1
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/prometheus/client_golang v1.14.0
