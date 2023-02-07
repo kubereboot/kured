@@ -162,7 +162,7 @@ A test-run with `minikube` could look like this:
 
 ```console
 # start minikube
-minikube start --vm-driver kvm2 --kubernetes-version <k8s-release>
+minikube start --driver=kvm2 --kubernetes-version <k8s-release>
 
 # build kured image and publish to registry accessible by minikube
 make image minikube-publish

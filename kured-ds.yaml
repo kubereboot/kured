@@ -31,7 +31,7 @@ spec:
       restartPolicy: Always
       containers:
         - name: kured
-          image: ghcr.io/kubereboot/kured:1.12.0
+          image: ghcr.io/kubereboot/kured:1.12.1
                  # If you find yourself here wondering why there is no
                  # :latest tag on Docker Hub,see the FAQ in the README
           imagePullPolicy: IfNotPresent
