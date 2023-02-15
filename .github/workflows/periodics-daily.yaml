@@ -69,9 +69,12 @@ jobs:
         id: tags
       - name: Build artifacts
         run: VERSION="${{ steps.tags.outputs.sha_short }}" make image
-      - uses: Azure/container-scan@v0
-        env:
-          # See https://github.com/goodwithtech/dockle/issues/188
-          DOCKLE_HOST: "unix:///var/run/docker.sock"
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@8bd2f9fbda2109502356ff8a6a89da55b1ead252
         with:
-          image-name: ghcr.io/${{ github.repository }}:${{ steps.tags.outputs.sha_short }}
+          image-ref: 'ghcr.io/${{ github.repository }}:${{ steps.tags.outputs.sha_short }}'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'

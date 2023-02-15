@@ -51,12 +51,15 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
 
-      - uses: Azure/container-scan@v0
-        env:
-          # See https://github.com/goodwithtech/dockle/issues/188
-          DOCKLE_HOST: "unix:///var/run/docker.sock"
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@8bd2f9fbda2109502356ff8a6a89da55b1ead252
         with:
-          image-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
+          image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
 
       - name: Login to ghcr.io
         uses: docker/login-action@v2
