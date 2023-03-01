@@ -2,3 +2,5 @@ app.fossa.com
 cluster.local
 hooks.slack.com
 localhost
+slack://
+teams://
