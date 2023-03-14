@@ -8,14 +8,14 @@ metadata:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: kured            # Must match `--ds-name`
+  name: kured # Must match `--ds-name`
   namespace: kube-system # Must match `--ds-namespace`
 spec:
   selector:
     matchLabels:
       name: kured
   updateStrategy:
-   type: RollingUpdate
+    type: RollingUpdate
   template:
     metadata:
       labels:
@@ -31,12 +31,15 @@ spec:
       restartPolicy: Always
       containers:
         - name: kured
+          # If you find yourself here wondering why there is no
+          # :latest tag on Docker Hub,see the FAQ in the README
           image: ghcr.io/kubereboot/kured:1.12.1
-                 # If you find yourself here wondering why there is no
-                 # :latest tag on Docker Hub,see the FAQ in the README
           imagePullPolicy: IfNotPresent
           securityContext:
             privileged: true # Give permission to nsenter /proc/1/ns/mnt
+          ports:
+            - containerPort: 8080
+              name: metrics
           env:
             # Pass in the name of the node on which this pod is scheduled
             # for use with drain/uncordon operations and lock acquisition
