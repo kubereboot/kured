@@ -30,13 +30,13 @@ import (
 	"github.com/google/shlex"
 
 	shoutrrr "github.com/containrrr/shoutrrr"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/kubereboot/kured/pkg/alerts"
 	"github.com/kubereboot/kured/pkg/daemonsetlock"
 	"github.com/kubereboot/kured/pkg/delaytick"
 	"github.com/kubereboot/kured/pkg/taints"
 	"github.com/kubereboot/kured/pkg/timewindow"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
@@ -696,18 +696,6 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 		}
 		log.Infof("Reboot required")
 
-		var blockCheckers []RebootBlocker
-		if prometheusURL != "" {
-			blockCheckers = append(blockCheckers, PrometheusBlockingChecker{promClient: promClient, filter: alertFilter, firingOnly: alertFiringOnly})
-		}
-		if podSelectors != nil {
-			blockCheckers = append(blockCheckers, KubernetesBlockingChecker{client: client, nodename: nodeID, filter: podSelectors})
-		}
-
-		if rebootBlocked(blockCheckers...) {
-			continue
-		}
-
 		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 		if err != nil {
 			log.Fatalf("Error retrieving node object via k8s API: %v", err)
@@ -733,6 +721,18 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 		if !holding(lock, &nodeMeta) && !acquire(lock, &nodeMeta, TTL) {
 			// Prefer to not schedule pods onto this node to avoid draing the same pod multiple times.
 			preferNoScheduleTaint.Enable()
+			continue
+		}
+
+		var blockCheckers []RebootBlocker
+		if prometheusURL != "" {
+			blockCheckers = append(blockCheckers, PrometheusBlockingChecker{promClient: promClient, filter: alertFilter, firingOnly: alertFiringOnly})
+		}
+		if podSelectors != nil {
+			blockCheckers = append(blockCheckers, KubernetesBlockingChecker{client: client, nodename: nodeID, filter: podSelectors})
+		}
+
+		if rebootBlocked(blockCheckers...) {
 			continue
 		}
 
