@@ -108,5 +108,5 @@ Governance require a 2/3 vote of all Maintainers.
 
 [maintainers-file]: ./MAINTAINERS
 [private-list]: cncf-kured-maintainers@lists.cncf.io
-[meeting-agenda]: https://docs.google.com/document/d/1bsHTjHhqaaZ7yJnXF6W8c89UB_yn-OoSZEmDnIP34n8/edit#
+[meeting-agenda]: https://docs.google.com/document/d/1AWT8YDdqZY-Se6Y1oAlwtujWLVpNVK2M_F_Vfqw06aI/edit
 [decision-issues]: https://github.com/kubereboot/kured/labels/decision
