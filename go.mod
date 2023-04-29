@@ -4,6 +4,8 @@ go 1.19
 
 replace golang.org/x/net => golang.org/x/net v0.7.0
 
+replace github.com/emicklei/go-restful/v3 => github.com/emicklei/go-restful/v3 v3.10.2
+
 require (
 	github.com/containrrr/shoutrrr v0.7.1
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
