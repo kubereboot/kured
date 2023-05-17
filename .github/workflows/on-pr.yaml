@@ -145,7 +145,7 @@ jobs:
 
       # Default name for helm/kind-action kind clusters is "chart-testing"
       - name: Create kind cluster with 5 nodes
-        uses: helm/kind-action@v1.6.0
+        uses: helm/kind-action@v1.7.0
         with:
           config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
           version: v0.14.0
