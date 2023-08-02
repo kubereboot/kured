@@ -315,7 +315,8 @@ func buildHostCommand(pid int, command []string) []string {
 }
 
 func rebootRequired(sentinelCommand []string) bool {
-	if err := newCommand(sentinelCommand[0], sentinelCommand[1:]...).Run(); err != nil {
+	cmd := newCommand(sentinelCommand[0], sentinelCommand[1:]...)
+	if err := cmd.Run(); err != nil {
 		switch err := err.(type) {
 		case *exec.ExitError:
 			// We assume a non-zero exit code means 'reboot not required', but of course
@@ -323,6 +324,9 @@ func rebootRequired(sentinelCommand []string) bool {
 			// went wrong during its execution. In that case, not entering a reboot loop
 			// is the right thing to do, and we are logging stdout/stderr of the command
 			// so it should be obvious what is wrong.
+			if cmd.ProcessState.ExitCode() != 1 {
+				log.Warnf("sentinel command ended with unexpected exit code: %v", cmd.ProcessState.ExitCode())
+			}
 			return false
 		default:
 			// Something was grossly misconfigured, such as the command path being wrong.
