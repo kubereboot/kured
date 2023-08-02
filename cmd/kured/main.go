@@ -348,7 +348,8 @@ func rebootRequired(sentinelCommand []string) bool {
 // RebootBlocker interface should be implemented by types
 // to know if their instantiations should block a reboot
 type RebootBlocker interface {
-	isBlocked() bool
+	// returns "isBlocked", "shouldReleaseNodeLock"
+	isBlocked() (bool, bool)
 }
 
 // PrometheusBlockingChecker contains info for connecting
@@ -375,11 +376,11 @@ type KubernetesBlockingChecker struct {
 	filter []string
 }
 
-func (pb PrometheusBlockingChecker) isBlocked() bool {
+func (pb PrometheusBlockingChecker) isBlocked() (bool, bool) {
 	alertNames, err := pb.promClient.ActiveAlerts(pb.filter, pb.firingOnly, pb.filterMatchOnly)
 	if err != nil {
 		log.Warnf("Reboot blocked: prometheus query error: %v", err)
-		return true
+		return true, false
 	}
 	count := len(alertNames)
 	if count > 10 {
@@ -387,12 +388,12 @@ func (pb PrometheusBlockingChecker) isBlocked() bool {
 	}
 	if count > 0 {
 		log.Warnf("Reboot blocked: %d active alerts: %v", count, alertNames)
-		return true
+		return true, false
 	}
-	return false
+	return false, false
 }
 
-func (kb KubernetesBlockingChecker) isBlocked() bool {
+func (kb KubernetesBlockingChecker) isBlocked() (bool, bool) {
 	fieldSelector := fmt.Sprintf("spec.nodeName=%s,status.phase!=Succeeded,status.phase!=Failed,status.phase!=Unknown", kb.nodename)
 	for _, labelSelector := range kb.filter {
 		podList, err := kb.client.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{
@@ -401,7 +402,7 @@ func (kb KubernetesBlockingChecker) isBlocked() bool {
 			Limit:         10})
 		if err != nil {
 			log.Warnf("Reboot blocked: pod query error: %v", err)
-			return true
+			return true, true
 		}
 
 		if len(podList.Items) > 0 {
@@ -413,19 +414,20 @@ func (kb KubernetesBlockingChecker) isBlocked() bool {
 				podNames = append(podNames, "...")
 			}
 			log.Warnf("Reboot blocked: matching pods: %v", podNames)
-			return true
+			return true, true
 		}
 	}
-	return false
+	return false, false
 }
 
-func rebootBlocked(blockers ...RebootBlocker) bool {
+func rebootBlocked(blockers ...RebootBlocker) (bool, bool) {
 	for _, blocker := range blockers {
-		if blocker.isBlocked() {
-			return true
+		isBlocked, shouldReleaseNodeLock := blocker.isBlocked()
+		if isBlocked {
+			return true, shouldReleaseNodeLock
 		}
 	}
-	return false
+	return false, false
 }
 
 func holding(lock *daemonsetlock.DaemonSetLock, metadata interface{}, isMultiLock bool) bool {
@@ -775,7 +777,12 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 			blockCheckers = append(blockCheckers, KubernetesBlockingChecker{client: client, nodename: nodeID, filter: podSelectors})
 		}
 
-		if rebootBlocked(blockCheckers...) {
+		isBlocked, shouldReleaseNodeLock := rebootBlocked(blockCheckers...)
+		if isBlocked {
+			if shouldReleaseNodeLock {
+				release(lock, concurrency > 1)
+			}
+
 			continue
 		}
 
