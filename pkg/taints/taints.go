@@ -65,7 +65,7 @@ func (t *Taint) Disable() {
 }
 
 func taintExists(client *kubernetes.Clientset, nodeID, taintName string) (bool, int, *v1.Node) {
-	updatedNode, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
+	updatedNode, err := client.CoreV1().Nodes().Get(context.Background(), nodeID, metav1.GetOptions{})
 	if err != nil || updatedNode == nil {
 		log.Fatalf("Error reading node %s: %v", nodeID, err)
 	}
@@ -153,7 +153,7 @@ func preferNoSchedule(client *kubernetes.Clientset, nodeID, taintName string, ef
 		log.Fatalf("Error encoding taint patch for node %s: %v", nodeID, err)
 	}
 
-	_, err = client.CoreV1().Nodes().Patch(context.TODO(), nodeID, types.JSONPatchType, patchBytes, metav1.PatchOptions{})
+	_, err = client.CoreV1().Nodes().Patch(context.Background(), nodeID, types.JSONPatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		log.Fatalf("Error patching taint for node %s: %v", nodeID, err)
 	}

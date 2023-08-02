@@ -75,7 +75,7 @@ func (dsl *DaemonSetLock) Acquire(metadata interface{}, TTL time.Duration) (bool
 		}
 		ds.ObjectMeta.Annotations[dsl.annotation] = string(valueBytes)
 
-		_, err = dsl.client.AppsV1().DaemonSets(dsl.namespace).Update(context.TODO(), ds, metav1.UpdateOptions{})
+		_, err = dsl.client.AppsV1().DaemonSets(dsl.namespace).Update(context.Background(), ds, metav1.UpdateOptions{})
 		if err != nil {
 			if se, ok := err.(*errors.StatusError); ok && se.ErrStatus.Reason == metav1.StatusReasonConflict {
 				// Something else updated the resource between us reading and writing - try again soon
@@ -245,7 +245,7 @@ func (dsl *DaemonSetLock) Release() error {
 
 		delete(ds.ObjectMeta.Annotations, dsl.annotation)
 
-		_, err = dsl.client.AppsV1().DaemonSets(dsl.namespace).Update(context.TODO(), ds, metav1.UpdateOptions{})
+		_, err = dsl.client.AppsV1().DaemonSets(dsl.namespace).Update(context.Background(), ds, metav1.UpdateOptions{})
 		if err != nil {
 			if se, ok := err.(*errors.StatusError); ok && se.ErrStatus.Reason == metav1.StatusReasonConflict {
 				// Something else updated the resource between us reading and writing - try again soon

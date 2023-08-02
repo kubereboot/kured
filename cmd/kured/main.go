@@ -395,7 +395,7 @@ func (pb PrometheusBlockingChecker) isBlocked() bool {
 func (kb KubernetesBlockingChecker) isBlocked() bool {
 	fieldSelector := fmt.Sprintf("spec.nodeName=%s,status.phase!=Succeeded,status.phase!=Failed,status.phase!=Unknown", kb.nodename)
 	for _, labelSelector := range kb.filter {
-		podList, err := kb.client.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{
+		podList, err := kb.client.CoreV1().Pods("").List(context.Background(), metav1.ListOptions{
 			LabelSelector: labelSelector,
 			FieldSelector: fieldSelector,
 			Limit:         10})
@@ -580,7 +580,7 @@ type nodeMeta struct {
 }
 
 func addNodeAnnotations(client *kubernetes.Clientset, nodeID string, annotations map[string]string) error {
-	node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
+	node, err := client.CoreV1().Nodes().Get(context.Background(), nodeID, metav1.GetOptions{})
 	if err != nil {
 		log.Errorf("Error retrieving node object via k8s API: %s", err)
 		return err
@@ -596,7 +596,7 @@ func addNodeAnnotations(client *kubernetes.Clientset, nodeID string, annotations
 		return err
 	}
 
-	_, err = client.CoreV1().Nodes().Patch(context.TODO(), node.GetName(), types.StrategicMergePatchType, bytes, metav1.PatchOptions{})
+	_, err = client.CoreV1().Nodes().Patch(context.Background(), node.GetName(), types.StrategicMergePatchType, bytes, metav1.PatchOptions{})
 	if err != nil {
 		var annotationsErr string
 		for k, v := range annotations {
@@ -615,7 +615,7 @@ func deleteNodeAnnotation(client *kubernetes.Clientset, nodeID, key string) erro
 	// So we replace all instances of "/" with "~1" as per:
 	// https://tools.ietf.org/html/rfc6901#section-3
 	patch := []byte(fmt.Sprintf("[{\"op\":\"remove\",\"path\":\"/metadata/annotations/%s\"}]", strings.ReplaceAll(key, "/", "~1")))
-	_, err := client.CoreV1().Nodes().Patch(context.TODO(), nodeID, types.JSONPatchType, patch, metav1.PatchOptions{})
+	_, err := client.CoreV1().Nodes().Patch(context.Background(), nodeID, types.JSONPatchType, patch, metav1.PatchOptions{})
 	if err != nil {
 		log.Errorf("Error deleting node annotation %s via k8s API: %v", key, err)
 		return err
@@ -641,7 +641,7 @@ func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []stri
 		log.Fatalf("Error marshalling node object into JSON: %v", err)
 	}
 
-	_, err = client.CoreV1().Nodes().Patch(context.TODO(), node.GetName(), types.StrategicMergePatchType, bytes, metav1.PatchOptions{})
+	_, err = client.CoreV1().Nodes().Patch(context.Background(), node.GetName(), types.StrategicMergePatchType, bytes, metav1.PatchOptions{})
 	if err != nil {
 		var labelsErr string
 		for _, label := range labels {
@@ -671,7 +671,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 	tick := delaytick.New(source, 1*time.Minute)
 	for range tick {
 		if holding(lock, &nodeMeta, concurrency > 1) {
-			node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
+			node, err := client.CoreV1().Nodes().Get(context.Background(), nodeID, metav1.GetOptions{})
 			if err != nil {
 				log.Errorf("Error retrieving node object via k8s API: %v", err)
 				continue
@@ -739,7 +739,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 		}
 		log.Infof("Reboot required")
 
-		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
+		node, err := client.CoreV1().Nodes().Get(context.Background(), nodeID, metav1.GetOptions{})
 		if err != nil {
 			log.Fatalf("Error retrieving node object via k8s API: %v", err)
 		}
