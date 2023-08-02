@@ -57,7 +57,6 @@ jobs:
         run: make kured-release-snapshot
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COSIGN_EXPERIMENTAL: 1
 
       - name: Build image
         uses: docker/build-push-action@v4
@@ -75,11 +74,9 @@ jobs:
 
       - name: Sign and attest artifacts
         run: |
-          .tmp/cosign sign -f -r ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.sha_short }}
+          .tmp/cosign sign -y -r ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.sha_short }}
 
           .tmp/cosign sign-blob --output-signature kured.sbom.sig --output-certificate kured.sbom.pem kured.sbom
 
-          .tmp/cosign attest -f --type spdx --predicate kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.sha_short }}
+          .tmp/cosign attest -y --type spdx --predicate kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.sha_short }}
           .tmp/cosign attach sbom --type spdx --sbom kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.sha_short }}
-        env:
-          COSIGN_EXPERIMENTAL: 1

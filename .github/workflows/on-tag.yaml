@@ -40,7 +40,6 @@ jobs:
         run: make kured-release-tag
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COSIGN_EXPERIMENTAL: 1
       - name: Build single image for scan
         uses: docker/build-push-action@v4
         with:
@@ -90,11 +89,9 @@ jobs:
 
       - name: Sign and attest artifacts
         run: |
-          .tmp/cosign sign -f -r ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
+          .tmp/cosign sign -y -r ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
 
           .tmp/cosign sign-blob --output-signature kured.sbom.sig kured.sbom
 
-          .tmp/cosign attest -f --type spdx --predicate kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
+          .tmp/cosign attest -y --type spdx --predicate kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
           .tmp/cosign attach sbom --type spdx --sbom kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
-        env:
-          COSIGN_EXPERIMENTAL: 1
