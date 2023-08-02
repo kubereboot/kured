@@ -37,6 +37,7 @@ spec:
           imagePullPolicy: IfNotPresent
           securityContext:
             privileged: true # Give permission to nsenter /proc/1/ns/mnt
+            readOnlyRootFilesystem: true
           ports:
             - containerPort: 8080
               name: metrics
