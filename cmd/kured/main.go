@@ -49,6 +49,7 @@ var (
 	period                          time.Duration
 	metricsPort                     int
 	drainGracePeriod                int
+	drainPodSelector                string
 	skipWaitForDeleteTimeoutSeconds int
 	dsNamespace                     string
 	dsName                          string
@@ -129,6 +130,8 @@ func NewRootCommand() *cobra.Command {
 		"port number where metrics will listen")
 	rootCmd.PersistentFlags().IntVar(&drainGracePeriod, "drain-grace-period", -1,
 		"time in seconds given to each pod to terminate gracefully, if negative, the default value specified in the pod will be used")
+	rootCmd.PersistentFlags().StringVar(&drainPodSelector, "drain-pod-selector", "",
+		"only drain pods with labels matching the selector (default: '', all pods)")
 	rootCmd.PersistentFlags().IntVar(&skipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", 0,
 		"when seconds is greater than zero, skip waiting for the pods whose deletion timestamp is older than N seconds while draining a node")
 	rootCmd.PersistentFlags().DurationVar(&drainTimeout, "drain-timeout", 0,
@@ -470,6 +473,7 @@ func drain(client *kubernetes.Clientset, node *v1.Node) error {
 		Client:                          client,
 		Ctx:                             context.Background(),
 		GracePeriodSeconds:              drainGracePeriod,
+		PodSelector:                     drainPodSelector,
 		SkipWaitForDeleteTimeoutSeconds: skipWaitForDeleteTimeoutSeconds,
 		Force:                           true,
 		DeleteEmptyDirData:              true,
