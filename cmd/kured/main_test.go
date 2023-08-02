@@ -4,20 +4,21 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/kubereboot/kured/pkg/alerts"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/kubereboot/kured/pkg/alerts"
 	assert "gotest.tools/v3/assert"
 
 	papi "github.com/prometheus/client_golang/api"
 )
 
 type BlockingChecker struct {
-	blocking bool
+	blocking        bool
+	releaseNodeLock bool
 }
 
-func (fbc BlockingChecker) isBlocked() bool {
-	return fbc.blocking
+func (fbc BlockingChecker) isBlocked() (bool, bool) {
+	return fbc.blocking, fbc.releaseNodeLock
 }
 
 var _ RebootBlocker = BlockingChecker{}       // Verify that Type implements Interface.
@@ -155,7 +156,7 @@ func Test_rebootBlocked(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := rebootBlocked(tt.args.blockers...); got != tt.want {
+			if got, _ := rebootBlocked(tt.args.blockers...); got != tt.want {
 				t.Errorf("rebootBlocked() = %v, want %v", got, tt.want)
 			}
 		})
