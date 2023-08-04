@@ -47,7 +47,7 @@ var (
 	drainTimeout                    time.Duration
 	rebootDelay                     time.Duration
 	period                          time.Duration
-	metricsAddress                  string
+	metricsPort                     int
 	drainGracePeriod                int
 	drainPodSelector                string
 	skipWaitForDeleteTimeoutSeconds int
@@ -126,8 +126,8 @@ func NewRootCommand() *cobra.Command {
 		"node name kured runs on, should be passed down from spec.nodeName via KURED_NODE_ID environment variable")
 	rootCmd.PersistentFlags().BoolVar(&forceReboot, "force-reboot", false,
 		"force a reboot even if the drain fails or times out")
-	rootCmd.PersistentFlags().StringVar(&metricsAddress, "metrics-address", ":8080",
-		"address where metrics will listen")
+	rootCmd.PersistentFlags().IntVar(&metricsPort, "metrics-port", 8080,
+		"port number where metrics will listen")
 	rootCmd.PersistentFlags().IntVar(&drainGracePeriod, "drain-grace-period", -1,
 		"time in seconds given to each pod to terminate gracefully, if negative, the default value specified in the pod will be used")
 	rootCmd.PersistentFlags().StringVar(&drainPodSelector, "drain-pod-selector", "",
@@ -844,5 +844,5 @@ func root(cmd *cobra.Command, args []string) {
 	go maintainRebootRequiredMetric(nodeID, hostSentinelCommand)
 
 	http.Handle("/metrics", promhttp.Handler())
-	log.Fatal(http.ListenAndServe(metricsAddress, nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", metricsPort), nil))
 }
