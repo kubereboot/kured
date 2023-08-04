@@ -55,7 +55,9 @@ spec:
           volumeMounts:
             - mountPath: /var/run
               name: sentinel
-              readOnly: true
+              # This can't be read-only because the service-account-token is mounted within the same directory
+              # This would cause a crash at startup
+              readOnly: false
           command:
             - /usr/bin/kured
 #            - --force-reboot=false
