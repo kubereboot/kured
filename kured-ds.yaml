@@ -29,6 +29,10 @@ spec:
           effect: NoSchedule
       hostPID: true # Facilitate entering the host mount namespace via init
       restartPolicy: Always
+      volumes:
+        - name: sentinel
+          hostPath:
+            path: /var/run
       containers:
         - name: kured
           # If you find yourself here wondering why there is no
@@ -48,6 +52,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+          volumeMounts:
+            - mountPath: /var/run
+              name: sentinel
+              readOnly: true
           command:
             - /usr/bin/kured
 #            - --force-reboot=false

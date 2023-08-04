@@ -880,8 +880,13 @@ func root(cmd *cobra.Command, args []string) {
 	// To run those commands as it was the host, we'll use nsenter
 	// Relies on hostPID:true and privileged:true to enter host mount space
 	// PID set to 1, until we have a better discovery mechanism.
-	hostSentinelCommand := buildHostCommand(1, sentinelCommand)
 	hostRestartCommand := buildHostCommand(1, restartCommand)
+
+	// Only wrap sentinel-command with nsenter, if a custom-command was configured, otherwise use the host-path mount
+	hostSentinelCommand := sentinelCommand
+	if rebootSentinelCommand != "" {
+		hostSentinelCommand = buildHostCommand(1, sentinelCommand)
+	}
 
 	go rebootAsRequired(nodeID, hostRestartCommand, hostSentinelCommand, window, lockTTL, lockReleaseDelay)
 	go maintainRebootRequiredMetric(nodeID, hostSentinelCommand)
