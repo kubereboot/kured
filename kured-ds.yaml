@@ -53,13 +53,12 @@ spec:
                 fieldRef:
                   fieldPath: spec.nodeName
           volumeMounts:
-            - mountPath: /var/run
+            - mountPath: /sentinel
               name: sentinel
-              # This can't be read-only because the service-account-token is mounted within the same directory
-              # This would cause a crash at startup
-              readOnly: false
+              readOnly: true
           command:
             - /usr/bin/kured
+            - --reboot-sentinel=/sentinel/reboot-required
 #            - --force-reboot=false
 #            - --drain-grace-period=-1
 #            - --skip-wait-for-delete-timeout=0
@@ -75,7 +74,6 @@ spec:
 #            - --alert-filter-regexp=^RebootRequired$
 #            - --alert-filter-match-only=false
 #            - --alert-firing-only=false
-#            - --reboot-sentinel=/var/run/reboot-required
 #            - --prefer-no-schedule-taint=""
 #            - --reboot-sentinel-command=""
 #            - --slack-hook-url=https://hooks.slack.com/...
