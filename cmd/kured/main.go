@@ -33,8 +33,10 @@ import (
 	"github.com/kubereboot/kured/pkg/alerts"
 	"github.com/kubereboot/kured/pkg/daemonsetlock"
 	"github.com/kubereboot/kured/pkg/delaytick"
+	"github.com/kubereboot/kured/pkg/reboot"
 	"github.com/kubereboot/kured/pkg/taints"
 	"github.com/kubereboot/kured/pkg/timewindow"
+	"github.com/kubereboot/kured/pkg/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -47,6 +49,7 @@ var (
 	drainDelay                      time.Duration
 	drainTimeout                    time.Duration
 	rebootDelay                     time.Duration
+	rebootMethod                    string
 	period                          time.Duration
 	metricsHost                     string
 	metricsPort                     int
@@ -103,6 +106,11 @@ const (
 	KuredMostRecentRebootNeededAnnotation string = "weave.works/kured-most-recent-reboot-needed"
 	// EnvPrefix The environment variable prefix of all environment variables bound to our command line flags.
 	EnvPrefix = "KURED"
+
+	// MethodCommand is used as "--reboot-method" value when rebooting with the configured "--reboot-command"
+	MethodCommand = "command"
+	// MethodSignal is used as "--reboot-method" value when rebooting with a SIGRTMIN+5 signal.
+	MethodSignal = "signal"
 )
 
 func init() {
@@ -146,6 +154,8 @@ func NewRootCommand() *cobra.Command {
 		"timeout after which the drain is aborted (default: 0, infinite time)")
 	rootCmd.PersistentFlags().DurationVar(&rebootDelay, "reboot-delay", 0,
 		"delay reboot for this duration (default: 0, disabled)")
+	rootCmd.PersistentFlags().StringVar(&rebootMethod, "reboot-method", "command",
+		"method to use for reboots. Available: command")
 	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
 		"sentinel check period")
 	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-namespace", "kube-system",
@@ -299,22 +309,6 @@ func flagToEnvVar(flag string) string {
 	return fmt.Sprintf("%s_%s", EnvPrefix, envVarSuffix)
 }
 
-// newCommand creates a new Command with stdout/stderr wired to our standard logger
-func newCommand(name string, arg ...string) *exec.Cmd {
-	cmd := exec.Command(name, arg...)
-	cmd.Stdout = log.NewEntry(log.StandardLogger()).
-		WithField("cmd", cmd.Args[0]).
-		WithField("std", "out").
-		WriterLevel(log.InfoLevel)
-
-	cmd.Stderr = log.NewEntry(log.StandardLogger()).
-		WithField("cmd", cmd.Args[0]).
-		WithField("std", "err").
-		WriterLevel(log.WarnLevel)
-
-	return cmd
-}
-
 // buildHostCommand writes a new command to run in the host namespace
 // Rancher based need different pid
 func buildHostCommand(pid int, command []string) []string {
@@ -327,7 +321,7 @@ func buildHostCommand(pid int, command []string) []string {
 }
 
 func rebootRequired(sentinelCommand []string) bool {
-	cmd := newCommand(sentinelCommand[0], sentinelCommand[1:]...)
+	cmd := util.NewCommand(sentinelCommand[0], sentinelCommand[1:]...)
 	if err := cmd.Run(); err != nil {
 		switch err := err.(type) {
 		case *exec.ExitError:
@@ -558,17 +552,22 @@ func uncordon(client *kubernetes.Clientset, node *v1.Node) error {
 }
 
 func invokeReboot(nodeID string, rebootCommand []string) {
-	log.Infof("Running command: %s for node: %s", rebootCommand, nodeID)
-
 	if notifyURL != "" {
 		if err := shoutrrr.Send(notifyURL, fmt.Sprintf(messageTemplateReboot, nodeID)); err != nil {
 			log.Warnf("Error notifying: %v", err)
 		}
 	}
 
-	if err := newCommand(rebootCommand[0], rebootCommand[1:]...).Run(); err != nil {
-		log.Fatalf("Error invoking reboot command: %v", err)
+	var booter reboot.Reboot
+	if rebootMethod == MethodCommand {
+		booter = reboot.NewCommandReboot(nodeID, rebootCommand)
+	} else if rebootMethod == MethodSignal {
+		booter = reboot.NewSignalReboot(nodeID)
+	} else {
+		log.Fatalf("Invalid reboot-method configured: %s", rebootMethod)
 	}
+
+	booter.Reboot()
 }
 
 func maintainRebootRequiredMetric(nodeID string, sentinelCommand []string) {
@@ -872,7 +871,11 @@ func root(cmd *cobra.Command, args []string) {
 	log.Infof("Reboot schedule: %v", window)
 	log.Infof("Reboot check command: %s every %v", sentinelCommand, period)
 	log.Infof("Concurrency: %v", concurrency)
-	log.Infof("Reboot command: %s", restartCommand)
+	log.Infof("Reboot method: %s", rebootMethod)
+	if rebootCommand == MethodSignal {
+		log.Infof("Reboot command: %s", restartCommand)
+	}
+
 	if annotateNodes {
 		log.Infof("Will annotate nodes during kured reboot operations")
 	}
