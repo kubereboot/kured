@@ -83,3 +83,5 @@ spec:
 #            - --annotate-nodes=false
 #            - --lock-release-delay=30m
 #            - --log-format=text
+#            - --metrics-host=""
+#            - --metrics-port=8080
