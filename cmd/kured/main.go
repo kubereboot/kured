@@ -77,6 +77,7 @@ var (
 	messageTemplateUncordon         string
 	podSelectors                    []string
 	rebootCommand                   string
+	rebootSignal                    int
 	logFormat                       string
 	preRebootNodeLabels             []string
 	postRebootNodeLabels            []string
@@ -186,6 +187,8 @@ func NewRootCommand() *cobra.Command {
 		"command to run when a reboot is required")
 	rootCmd.PersistentFlags().IntVar(&concurrency, "concurrency", 1,
 		"amount of nodes to concurrently reboot. Defaults to 1")
+	rootCmd.PersistentFlags().IntVar(&rebootSignal, "reboot-signal", 34+5,
+		"signal to use for reboot, SIGRTMIN+5 by default.")
 
 	rootCmd.PersistentFlags().StringVar(&slackHookURL, "slack-hook-url", "",
 		"slack hook URL for reboot notifications [deprecated in favor of --notify-url]")
@@ -562,7 +565,7 @@ func invokeReboot(nodeID string, rebootCommand []string) {
 	if rebootMethod == MethodCommand {
 		booter = reboot.NewCommandReboot(nodeID, rebootCommand)
 	} else if rebootMethod == MethodSignal {
-		booter = reboot.NewSignalReboot(nodeID)
+		booter = reboot.NewSignalReboot(nodeID, rebootSignal)
 	} else {
 		log.Fatalf("Invalid reboot-method configured: %s", rebootMethod)
 	}
@@ -872,8 +875,10 @@ func root(cmd *cobra.Command, args []string) {
 	log.Infof("Reboot check command: %s every %v", sentinelCommand, period)
 	log.Infof("Concurrency: %v", concurrency)
 	log.Infof("Reboot method: %s", rebootMethod)
-	if rebootCommand == MethodSignal {
+	if rebootCommand == MethodCommand {
 		log.Infof("Reboot command: %s", restartCommand)
+	} else {
+		log.Infof("Reboot signal: %v", rebootSignal)
 	}
 
 	if annotateNodes {

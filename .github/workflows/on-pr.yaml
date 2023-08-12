@@ -103,7 +103,8 @@ jobs:
   # - Ensure manifests work with the latest versions even with no manifest change
   #     (compared to helm charts, manifests cannot easily template changes based on versions)
   # Helm charts are _trailing_ releases, while manifests are done during development.
-  e2e-manifests:
+  # This test uses the "command" reboot-method.
+  e2e-manifests-command:
     name: End-to-End test with kured with code and manifests from HEAD
     runs-on: ubuntu-latest
     strategy:

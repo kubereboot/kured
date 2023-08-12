@@ -38,11 +38,15 @@ spec:
         - name: kured
           # If you find yourself here wondering why there is no
           # :latest tag on Docker Hub,see the FAQ in the README
-          image: ghcr.io/kubereboot/kured:1.14.2
+          image: ghcr.io/kubereboot/kured:1.13.2
           imagePullPolicy: IfNotPresent
           securityContext:
-            privileged: true # Give permission to nsenter /proc/1/ns/mnt
+            privileged: false # Give permission to nsenter /proc/1/ns/mnt
             readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["*"]
+              add: ["CAP_KILL"]
           ports:
             - containerPort: 8080
               name: metrics
@@ -60,12 +64,12 @@ spec:
           command:
             - /usr/bin/kured
             - --reboot-sentinel=/sentinel/reboot-required
+            - --reboot-method=signal
+#            - --reboot-signal=39
 #            - --force-reboot=false
 #            - --drain-grace-period=-1
 #            - --skip-wait-for-delete-timeout=0
-#            - --drain-delay=0
 #            - --drain-timeout=0
-#            - --drain-pod-selector=""
 #            - --period=1h
 #            - --ds-namespace=kube-system
 #            - --ds-name=kured
@@ -73,12 +77,9 @@ spec:
 #            - --lock-ttl=0
 #            - --prometheus-url=http://prometheus.monitoring.svc.cluster.local
 #            - --alert-filter-regexp=^RebootRequired$
-#            - --alert-filter-match-only=false
 #            - --alert-firing-only=false
 #            - --prefer-no-schedule-taint=""
 #            - --reboot-sentinel-command=""
-#            - --reboot-method=command
-#            - --reboot-signal=39
 #            - --slack-hook-url=https://hooks.slack.com/...
 #            - --slack-username=prod
 #            - --slack-channel=alerting
@@ -97,6 +98,3 @@ spec:
 #            - --annotate-nodes=false
 #            - --lock-release-delay=30m
 #            - --log-format=text
-#            - --metrics-host=""
-#            - --metrics-port=8080
-#            - --concurrency=1

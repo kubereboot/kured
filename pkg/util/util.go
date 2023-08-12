@@ -6,7 +6,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// newCommand creates a new Command with stdout/stderr wired to our standard logger
+// NewCommand creates a new Command with stdout/stderr wired to our standard logger
 func NewCommand(name string, arg ...string) *exec.Cmd {
 	cmd := exec.Command(name, arg...)
 	cmd.Stdout = log.NewEntry(log.StandardLogger()).
