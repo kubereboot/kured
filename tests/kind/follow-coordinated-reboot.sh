@@ -53,6 +53,10 @@ do
         # come back up.
         echo "Result of command $KUBECTL_CMD get nodes ... showing unschedulable nodes:"
         cat "$tmp_dir"/node_output
+
+        "$KUBECTL_CMD" logs -n kube-system -l name=kured --ignore-errors > "$tmp_dir"/node_output
+        echo "Kured pod logs:"
+        cat "$tmp_dir"/node_output
     fi
     while read -r node; do
         unschedulable=$(echo "$node" | grep true | cut -f 1 -d ' ')
