@@ -857,6 +857,7 @@ func root(cmd *cobra.Command, args []string) {
 	log.Infof("Blocking Pod Selectors: %v", podSelectors)
 	log.Infof("Reboot schedule: %v", window)
 	log.Infof("Reboot check command: %s every %v", sentinelCommand, period)
+	log.Infof("Concurrency: %v", concurrency)
 	log.Infof("Reboot command: %s", restartCommand)
 	if annotateNodes {
 		log.Infof("Will annotate nodes during kured reboot operations")

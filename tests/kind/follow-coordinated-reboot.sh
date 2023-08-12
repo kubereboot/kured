@@ -12,7 +12,6 @@ function gather_logs_and_cleanup {
     fi
     rmdir "$tmp_dir"
 
-
     # The next commands are useful regardless of success or failures.
     if [[ "$DEBUG" == "true" ]]; then
         echo "############################################################"
@@ -47,11 +46,11 @@ do
     echo "${#was_unschedulable[@]} nodes were removed from pool once:" "${!was_unschedulable[@]}"
     echo "${#has_recovered[@]} nodes removed from the pool are now back:" "${!has_recovered[@]}"
 
-    "$KUBECTL_CMD" logs -n kube-system -l name=kured --ignore-errors > "$tmp_dir"/node_output
-    if [[ "$DEBUG" == "true" ]]; then
-        echo "Kured pod logs:"
-        cat "$tmp_dir"/node_output
-    fi
+    #"$KUBECTL_CMD" logs -n kube-system -l name=kured --ignore-errors > "$tmp_dir"/node_output
+    #if [[ "$DEBUG" == "true" ]]; then
+    #    echo "Kured pod logs:"
+    #    cat "$tmp_dir"/node_output
+    #fi
 
     "$KUBECTL_CMD" get nodes -o custom-columns=NAME:.metadata.name,SCHEDULABLE:.spec.unschedulable --no-headers > "$tmp_dir"/node_output
     if [[ "$DEBUG" == "true" ]]; then
