@@ -18,6 +18,7 @@ func NewSignalReboot(nodeID string, signal int) *SignalRebootMethod {
 	return &SignalRebootMethod{nodeID: nodeID, signal: signal}
 }
 
+// Reboot triggers the signal-reboot.
 func (c *SignalRebootMethod) Reboot() {
 	log.Infof("Emit reboot-signal for node: %s", c.nodeID)
 
