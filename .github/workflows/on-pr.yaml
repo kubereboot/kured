@@ -105,7 +105,7 @@ jobs:
   # Helm charts are _trailing_ releases, while manifests are done during development.
   # This test uses the "command" reboot-method.
   e2e-manifests-command:
-    name: End-to-End test with kured with code and manifests from HEAD
+    name: End-to-End test with kured with code and manifests from HEAD (command)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
