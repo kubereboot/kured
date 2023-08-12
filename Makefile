@@ -42,6 +42,7 @@ minikube-publish: image
 
 manifest:
 	sed -i "s#image: ghcr.io/.*kured.*#image: ghcr.io/$(DH_ORG)/kured:$(VERSION)#g" kured-ds.yaml
+	sed -i "s#image: ghcr.io/.*kured.*#image: ghcr.io/$(DH_ORG)/kured:$(VERSION)#g" kured-ds-signal.yaml
 	echo "Please generate combined manifest if necessary"
 
 test:
