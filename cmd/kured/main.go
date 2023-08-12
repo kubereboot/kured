@@ -757,7 +757,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 			}
 		}
 
-		if holding(lock, &nodeMeta, concurrency > 1) && !acquire(lock, &nodeMeta, TTL, concurrency) {
+		if !holding(lock, &nodeMeta, concurrency > 1) && !acquire(lock, &nodeMeta, TTL, concurrency) {
 			// Prefer to not schedule pods onto this node to avoid draing the same pod multiple times.
 			preferNoScheduleTaint.Enable()
 			continue
