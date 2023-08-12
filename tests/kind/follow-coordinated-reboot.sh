@@ -47,15 +47,17 @@ do
     echo "${#was_unschedulable[@]} nodes were removed from pool once:" "${!was_unschedulable[@]}"
     echo "${#has_recovered[@]} nodes removed from the pool are now back:" "${!has_recovered[@]}"
 
+    "$KUBECTL_CMD" logs -n kube-system -l name=kured --ignore-errors > "$tmp_dir"/node_output
+    if [[ "$DEBUG" == "true" ]]; then
+        echo "Kured pod logs:"
+        cat "$tmp_dir"/node_output
+    fi
+
     "$KUBECTL_CMD" get nodes -o custom-columns=NAME:.metadata.name,SCHEDULABLE:.spec.unschedulable --no-headers > "$tmp_dir"/node_output
     if [[ "$DEBUG" == "true" ]]; then
         # This is useful to see if a node gets stuck after drain, and doesn't
         # come back up.
         echo "Result of command $KUBECTL_CMD get nodes ... showing unschedulable nodes:"
-        cat "$tmp_dir"/node_output
-
-        "$KUBECTL_CMD" logs -n kube-system -l name=kured --ignore-errors > "$tmp_dir"/node_output
-        echo "Kured pod logs:"
         cat "$tmp_dir"/node_output
     fi
     while read -r node; do
