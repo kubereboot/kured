@@ -294,7 +294,7 @@ func (dsl *DaemonSetLock) ReleaseMultiple() error {
 		}
 		ds.ObjectMeta.Annotations[dsl.annotation] = string(newAnnotationBytes)
 
-		_, err = dsl.client.AppsV1().DaemonSets(dsl.namespace).Update(context.TODO(), ds, metav1.UpdateOptions{})
+		_, err = dsl.client.AppsV1().DaemonSets(dsl.namespace).Update(context.Background(), ds, metav1.UpdateOptions{})
 		if err != nil {
 			if se, ok := err.(*errors.StatusError); ok && se.ErrStatus.Reason == metav1.StatusReasonConflict {
 				// Something else updated the resource between us reading and writing - try again soon
