@@ -363,25 +363,10 @@ type KubernetesBlockingChecker struct {
 }
 
 func (pb PrometheusBlockingChecker) isBlocked() bool {
-	getFilter := func(useMatchOnlyFilter bool, filter *regexp.Regexp) *regexp.Regexp {
-		if useMatchOnlyFilter {
-			return nil
-		}
-		return filter
-	}
-	alertNames, err := pb.promClient.ActiveAlerts(getFilter(pb.filterMatchOnly, pb.filter), pb.firingOnly)
+	alertNames, err := pb.promClient.ActiveAlerts(pb.filter, pb.firingOnly, pb.filterMatchOnly)
 	if err != nil {
 		log.Warnf("Reboot blocked: prometheus query error: %v", err)
 		return true
-	}
-	if pb.filterMatchOnly {
-		var matchedAlertNames []string
-		for _, alertName := range alertNames {
-			if pb.filter.MatchString(alertName) {
-				matchedAlertNames = append(matchedAlertNames, alertName)
-			}
-		}
-		alertNames = matchedAlertNames
 	}
 	count := len(alertNames)
 	if count > 10 {
