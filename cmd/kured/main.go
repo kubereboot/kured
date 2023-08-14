@@ -76,6 +76,7 @@ var (
 	preRebootNodeLabels             []string
 	postRebootNodeLabels            []string
 	nodeID                          string
+	concurrency                     int
 
 	rebootDays    []string
 	rebootStart   string
@@ -167,6 +168,8 @@ func NewRootCommand() *cobra.Command {
 		"command for which a zero return code will trigger a reboot command")
 	rootCmd.PersistentFlags().StringVar(&rebootCommand, "reboot-command", "/bin/systemctl reboot",
 		"command to run when a reboot is required")
+	rootCmd.PersistentFlags().IntVar(&concurrency, "concurrency", 1,
+		"amount of nodes to concurrently reboot. Defaults to 1")
 
 	rootCmd.PersistentFlags().StringVar(&slackHookURL, "slack-hook-url", "",
 		"slack hook URL for reboot notifications [deprecated in favor of --notify-url]")
@@ -421,8 +424,14 @@ func rebootBlocked(blockers ...RebootBlocker) bool {
 	return false
 }
 
-func holding(lock *daemonsetlock.DaemonSetLock, metadata interface{}) bool {
-	holding, err := lock.Test(metadata)
+func holding(lock *daemonsetlock.DaemonSetLock, metadata interface{}, isMultiLock bool) bool {
+	var holding bool
+	var err error
+	if isMultiLock {
+		holding, err = lock.TestMultiple()
+	} else {
+		holding, err = lock.Test(metadata)
+	}
 	if err != nil {
 		log.Fatalf("Error testing lock: %v", err)
 	}
@@ -432,8 +441,17 @@ func holding(lock *daemonsetlock.DaemonSetLock, metadata interface{}) bool {
 	return holding
 }
 
-func acquire(lock *daemonsetlock.DaemonSetLock, metadata interface{}, TTL time.Duration) bool {
-	holding, holder, err := lock.Acquire(metadata, TTL)
+func acquire(lock *daemonsetlock.DaemonSetLock, metadata interface{}, TTL time.Duration, maxOwners int) bool {
+	var holding bool
+	var holder string
+	var err error
+	if maxOwners > 1 {
+		var holders []string
+		holding, holders, err = lock.AcquireMultiple(metadata, TTL, maxOwners)
+		holder = strings.Join(holders, ",")
+	} else {
+		holding, holder, err = lock.Acquire(metadata, TTL)
+	}
 	switch {
 	case err != nil:
 		log.Fatalf("Error acquiring lock: %v", err)
@@ -454,9 +472,16 @@ func throttle(releaseDelay time.Duration) {
 	}
 }
 
-func release(lock *daemonsetlock.DaemonSetLock) {
+func release(lock *daemonsetlock.DaemonSetLock, isMultiLock bool) {
 	log.Infof("Releasing lock")
-	if err := lock.Release(); err != nil {
+
+	var err error
+	if isMultiLock {
+		err = lock.ReleaseMultiple()
+	} else {
+		err = lock.Release()
+	}
+	if err != nil {
 		log.Fatalf("Error releasing lock: %v", err)
 	}
 }
@@ -641,7 +666,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 	source := rand.NewSource(time.Now().UnixNano())
 	tick := delaytick.New(source, 1*time.Minute)
 	for range tick {
-		if holding(lock, &nodeMeta) {
+		if holding(lock, &nodeMeta, concurrency > 1) {
 			node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 			if err != nil {
 				log.Errorf("Error retrieving node object via k8s API: %v", err)
@@ -674,7 +699,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 				}
 			}
 			throttle(releaseDelay)
-			release(lock)
+			release(lock, concurrency > 1)
 			break
 		} else {
 			break
@@ -732,7 +757,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 			}
 		}
 
-		if !holding(lock, &nodeMeta) && !acquire(lock, &nodeMeta, TTL) {
+		if !holding(lock, &nodeMeta, concurrency > 1) && !acquire(lock, &nodeMeta, TTL, concurrency) {
 			// Prefer to not schedule pods onto this node to avoid draing the same pod multiple times.
 			preferNoScheduleTaint.Enable()
 			continue
@@ -754,7 +779,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 		if err != nil {
 			if !forceReboot {
 				log.Errorf("Unable to cordon or drain %s: %v, will release lock and retry cordon and drain before rebooting when lock is next acquired", node.GetName(), err)
-				release(lock)
+				release(lock, concurrency > 1)
 				log.Infof("Performing a best-effort uncordon after failed cordon and drain")
 				uncordon(client, node)
 				continue
@@ -832,6 +857,7 @@ func root(cmd *cobra.Command, args []string) {
 	log.Infof("Blocking Pod Selectors: %v", podSelectors)
 	log.Infof("Reboot schedule: %v", window)
 	log.Infof("Reboot check command: %s every %v", sentinelCommand, period)
+	log.Infof("Concurrency: %v", concurrency)
 	log.Infof("Reboot command: %s", restartCommand)
 	if annotateNodes {
 		log.Infof("Will annotate nodes during kured reboot operations")
