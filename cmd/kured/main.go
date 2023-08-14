@@ -60,6 +60,7 @@ var (
 	prometheusURL                   string
 	preferNoScheduleTaintName       string
 	alertFilter                     *regexp.Regexp
+	alertFilterMatchOnly            bool
 	alertFiringOnly                 bool
 	rebootSentinelFile              string
 	rebootSentinelCommand           string
@@ -158,6 +159,8 @@ func NewRootCommand() *cobra.Command {
 		"Prometheus instance to probe for active alerts")
 	rootCmd.PersistentFlags().Var(&regexpValue{&alertFilter}, "alert-filter-regexp",
 		"alert names to ignore when checking for active alerts")
+	rootCmd.PersistentFlags().BoolVar(&alertFilterMatchOnly, "alert-filter-match-only", false,
+		"Only block if the alert-filter-regexp matches active alerts")
 	rootCmd.PersistentFlags().BoolVar(&alertFiringOnly, "alert-firing-only", false,
 		"only consider firing alerts when checking for active alerts")
 	rootCmd.PersistentFlags().StringVar(&rebootSentinelFile, "reboot-sentinel", "/var/run/reboot-required",
@@ -358,6 +361,8 @@ type PrometheusBlockingChecker struct {
 	filter *regexp.Regexp
 	// bool to indicate if only firing alerts should be considered
 	firingOnly bool
+	// bool to indicate that we're only blocking on alerts which match the filter
+	filterMatchOnly bool
 }
 
 // KubernetesBlockingChecker contains info for connecting
@@ -371,8 +376,7 @@ type KubernetesBlockingChecker struct {
 }
 
 func (pb PrometheusBlockingChecker) isBlocked() bool {
-
-	alertNames, err := pb.promClient.ActiveAlerts(pb.filter, pb.firingOnly)
+	alertNames, err := pb.promClient.ActiveAlerts(pb.filter, pb.firingOnly, pb.filterMatchOnly)
 	if err != nil {
 		log.Warnf("Reboot blocked: prometheus query error: %v", err)
 		return true
@@ -765,7 +769,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 
 		var blockCheckers []RebootBlocker
 		if prometheusURL != "" {
-			blockCheckers = append(blockCheckers, PrometheusBlockingChecker{promClient: promClient, filter: alertFilter, firingOnly: alertFiringOnly})
+			blockCheckers = append(blockCheckers, PrometheusBlockingChecker{promClient: promClient, filter: alertFilter, firingOnly: alertFiringOnly, filterMatchOnly: alertFilterMatchOnly})
 		}
 		if podSelectors != nil {
 			blockCheckers = append(blockCheckers, KubernetesBlockingChecker{client: client, nodename: nodeID, filter: podSelectors})
