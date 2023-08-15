@@ -14,25 +14,25 @@ $(TEMPDIR):
 
 .PHONY: bootstrap-tools
 bootstrap-tools: $(TEMPDIR)
-	VERSION=v1.11.4 TMPDIR=.tmp bash .github/scripts/goreleaser-install.sh
-	curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b .tmp v0.58.0
-	curl -sSfL https://github.com/sigstore/cosign/releases/download/v1.12.1/cosign-linux-amd64 -o .tmp/cosign
+	VERSION=v1.19.2 TMPDIR=.tmp bash .github/scripts/goreleaser-install.sh
+	curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b .tmp v0.86.1
+	curl -sSfL https://github.com/sigstore/cosign/releases/download/v2.1.1/cosign-linux-amd64 -o .tmp/cosign
 	chmod +x .tmp/goreleaser .tmp/cosign .tmp/syft
 
 clean:
 	rm -rf ./dist
 
 kured:
-	$(GORELEASER_CMD) build --rm-dist --single-target --snapshot
+	$(GORELEASER_CMD) build --clean --single-target --snapshot
 
 kured-all:
-	$(GORELEASER_CMD) build --rm-dist --snapshot
+	$(GORELEASER_CMD) build --clean --snapshot
 
 kured-release-tag:
-	$(GORELEASER_CMD) release --rm-dist
+	$(GORELEASER_CMD) release --clean
 
 kured-release-snapshot:
-	$(GORELEASER_CMD) release --rm-dist --snapshot
+	$(GORELEASER_CMD) release --clean --snapshot
 
 image: kured
 	$(SUDO) docker buildx build --load -t ghcr.io/$(DH_ORG)/kured:$(VERSION) .
