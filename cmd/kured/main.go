@@ -737,7 +737,6 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 			preferNoScheduleTaint.Disable()
 			continue
 		}
-		log.Infof("Reboot required")
 
 		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 		if err != nil {
@@ -761,12 +760,6 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 			}
 		}
 
-		if !holding(lock, &nodeMeta, concurrency > 1) && !acquire(lock, &nodeMeta, TTL, concurrency) {
-			// Prefer to not schedule pods onto this node to avoid draing the same pod multiple times.
-			preferNoScheduleTaint.Enable()
-			continue
-		}
-
 		var blockCheckers []RebootBlocker
 		if prometheusURL != "" {
 			blockCheckers = append(blockCheckers, PrometheusBlockingChecker{promClient: promClient, filter: alertFilter, firingOnly: alertFiringOnly, filterMatchOnly: alertFilterMatchOnly})
@@ -775,7 +768,16 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 			blockCheckers = append(blockCheckers, KubernetesBlockingChecker{client: client, nodename: nodeID, filter: podSelectors})
 		}
 
+		var rebootRequiredBlockCondition string
 		if rebootBlocked(blockCheckers...) {
+			rebootRequiredBlockCondition = ", but blocked at this time"
+			continue
+		}
+		log.Infof("Reboot required%s", rebootRequiredBlockCondition)
+
+		if !holding(lock, &nodeMeta, concurrency > 1) && !acquire(lock, &nodeMeta, TTL, concurrency) {
+			// Prefer to not schedule pods onto this node to avoid draing the same pod multiple times.
+			preferNoScheduleTaint.Enable()
 			continue
 		}
 
