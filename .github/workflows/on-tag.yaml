@@ -91,7 +91,7 @@ jobs:
         run: |
           .tmp/cosign sign -y -r ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
 
-          .tmp/cosign sign-blob --output-signature kured.sbom.sig kured.sbom
+          .tmp/cosign sign-blob -y --output-signature kured.sbom.sig kured.sbom
 
           .tmp/cosign attest -y --type spdx --predicate kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
           .tmp/cosign attach sbom --type spdx --sbom kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
