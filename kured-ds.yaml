@@ -33,7 +33,7 @@ spec:
         - name: kured
           # If you find yourself here wondering why there is no
           # :latest tag on Docker Hub,see the FAQ in the README
-          image: ghcr.io/kubereboot/kured:1.13.2
+          image: ghcr.io/kubereboot/kured:1.14.0
           imagePullPolicy: IfNotPresent
           securityContext:
             privileged: true # Give permission to nsenter /proc/1/ns/mnt
@@ -54,6 +54,7 @@ spec:
 #            - --drain-grace-period=-1
 #            - --skip-wait-for-delete-timeout=0
 #            - --drain-timeout=0
+#            - --drain-pod-selector=""
 #            - --period=1h
 #            - --ds-namespace=kube-system
 #            - --ds-name=kured
