@@ -7,7 +7,7 @@ replace golang.org/x/net => golang.org/x/net v0.7.0
 replace github.com/emicklei/go-restful/v3 => github.com/emicklei/go-restful/v3 v3.10.2
 
 require (
-	github.com/containrrr/shoutrrr v0.7.1
+	github.com/containrrr/shoutrrr v0.8.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/prometheus/client_golang v1.16.0
@@ -34,7 +34,7 @@ require (
 	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d // indirect
-	github.com/fatih/color v1.14.1 // indirect
+	github.com/fatih/color v1.15.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
