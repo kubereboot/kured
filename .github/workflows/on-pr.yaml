@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Ensure go version
         uses: actions/setup-go@v4
         with:
@@ -27,7 +27,7 @@ jobs:
     name: Lint bash code with shellcheck
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Run ShellCheck
       uses: bewuethr/shellcheck-action@v2
 
@@ -35,7 +35,7 @@ jobs:
     name: Lint golang code
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Ensure go version
       uses: actions/setup-go@v4
       with:
@@ -54,7 +54,7 @@ jobs:
     name: Check docs for incorrect links
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Link Checker
       uses: lycheeverse/lychee-action@ec3ed119d4f44ad2673a7232460dc7dff59d2421
       env:
@@ -70,7 +70,7 @@ jobs:
     name: Build image and scan it against known vulnerabilities
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Ensure go version
         uses: actions/setup-go@v4
         with:
@@ -114,7 +114,7 @@ jobs:
           - "1.27"
           - "1.28"
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Ensure go version
         uses: actions/setup-go@v4
         with:
@@ -200,7 +200,7 @@ jobs:
           - "1.27"
           - "1.28"
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Ensure go version
         uses: actions/setup-go@v4
         with:
