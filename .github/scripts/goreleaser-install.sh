@@ -10,13 +10,15 @@ test -z "$VERSION" && {
 }
 
 test -z "$TMPDIR" && TMPDIR="$(mktemp -d)"
-TAR_FILE="$TMPDIR/${FILE_BASENAME}_$(uname -s)_$(uname -m).tar.gz"
+# goreleaser uses arm64 instead of aarch64
+goreleaser_arch=$(uname -m | sed -e 's/aarch64/arm64/g' -e 's/ppc64le/ppc64/' -e 's/armv7l/armv7/' )
+TAR_FILE="$TMPDIR/${FILE_BASENAME}_$(uname -s)_${goreleaser_arch}.tar.gz"
 export TAR_FILE
 
 (
     echo "Downloading GoReleaser $VERSION..."
     curl -sfLo "$TAR_FILE" \
-        "$RELEASES_URL/download/$VERSION/${FILE_BASENAME}_$(uname -s)_$(uname -m).tar.gz"
+        "$RELEASES_URL/download/$VERSION/${FILE_BASENAME}_$(uname -s)_${goreleaser_arch}.tar.gz"
     cd "$TMPDIR"
     curl -sfLo "checksums.txt" "$RELEASES_URL/download/$VERSION/checksums.txt"
     echo "Verifying checksums..."
