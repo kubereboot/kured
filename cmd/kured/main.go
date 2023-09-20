@@ -31,8 +31,8 @@ import (
 
 	shoutrrr "github.com/containrrr/shoutrrr"
 	"github.com/kubereboot/kured/pkg/alerts"
-	"github.com/kubereboot/kured/pkg/daemonsetlock"
 	"github.com/kubereboot/kured/pkg/delaytick"
+	"github.com/kubereboot/kured/pkg/leaselock"
 	"github.com/kubereboot/kured/pkg/taints"
 	"github.com/kubereboot/kured/pkg/timewindow"
 	"github.com/prometheus/client_golang/prometheus"
@@ -428,14 +428,9 @@ func rebootBlocked(blockers ...RebootBlocker) bool {
 	return false
 }
 
-func holding(lock *daemonsetlock.DaemonSetLock, metadata interface{}, isMultiLock bool) bool {
-	var holding bool
-	var err error
-	if isMultiLock {
-		holding, err = lock.TestMultiple()
-	} else {
-		holding, err = lock.Test(metadata)
-	}
+func holding(lock *leaselock.LeaseLock) bool {
+	holding, err := lock.Test()
+
 	if err != nil {
 		log.Fatalf("Error testing lock: %v", err)
 	}
@@ -445,28 +440,14 @@ func holding(lock *daemonsetlock.DaemonSetLock, metadata interface{}, isMultiLoc
 	return holding
 }
 
-func acquire(lock *daemonsetlock.DaemonSetLock, metadata interface{}, TTL time.Duration, maxOwners int) bool {
-	var holding bool
-	var holder string
+func acquire(lock *leaselock.LeaseLock, TTL time.Duration, restartFunc func()) error {
 	var err error
-	if maxOwners > 1 {
-		var holders []string
-		holding, holders, err = lock.AcquireMultiple(metadata, TTL, maxOwners)
-		holder = strings.Join(holders, ",")
-	} else {
-		holding, holder, err = lock.Acquire(metadata, TTL)
-	}
-	switch {
-	case err != nil:
+	err = lock.Acquire(TTL, restartFunc)
+	if err != nil {
 		log.Fatalf("Error acquiring lock: %v", err)
-		return false
-	case !holding:
-		log.Warnf("Lock already held: %v", holder)
-		return false
-	default:
-		log.Infof("Acquired reboot lock")
-		return true
+		return err
 	}
+	return nil
 }
 
 func throttle(releaseDelay time.Duration) {
@@ -476,16 +457,10 @@ func throttle(releaseDelay time.Duration) {
 	}
 }
 
-func release(lock *daemonsetlock.DaemonSetLock, isMultiLock bool) {
+func release(lock *leaselock.LeaseLock) {
 	log.Infof("Releasing lock")
 
-	var err error
-	if isMultiLock {
-		err = lock.ReleaseMultiple()
-	} else {
-		err = lock.Release()
-	}
-	if err != nil {
+	if err := lock.Release(); err != nil {
 		log.Fatalf("Error releasing lock: %v", err)
 	}
 }
@@ -664,13 +639,13 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 		log.Fatal(err)
 	}
 
-	lock := daemonsetlock.New(client, nodeID, dsNamespace, dsName, lockAnnotation)
+	lock := leaselock.New(client, nodeID, dsNamespace, dsName, concurrency)
 
 	nodeMeta := nodeMeta{}
 	source := rand.NewSource(time.Now().UnixNano())
 	tick := delaytick.New(source, 1*time.Minute)
 	for range tick {
-		if holding(lock, &nodeMeta, concurrency > 1) {
+		if holding(lock) {
 			node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 			if err != nil {
 				log.Errorf("Error retrieving node object via k8s API: %v", err)
@@ -703,7 +678,7 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 				}
 			}
 			throttle(releaseDelay)
-			release(lock, concurrency > 1)
+			release(lock)
 			break
 		} else {
 			break
@@ -775,33 +750,30 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 		}
 		log.Infof("Reboot required%s", rebootRequiredBlockCondition)
 
-		if !holding(lock, &nodeMeta, concurrency > 1) && !acquire(lock, &nodeMeta, TTL, concurrency) {
-			// Prefer to not schedule pods onto this node to avoid draing the same pod multiple times.
-			preferNoScheduleTaint.Enable()
-			continue
-		}
-
-		err = drain(client, node)
-		if err != nil {
-			if !forceReboot {
-				log.Errorf("Unable to cordon or drain %s: %v, will release lock and retry cordon and drain before rebooting when lock is next acquired", node.GetName(), err)
-				release(lock, concurrency > 1)
-				log.Infof("Performing a best-effort uncordon after failed cordon and drain")
-				uncordon(client, node)
-				continue
+		preferNoScheduleTaint.Enable()
+		acquire(lock, TTL, func() {
+			//once this function returns acquire will unblock
+			err = drain(client, node)
+			if err != nil {
+				if !forceReboot {
+					log.Errorf("Unable to cordon or drain %s: %v, will release lock and retry cordon and drain before rebooting when lock is next acquired", node.GetName(), err)
+					release(lock)
+					log.Infof("Performing a best-effort uncordon after failed cordon and drain")
+					uncordon(client, node)
+				}
 			}
-		}
 
-		if rebootDelay > 0 {
-			log.Infof("Delaying reboot for %v", rebootDelay)
-			time.Sleep(rebootDelay)
-		}
+			if rebootDelay > 0 {
+				log.Infof("Delaying reboot for %v", rebootDelay)
+				time.Sleep(rebootDelay)
+			}
 
-		invokeReboot(nodeID, rebootCommand)
-		for {
-			log.Infof("Waiting for reboot")
-			time.Sleep(time.Minute)
-		}
+			invokeReboot(nodeID, rebootCommand)
+			for {
+				log.Infof("Waiting for reboot")
+				time.Sleep(time.Minute)
+			}
+		})
 	}
 }
 
