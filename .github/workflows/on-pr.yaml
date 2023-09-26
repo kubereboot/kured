@@ -162,7 +162,7 @@ jobs:
           kubectl apply -f kured-rbac.yaml && kubectl apply -f kured-ds.yaml
 
       - name: Ensure kured is ready
-        uses: nick-invision/retry@v2.8.3
+        uses: nick-invision/retry@v2.9.0
         with:
           timeout_minutes: 10
           max_attempts: 10
@@ -249,7 +249,7 @@ jobs:
           kubectl apply -f kured-rbac.yaml && kubectl apply -f kured-ds.yaml
 
       - name: Ensure kured is ready
-        uses: nick-invision/retry@v2.8.3
+        uses: nick-invision/retry@v2.9.0
         with:
           timeout_minutes: 10
           max_attempts: 10
