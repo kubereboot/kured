@@ -2,7 +2,7 @@ module github.com/kubereboot/kured
 
 go 1.20
 
-replace golang.org/x/net => golang.org/x/net v0.7.0
+replace golang.org/x/net => golang.org/x/net v0.17.0
 
 replace github.com/emicklei/go-restful/v3 => github.com/emicklei/go-restful/v3 v3.10.2
 
@@ -18,10 +18,10 @@ require (
 	github.com/spf13/viper v1.17.0
 	github.com/stretchr/testify v1.8.4
 	gotest.tools/v3 v3.5.1
-	k8s.io/api v0.27.4
-	k8s.io/apimachinery v0.27.4
-	k8s.io/client-go v0.27.4
-	k8s.io/kubectl v0.27.4
+	k8s.io/api v0.27.6
+	k8s.io/apimachinery v0.27.6
+	k8s.io/client-go v0.27.6
+	k8s.io/kubectl v0.27.6
 )
 
 require (
@@ -87,8 +87,8 @@ require (
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 	golang.org/x/net v0.15.0 // indirect
 	golang.org/x/oauth2 v0.12.0 // indirect
-	golang.org/x/sys v0.12.0 // indirect
-	golang.org/x/term v0.6.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/term v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
@@ -97,8 +97,8 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/cli-runtime v0.27.4 // indirect
-	k8s.io/component-base v0.27.4 // indirect
+	k8s.io/cli-runtime v0.27.6 // indirect
+	k8s.io/component-base v0.27.6 // indirect
 	k8s.io/klog/v2 v2.90.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f // indirect
 	k8s.io/utils v0.0.0-20230209194617-a36077c30491 // indirect
