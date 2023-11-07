@@ -51,7 +51,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@f78e9ecf42a1271402d4f484518b9313235990e1
+        uses: aquasecurity/trivy-action@2b6a709cf9c4025c5438138008beaddbb02086f0
         with:
           image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}'
           format: 'table'
