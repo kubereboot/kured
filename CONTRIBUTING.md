@@ -208,8 +208,7 @@ kind create cluster --config .github/kind-cluster-<k8s-version>.yaml
 
 ### Prepare Documentation
 
-Check that `README.md` has an updated compatibility matrix and that the
-url in the `kubectl` incantation (under "Installation") is updated to the
+Check that `README.md` has an updated compatibility matrix is updated to the
 new version you want to release.
 
 ### Create a tag on the repo
