@@ -44,6 +44,7 @@ var (
 
 	// Command line flags
 	forceReboot                     bool
+	drainDelay                      time.Duration
 	drainTimeout                    time.Duration
 	rebootDelay                     time.Duration
 	period                          time.Duration
@@ -139,6 +140,8 @@ func NewRootCommand() *cobra.Command {
 		"only drain pods with labels matching the selector (default: '', all pods)")
 	rootCmd.PersistentFlags().IntVar(&skipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", 0,
 		"when seconds is greater than zero, skip waiting for the pods whose deletion timestamp is older than N seconds while draining a node")
+	rootCmd.PersistentFlags().DurationVar(&drainDelay, "drain-delay", 0,
+		"delay drain for this duration (default: 0, disabled)")
 	rootCmd.PersistentFlags().DurationVar(&drainTimeout, "drain-timeout", 0,
 		"timeout after which the drain is aborted (default: 0, infinite time)")
 	rootCmd.PersistentFlags().DurationVar(&rebootDelay, "reboot-delay", 0,
@@ -495,6 +498,11 @@ func drain(client *kubernetes.Clientset, node *v1.Node) error {
 
 	if preRebootNodeLabels != nil {
 		updateNodeLabels(client, node, preRebootNodeLabels)
+	}
+
+	if drainDelay > 0 {
+		log.Infof("Delaying drain for %v", drainDelay)
+		time.Sleep(drainDelay)
 	}
 
 	log.Infof("Draining node %s", nodename)
