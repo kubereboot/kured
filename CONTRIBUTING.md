@@ -208,8 +208,8 @@ kind create cluster --config .github/kind-cluster-<k8s-version>.yaml
 
 ### Prepare Documentation
 
-Check that `README.md` has an updated compatibility matrix is updated to the
-new version you want to release.
+Check that [compatibility matrix](https://kured.dev/docs/installation/) is updated
+to the new version you want to release.
 
 ### Create a tag on the repo
 
