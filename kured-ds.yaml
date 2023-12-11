@@ -53,6 +53,7 @@ spec:
 #            - --force-reboot=false
 #            - --drain-grace-period=-1
 #            - --skip-wait-for-delete-timeout=0
+#            - --drain-delay=0
 #            - --drain-timeout=0
 #            - --drain-pod-selector=""
 #            - --period=1h
