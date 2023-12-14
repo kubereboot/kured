@@ -112,6 +112,8 @@ const (
 	MethodCommand = "command"
 	// MethodSignal is used as "--reboot-method" value when rebooting with a SIGRTMIN+5 signal.
 	MethodSignal = "signal"
+
+	sigTrminPlus5 = 34 + 5
 )
 
 func init() {
@@ -187,7 +189,7 @@ func NewRootCommand() *cobra.Command {
 		"command to run when a reboot is required")
 	rootCmd.PersistentFlags().IntVar(&concurrency, "concurrency", 1,
 		"amount of nodes to concurrently reboot. Defaults to 1")
-	rootCmd.PersistentFlags().IntVar(&rebootSignal, "reboot-signal", 34+5,
+	rootCmd.PersistentFlags().IntVar(&rebootSignal, "reboot-signal", sigTrminPlus5,
 		"signal to use for reboot, SIGRTMIN+5 by default.")
 
 	rootCmd.PersistentFlags().StringVar(&slackHookURL, "slack-hook-url", "",
@@ -554,25 +556,6 @@ func uncordon(client *kubernetes.Clientset, node *v1.Node) error {
 	return nil
 }
 
-func invokeReboot(nodeID string, rebootCommand []string) {
-	if notifyURL != "" {
-		if err := shoutrrr.Send(notifyURL, fmt.Sprintf(messageTemplateReboot, nodeID)); err != nil {
-			log.Warnf("Error notifying: %v", err)
-		}
-	}
-
-	var booter reboot.Reboot
-	if rebootMethod == MethodCommand {
-		booter = reboot.NewCommandReboot(nodeID, rebootCommand)
-	} else if rebootMethod == MethodSignal {
-		booter = reboot.NewSignalReboot(nodeID, rebootSignal)
-	} else {
-		log.Fatalf("Invalid reboot-method configured: %s", rebootMethod)
-	}
-
-	booter.Reboot()
-}
-
 func maintainRebootRequiredMetric(nodeID string, sentinelCommand []string) {
 	for {
 		if rebootRequired(sentinelCommand) {
@@ -663,7 +646,7 @@ func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []stri
 	}
 }
 
-func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []string, window *timewindow.TimeWindow, TTL time.Duration, releaseDelay time.Duration) {
+func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []string, window *timewindow.TimeWindow, TTL time.Duration, releaseDelay time.Duration) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Fatal(err)
@@ -807,7 +790,13 @@ func rebootAsRequired(nodeID string, rebootCommand []string, sentinelCommand []s
 			time.Sleep(rebootDelay)
 		}
 
-		invokeReboot(nodeID, rebootCommand)
+		if notifyURL != "" {
+			if err := shoutrrr.Send(notifyURL, fmt.Sprintf(messageTemplateReboot, nodeID)); err != nil {
+				log.Warnf("Error notifying: %v", err)
+			}
+		}
+
+		booter.Reboot()
 		for {
 			log.Infof("Waiting for reboot")
 			time.Sleep(time.Minute)
@@ -896,7 +885,16 @@ func root(cmd *cobra.Command, args []string) {
 		hostSentinelCommand = buildHostCommand(1, sentinelCommand)
 	}
 
-	go rebootAsRequired(nodeID, hostRestartCommand, hostSentinelCommand, window, lockTTL, lockReleaseDelay)
+	var booter reboot.Reboot
+	if rebootMethod == MethodCommand {
+		booter = reboot.NewCommandReboot(nodeID, hostRestartCommand)
+	} else if rebootMethod == MethodSignal {
+		booter = reboot.NewSignalReboot(nodeID, rebootSignal)
+	} else {
+		log.Fatalf("Invalid reboot-method configured: %s", rebootMethod)
+	}
+
+	go rebootAsRequired(nodeID, booter, hostSentinelCommand, window, lockTTL, lockReleaseDelay)
 	go maintainRebootRequiredMetric(nodeID, hostSentinelCommand)
 
 	http.Handle("/metrics", promhttp.Handler())
