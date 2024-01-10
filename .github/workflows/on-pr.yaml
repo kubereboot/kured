@@ -200,7 +200,7 @@ jobs:
           - "1.28"
           - "1.29"
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Ensure go version
         uses: actions/setup-go@v5
         with:
