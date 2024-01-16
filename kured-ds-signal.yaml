@@ -38,7 +38,7 @@ spec:
         - name: kured
           # If you find yourself here wondering why there is no
           # :latest tag on Docker Hub,see the FAQ in the README
-          image: ghcr.io/kubereboot/kured:1.14.2
+          image: ghcr.io/kubereboot/kured:1.15.0
           imagePullPolicy: IfNotPresent
           securityContext:
             privileged: false # Give permission to nsenter /proc/1/ns/mnt
