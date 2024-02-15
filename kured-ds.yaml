@@ -77,6 +77,8 @@ spec:
 #            - --alert-firing-only=false
 #            - --prefer-no-schedule-taint=""
 #            - --reboot-sentinel-command=""
+#            - --reboot-command=/bin/systemctl reboot
+#            - --nsenter-command=/usr/bin/nsenter -m/proc/1/ns/mnt --
 #            - --reboot-method=command
 #            - --reboot-signal=39
 #            - --slack-hook-url=https://hooks.slack.com/...
