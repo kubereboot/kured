@@ -4,7 +4,7 @@
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fkubereboot%2Fkured.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fkubereboot%2Fkured?ref=badge_shield)
 [![CLOMonitor](https://img.shields.io/endpoint?url=https://clomonitor.io/api/projects/cncf/kured/badge)](https://clomonitor.io/projects/cncf/kured)
 
-<img src="https://github.com/kubereboot/website/raw/main/static/img/kured.png" width="200" align="right"/>
+<img src="https://github.com/kubereboot/website/raw/main/static/img/kured.png" alt="kured logo" width="200" align="right"/>
 
 - [kured - Kubernetes Reboot Daemon](#kured---kubernetes-reboot-daemon)
   - [Introduction](#introduction)
