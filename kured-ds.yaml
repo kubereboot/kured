@@ -100,3 +100,4 @@ spec:
 #            - --metrics-host=""
 #            - --metrics-port=8080
 #            - --concurrency=1
+#            - --min-reboot-period=336h
