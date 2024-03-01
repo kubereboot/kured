@@ -106,7 +106,7 @@ const (
 	KuredRebootInProgressAnnotation string = "weave.works/kured-reboot-in-progress"
 	// KuredMostRecentRebootNeededAnnotation is the canonical string value for the kured most-recent-reboot-needed annotation
 	KuredMostRecentRebootNeededAnnotation string = "weave.works/kured-most-recent-reboot-needed"
-	// KuredMostRecentRebootNeededAnnotation is the canonical string value for the kured last-successful-reboot annotation
+	// KuredLastSuccessfulRebootAnnotation is the canonical string value for the kured last-successful-reboot annotation
 	KuredLastSuccessfulRebootAnnotation string = "weave.works/kured-last-successful-reboot"
 	// EnvPrefix The environment variable prefix of all environment variables bound to our command line flags.
 	EnvPrefix = "KURED"
@@ -272,7 +272,7 @@ func flagCheck(cmd *cobra.Command, args []string) {
 		log.Warnf("pre-reboot-node-labels keys and post-reboot-node-labels keys do not match. This may result in unexpected behaviour.")
 	}
 	if !annotateNodes && minRebootPeriod != 0 {
-		log.Fatal("Cannot use --min-reboot-period without --annotate-nodes")
+		log.Warn("Cannot use --min-reboot-period without --annotate-nodes. This will ignore the min-reboot-period value")
 	}
 }
 
@@ -828,7 +828,10 @@ func lastSuccessfulRebootWithinMinRebootPeriod(node *v1.Node) bool {
 	if minRebootPeriod == 0 {
 		return false
 	}
-	if v, ok := node.GetAnnotations()[KuredLastSuccessfulRebootAnnotation]; ok {
+	if !annotateNodes {
+		return false
+	}
+	if v, ok := node.Annotations[KuredLastSuccessfulRebootAnnotation]; ok {
 		t, err := time.Parse(time.RFC3339, v)
 		if err != nil {
 			log.Warnf("failed to parse time %q in annotation %q: %s", v, KuredLastSuccessfulRebootAnnotation, err.Error())
