@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -13,8 +14,10 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 
+	"github.com/oklog/run"
 	papi "github.com/prometheus/client_golang/api"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -135,7 +138,8 @@ func NewRootCommand() *cobra.Command {
 		Short:             "Kubernetes Reboot Daemon",
 		PersistentPreRunE: bindViper,
 		PreRun:            flagCheck,
-		Run:               root}
+		Run:               root,
+	}
 
 	rootCmd.PersistentFlags().StringVar(&nodeID, "node-id", "",
 		"node name kured runs on, should be passed down from spec.nodeName via KURED_NODE_ID environment variable")
@@ -317,7 +321,6 @@ func flagToEnvVar(flag string) string {
 // buildHostCommand writes a new command to run in the host namespace
 // Rancher based need different pid
 func buildHostCommand(pid int, command []string) []string {
-
 	// From the container, we nsenter into the proper PID to run the hostCommand.
 	// For this, kured daemonset need to be configured with hostPID:true and privileged:true
 	cmd := []string{"/usr/bin/nsenter", fmt.Sprintf("-m/proc/%d/ns/mnt", pid), "--"}
@@ -325,8 +328,8 @@ func buildHostCommand(pid int, command []string) []string {
 	return cmd
 }
 
-func rebootRequired(sentinelCommand []string) bool {
-	cmd := util.NewCommand(sentinelCommand[0], sentinelCommand[1:]...)
+func rebootRequired(ctx context.Context, sentinelCommand []string) bool {
+	cmd := util.NewCommand(ctx, sentinelCommand[0], sentinelCommand[1:]...)
 	if err := cmd.Run(); err != nil {
 		switch err := err.(type) {
 		case *exec.ExitError:
@@ -350,7 +353,7 @@ func rebootRequired(sentinelCommand []string) bool {
 // RebootBlocker interface should be implemented by types
 // to know if their instantiations should block a reboot
 type RebootBlocker interface {
-	isBlocked() bool
+	isBlocked(ctx context.Context) bool
 }
 
 // PrometheusBlockingChecker contains info for connecting
@@ -377,8 +380,8 @@ type KubernetesBlockingChecker struct {
 	filter []string
 }
 
-func (pb PrometheusBlockingChecker) isBlocked() bool {
-	alertNames, err := pb.promClient.ActiveAlerts(pb.filter, pb.firingOnly, pb.filterMatchOnly)
+func (pb PrometheusBlockingChecker) isBlocked(ctx context.Context) bool {
+	alertNames, err := pb.promClient.ActiveAlerts(ctx, pb.filter, pb.firingOnly, pb.filterMatchOnly)
 	if err != nil {
 		log.Warnf("Reboot blocked: prometheus query error: %v", err)
 		return true
@@ -394,13 +397,14 @@ func (pb PrometheusBlockingChecker) isBlocked() bool {
 	return false
 }
 
-func (kb KubernetesBlockingChecker) isBlocked() bool {
+func (kb KubernetesBlockingChecker) isBlocked(ctx context.Context) bool {
 	fieldSelector := fmt.Sprintf("spec.nodeName=%s,status.phase!=Succeeded,status.phase!=Failed,status.phase!=Unknown", kb.nodename)
 	for _, labelSelector := range kb.filter {
-		podList, err := kb.client.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{
+		podList, err := kb.client.CoreV1().Pods("").List(ctx, metav1.ListOptions{
 			LabelSelector: labelSelector,
 			FieldSelector: fieldSelector,
-			Limit:         10})
+			Limit:         10,
+		})
 		if err != nil {
 			log.Warnf("Reboot blocked: pod query error: %v", err)
 			return true
@@ -421,22 +425,23 @@ func (kb KubernetesBlockingChecker) isBlocked() bool {
 	return false
 }
 
-func rebootBlocked(blockers ...RebootBlocker) bool {
+func rebootBlocked(ctx context.Context, blockers ...RebootBlocker) bool {
+	// TODO: can we do that concurrently
 	for _, blocker := range blockers {
-		if blocker.isBlocked() {
+		if blocker.isBlocked(ctx) {
 			return true
 		}
 	}
 	return false
 }
 
-func holding(lock *daemonsetlock.DaemonSetLock, metadata interface{}, isMultiLock bool) bool {
+func holding(ctx context.Context, lock *daemonsetlock.DaemonSetLock, metadata interface{}, isMultiLock bool) bool {
 	var holding bool
 	var err error
 	if isMultiLock {
-		holding, err = lock.TestMultiple()
+		holding, err = lock.TestMultiple(ctx)
 	} else {
-		holding, err = lock.Test(metadata)
+		holding, err = lock.Test(ctx, metadata)
 	}
 	if err != nil {
 		log.Fatalf("Error testing lock: %v", err)
@@ -447,16 +452,16 @@ func holding(lock *daemonsetlock.DaemonSetLock, metadata interface{}, isMultiLoc
 	return holding
 }
 
-func acquire(lock *daemonsetlock.DaemonSetLock, metadata interface{}, TTL time.Duration, maxOwners int) bool {
+func acquire(ctx context.Context, lock *daemonsetlock.DaemonSetLock, metadata interface{}, TTL time.Duration, maxOwners int) bool {
 	var holding bool
 	var holder string
 	var err error
 	if maxOwners > 1 {
 		var holders []string
-		holding, holders, err = lock.AcquireMultiple(metadata, TTL, maxOwners)
+		holding, holders, err = lock.AcquireMultiple(ctx, metadata, TTL, maxOwners)
 		holder = strings.Join(holders, ",")
 	} else {
-		holding, holder, err = lock.Acquire(metadata, TTL)
+		holding, holder, err = lock.Acquire(ctx, metadata, TTL)
 	}
 	switch {
 	case err != nil:
@@ -478,25 +483,25 @@ func throttle(releaseDelay time.Duration) {
 	}
 }
 
-func release(lock *daemonsetlock.DaemonSetLock, isMultiLock bool) {
+func release(ctx context.Context, lock *daemonsetlock.DaemonSetLock, isMultiLock bool) {
 	log.Infof("Releasing lock")
 
 	var err error
 	if isMultiLock {
-		err = lock.ReleaseMultiple()
+		err = lock.ReleaseMultiple(ctx)
 	} else {
-		err = lock.Release()
+		err = lock.Release(ctx)
 	}
 	if err != nil {
 		log.Fatalf("Error releasing lock: %v", err)
 	}
 }
 
-func drain(client *kubernetes.Clientset, node *v1.Node) error {
+func drain(ctx context.Context, client *kubernetes.Clientset, node *v1.Node) error {
 	nodename := node.GetName()
 
 	if preRebootNodeLabels != nil {
-		updateNodeLabels(client, node, preRebootNodeLabels)
+		updateNodeLabels(ctx, client, node, preRebootNodeLabels)
 	}
 
 	if drainDelay > 0 {
@@ -538,7 +543,7 @@ func drain(client *kubernetes.Clientset, node *v1.Node) error {
 	return nil
 }
 
-func uncordon(client *kubernetes.Clientset, node *v1.Node) error {
+func uncordon(ctx context.Context, client *kubernetes.Clientset, node *v1.Node) error {
 	nodename := node.GetName()
 	log.Infof("Uncordoning node %s", nodename)
 	drainer := &kubectldrain.Helper{
@@ -551,14 +556,14 @@ func uncordon(client *kubernetes.Clientset, node *v1.Node) error {
 		log.Fatalf("Error uncordonning %s: %v", nodename, err)
 		return err
 	} else if postRebootNodeLabels != nil {
-		updateNodeLabels(client, node, postRebootNodeLabels)
+		updateNodeLabels(ctx, client, node, postRebootNodeLabels)
 	}
 	return nil
 }
 
-func maintainRebootRequiredMetric(nodeID string, sentinelCommand []string) {
+func maintainRebootRequiredMetric(ctx context.Context, nodeID string, sentinelCommand []string) {
 	for {
-		if rebootRequired(sentinelCommand) {
+		if rebootRequired(ctx, sentinelCommand) {
 			rebootRequiredGauge.WithLabelValues(nodeID).Set(1)
 		} else {
 			rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
@@ -572,8 +577,8 @@ type nodeMeta struct {
 	Unschedulable bool `json:"unschedulable"`
 }
 
-func addNodeAnnotations(client *kubernetes.Clientset, nodeID string, annotations map[string]string) error {
-	node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
+func addNodeAnnotations(ctx context.Context, client *kubernetes.Clientset, nodeID string, annotations map[string]string) error {
+	node, err := client.CoreV1().Nodes().Get(ctx, nodeID, metav1.GetOptions{})
 	if err != nil {
 		log.Errorf("Error retrieving node object via k8s API: %s", err)
 		return err
@@ -589,7 +594,7 @@ func addNodeAnnotations(client *kubernetes.Clientset, nodeID string, annotations
 		return err
 	}
 
-	_, err = client.CoreV1().Nodes().Patch(context.TODO(), node.GetName(), types.StrategicMergePatchType, bytes, metav1.PatchOptions{})
+	_, err = client.CoreV1().Nodes().Patch(ctx, node.GetName(), types.StrategicMergePatchType, bytes, metav1.PatchOptions{})
 	if err != nil {
 		var annotationsErr string
 		for k, v := range annotations {
@@ -601,14 +606,14 @@ func addNodeAnnotations(client *kubernetes.Clientset, nodeID string, annotations
 	return nil
 }
 
-func deleteNodeAnnotation(client *kubernetes.Clientset, nodeID, key string) error {
+func deleteNodeAnnotation(ctx context.Context, client *kubernetes.Clientset, nodeID, key string) error {
 	log.Infof("Deleting node %s annotation %s", nodeID, key)
 
 	// JSON Patch takes as path input a JSON Pointer, defined in RFC6901
 	// So we replace all instances of "/" with "~1" as per:
 	// https://tools.ietf.org/html/rfc6901#section-3
 	patch := []byte(fmt.Sprintf("[{\"op\":\"remove\",\"path\":\"/metadata/annotations/%s\"}]", strings.ReplaceAll(key, "/", "~1")))
-	_, err := client.CoreV1().Nodes().Patch(context.TODO(), nodeID, types.JSONPatchType, patch, metav1.PatchOptions{})
+	_, err := client.CoreV1().Nodes().Patch(ctx, nodeID, types.JSONPatchType, patch, metav1.PatchOptions{})
 	if err != nil {
 		log.Errorf("Error deleting node annotation %s via k8s API: %v", key, err)
 		return err
@@ -616,7 +621,7 @@ func deleteNodeAnnotation(client *kubernetes.Clientset, nodeID, key string) erro
 	return nil
 }
 
-func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []string) {
+func updateNodeLabels(ctx context.Context, client *kubernetes.Clientset, node *v1.Node, labels []string) {
 	labelsMap := make(map[string]string)
 	for _, label := range labels {
 		k := strings.Split(label, "=")[0]
@@ -634,7 +639,7 @@ func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []stri
 		log.Fatalf("Error marshalling node object into JSON: %v", err)
 	}
 
-	_, err = client.CoreV1().Nodes().Patch(context.TODO(), node.GetName(), types.StrategicMergePatchType, bytes, metav1.PatchOptions{})
+	_, err = client.CoreV1().Nodes().Patch(ctx, node.GetName(), types.StrategicMergePatchType, bytes, metav1.PatchOptions{})
 	if err != nil {
 		var labelsErr string
 		for _, label := range labels {
@@ -646,7 +651,7 @@ func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []stri
 	}
 }
 
-func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []string, window *timewindow.TimeWindow, TTL time.Duration, releaseDelay time.Duration) {
+func rebootAsRequired(ctx context.Context, nodeID string, booter reboot.Reboot, sentinelCommand []string, window *timewindow.TimeWindow, TTL time.Duration, releaseDelay time.Duration) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Fatal(err)
@@ -663,14 +668,14 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 	source := rand.NewSource(time.Now().UnixNano())
 	tick := delaytick.New(source, 1*time.Minute)
 	for range tick {
-		if holding(lock, &nodeMeta, concurrency > 1) {
-			node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
+		if holding(ctx, lock, &nodeMeta, concurrency > 1) {
+			node, err := client.CoreV1().Nodes().Get(ctx, nodeID, metav1.GetOptions{})
 			if err != nil {
 				log.Errorf("Error retrieving node object via k8s API: %v", err)
 				continue
 			}
 			if !nodeMeta.Unschedulable {
-				err = uncordon(client, node)
+				err = uncordon(ctx, client, node)
 				if err != nil {
 					log.Errorf("Unable to uncordon %s: %v, will continue to hold lock and retry uncordon", node.GetName(), err)
 					continue
@@ -687,17 +692,18 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 			// And (2) check if we previously annotated the node that it was in the process of being rebooted,
 			// And finally (3) if it has that annotation, to delete it.
 			// This indicates to other node tools running on the cluster that this node may be a candidate for maintenance
-			if annotateNodes && !rebootRequired(sentinelCommand) {
+			if annotateNodes && !rebootRequired(ctx, sentinelCommand) {
 				if _, ok := node.Annotations[KuredRebootInProgressAnnotation]; ok {
-					err := deleteNodeAnnotation(client, nodeID, KuredRebootInProgressAnnotation)
+					err := deleteNodeAnnotation(ctx, client, nodeID, KuredRebootInProgressAnnotation)
 					if err != nil {
 						continue
 					}
 				}
 			}
 			throttle(releaseDelay)
-			release(lock, concurrency > 1)
+			release(ctx, lock, concurrency > 1)
 			break
+
 		} else {
 			break
 		}
@@ -706,7 +712,7 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 	preferNoScheduleTaint := taints.New(client, nodeID, preferNoScheduleTaintName, v1.TaintEffectPreferNoSchedule)
 
 	// Remove taint immediately during startup to quickly allow scheduling again.
-	if !rebootRequired(sentinelCommand) {
+	if !rebootRequired(ctx, sentinelCommand) {
 		preferNoScheduleTaint.Disable()
 	}
 
@@ -725,13 +731,13 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 			continue
 		}
 
-		if !rebootRequired(sentinelCommand) {
+		if !rebootRequired(ctx, sentinelCommand) {
 			log.Infof("Reboot not required")
 			preferNoScheduleTaint.Disable()
 			continue
 		}
 
-		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
+		node, err := client.CoreV1().Nodes().Get(ctx, nodeID, metav1.GetOptions{})
 		if err != nil {
 			log.Fatalf("Error retrieving node object via k8s API: %v", err)
 		}
@@ -746,7 +752,7 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 				annotations := map[string]string{KuredRebootInProgressAnnotation: timeNowString}
 				// & annotate this node with a timestamp so that other node maintenance tools know how long it's been since this node has been marked for reboot
 				annotations[KuredMostRecentRebootNeededAnnotation] = timeNowString
-				err := addNodeAnnotations(client, nodeID, annotations)
+				err := addNodeAnnotations(ctx, client, nodeID, annotations)
 				if err != nil {
 					continue
 				}
@@ -762,25 +768,25 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 		}
 
 		var rebootRequiredBlockCondition string
-		if rebootBlocked(blockCheckers...) {
+		if rebootBlocked(ctx, blockCheckers...) {
 			rebootRequiredBlockCondition = ", but blocked at this time"
 			continue
 		}
 		log.Infof("Reboot required%s", rebootRequiredBlockCondition)
 
-		if !holding(lock, &nodeMeta, concurrency > 1) && !acquire(lock, &nodeMeta, TTL, concurrency) {
+		if !holding(ctx, lock, &nodeMeta, concurrency > 1) && !acquire(ctx, lock, &nodeMeta, TTL, concurrency) {
 			// Prefer to not schedule pods onto this node to avoid draing the same pod multiple times.
 			preferNoScheduleTaint.Enable()
 			continue
 		}
 
-		err = drain(client, node)
+		err = drain(ctx, client, node)
 		if err != nil {
 			if !forceReboot {
 				log.Errorf("Unable to cordon or drain %s: %v, will release lock and retry cordon and drain before rebooting when lock is next acquired", node.GetName(), err)
-				release(lock, concurrency > 1)
+				release(ctx, lock, concurrency > 1)
 				log.Infof("Performing a best-effort uncordon after failed cordon and drain")
-				uncordon(client, node)
+				uncordon(ctx, client, node)
 				continue
 			}
 		}
@@ -796,7 +802,7 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 			}
 		}
 
-		booter.Reboot()
+		booter.Reboot(ctx)
 		for {
 			log.Infof("Waiting for reboot")
 			time.Sleep(time.Minute)
@@ -894,9 +900,47 @@ func root(cmd *cobra.Command, args []string) {
 		log.Fatalf("Invalid reboot-method configured: %s", rebootMethod)
 	}
 
-	go rebootAsRequired(nodeID, booter, hostSentinelCommand, window, lockTTL, lockReleaseDelay)
-	go maintainRebootRequiredMetric(nodeID, hostSentinelCommand)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	g := run.Group{}
+	{
+		g.Add(run.SignalHandler(ctx, syscall.SIGINT, syscall.SIGTERM))
+	}
+	{
+		ctx, cancel := context.WithCancel(ctx)
+		g.Add(func() error {
+			rebootAsRequired(ctx, nodeID, booter, hostSentinelCommand, window, lockTTL, lockReleaseDelay)
+			return nil
+		},
+			func(err error) {
+				cancel()
+			})
+	}
 
-	http.Handle("/metrics", promhttp.Handler())
-	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", metricsHost, metricsPort), nil))
+	{
+		ctx, cancel := context.WithCancel(ctx)
+		g.Add(func() error {
+			maintainRebootRequiredMetric(ctx, nodeID, hostSentinelCommand)
+			return nil
+		},
+			func(err error) {
+				cancel()
+			})
+	}
+	{
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		l, err := net.Listen("tcp", fmt.Sprintf("%s:%d", metricsHost, metricsPort))
+		if err != nil {
+			log.Fatal(err)
+		}
+		g.Add(func() error {
+			return http.Serve(l, mux)
+		}, func(err error) {
+			l.Close()
+		})
+	}
+	if err := g.Run(); err != nil {
+		log.Fatal(err)
+	}
 }

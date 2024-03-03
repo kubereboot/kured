@@ -46,9 +46,9 @@ func New(client *kubernetes.Clientset, nodeID, namespace, name, annotation strin
 }
 
 // Acquire attempts to annotate the kured daemonset with lock info from instantiated DaemonSetLock using client-go
-func (dsl *DaemonSetLock) Acquire(metadata interface{}, TTL time.Duration) (bool, string, error) {
+func (dsl *DaemonSetLock) Acquire(ctx context.Context, metadata interface{}, TTL time.Duration) (bool, string, error) {
 	for {
-		ds, err := dsl.GetDaemonSet(k8sAPICallRetrySleep, k8sAPICallRetryTimeout)
+		ds, err := dsl.GetDaemonSet(ctx, k8sAPICallRetrySleep, k8sAPICallRetryTimeout)
 		if err != nil {
 			return false, "", fmt.Errorf("timed out trying to get daemonset %s in namespace %s: %w", dsl.name, dsl.namespace, err)
 		}
@@ -75,7 +75,7 @@ func (dsl *DaemonSetLock) Acquire(metadata interface{}, TTL time.Duration) (bool
 		}
 		ds.ObjectMeta.Annotations[dsl.annotation] = string(valueBytes)
 
-		_, err = dsl.client.AppsV1().DaemonSets(dsl.namespace).Update(context.TODO(), ds, metav1.UpdateOptions{})
+		_, err = dsl.client.AppsV1().DaemonSets(dsl.namespace).Update(ctx, ds, metav1.UpdateOptions{})
 		if err != nil {
 			if se, ok := err.(*errors.StatusError); ok && se.ErrStatus.Reason == metav1.StatusReasonConflict {
 				// Something else updated the resource between us reading and writing - try again soon
@@ -90,9 +90,9 @@ func (dsl *DaemonSetLock) Acquire(metadata interface{}, TTL time.Duration) (bool
 }
 
 // AcquireMultiple creates and annotates the daemonset with a multiple owner lock
-func (dsl *DaemonSetLock) AcquireMultiple(metadata interface{}, TTL time.Duration, maxOwners int) (bool, []string, error) {
+func (dsl *DaemonSetLock) AcquireMultiple(ctx context.Context, metadata interface{}, TTL time.Duration, maxOwners int) (bool, []string, error) {
 	for {
-		ds, err := dsl.GetDaemonSet(k8sAPICallRetrySleep, k8sAPICallRetryTimeout)
+		ds, err := dsl.GetDaemonSet(ctx, k8sAPICallRetrySleep, k8sAPICallRetryTimeout)
 		if err != nil {
 			return false, []string{}, fmt.Errorf("timed out trying to get daemonset %s in namespace %s: %w", dsl.name, dsl.namespace, err)
 		}
@@ -119,7 +119,7 @@ func (dsl *DaemonSetLock) AcquireMultiple(metadata interface{}, TTL time.Duratio
 		}
 		ds.ObjectMeta.Annotations[dsl.annotation] = string(newAnnotationBytes)
 
-		_, err = dsl.client.AppsV1().DaemonSets(dsl.namespace).Update(context.Background(), ds, metav1.UpdateOptions{})
+		_, err = dsl.client.AppsV1().DaemonSets(dsl.namespace).Update(ctx, ds, metav1.UpdateOptions{})
 		if err != nil {
 			if se, ok := err.(*errors.StatusError); ok && se.ErrStatus.Reason == metav1.StatusReasonConflict {
 				time.Sleep(time.Second)
@@ -176,8 +176,8 @@ func (dsl *DaemonSetLock) canAcquireMultiple(annotation multiLockAnnotationValue
 }
 
 // Test attempts to check the kured daemonset lock status (existence, expiry) from instantiated DaemonSetLock using client-go
-func (dsl *DaemonSetLock) Test(metadata interface{}) (bool, error) {
-	ds, err := dsl.GetDaemonSet(k8sAPICallRetrySleep, k8sAPICallRetryTimeout)
+func (dsl *DaemonSetLock) Test(ctx context.Context, metadata interface{}) (bool, error) {
+	ds, err := dsl.GetDaemonSet(ctx, k8sAPICallRetrySleep, k8sAPICallRetryTimeout)
 	if err != nil {
 		return false, fmt.Errorf("timed out trying to get daemonset %s in namespace %s: %w", dsl.name, dsl.namespace, err)
 	}
@@ -198,8 +198,8 @@ func (dsl *DaemonSetLock) Test(metadata interface{}) (bool, error) {
 }
 
 // TestMultiple attempts to check the kured daemonset lock status for multi locks
-func (dsl *DaemonSetLock) TestMultiple() (bool, error) {
-	ds, err := dsl.GetDaemonSet(k8sAPICallRetrySleep, k8sAPICallRetryTimeout)
+func (dsl *DaemonSetLock) TestMultiple(ctx context.Context) (bool, error) {
+	ds, err := dsl.GetDaemonSet(ctx, k8sAPICallRetrySleep, k8sAPICallRetryTimeout)
 	if err != nil {
 		return false, fmt.Errorf("timed out trying to get daemonset %s in namespace %s: %w", dsl.name, dsl.namespace, err)
 	}
@@ -222,9 +222,9 @@ func (dsl *DaemonSetLock) TestMultiple() (bool, error) {
 }
 
 // Release attempts to remove the lock data from the kured ds annotations using client-go
-func (dsl *DaemonSetLock) Release() error {
+func (dsl *DaemonSetLock) Release(ctx context.Context) error {
 	for {
-		ds, err := dsl.GetDaemonSet(k8sAPICallRetrySleep, k8sAPICallRetryTimeout)
+		ds, err := dsl.GetDaemonSet(ctx, k8sAPICallRetrySleep, k8sAPICallRetryTimeout)
 		if err != nil {
 			return fmt.Errorf("timed out trying to get daemonset %s in namespace %s: %w", dsl.name, dsl.namespace, err)
 		}
@@ -245,7 +245,7 @@ func (dsl *DaemonSetLock) Release() error {
 
 		delete(ds.ObjectMeta.Annotations, dsl.annotation)
 
-		_, err = dsl.client.AppsV1().DaemonSets(dsl.namespace).Update(context.TODO(), ds, metav1.UpdateOptions{})
+		_, err = dsl.client.AppsV1().DaemonSets(dsl.namespace).Update(ctx, ds, metav1.UpdateOptions{})
 		if err != nil {
 			if se, ok := err.(*errors.StatusError); ok && se.ErrStatus.Reason == metav1.StatusReasonConflict {
 				// Something else updated the resource between us reading and writing - try again soon
@@ -260,9 +260,9 @@ func (dsl *DaemonSetLock) Release() error {
 }
 
 // ReleaseMultiple attempts to remove the lock data from the kured ds annotations using client-go
-func (dsl *DaemonSetLock) ReleaseMultiple() error {
+func (dsl *DaemonSetLock) ReleaseMultiple(ctx context.Context) error {
 	for {
-		ds, err := dsl.GetDaemonSet(k8sAPICallRetrySleep, k8sAPICallRetryTimeout)
+		ds, err := dsl.GetDaemonSet(ctx, k8sAPICallRetrySleep, k8sAPICallRetryTimeout)
 		if err != nil {
 			return fmt.Errorf("timed out trying to get daemonset %s in namespace %s: %w", dsl.name, dsl.namespace, err)
 		}
@@ -294,7 +294,7 @@ func (dsl *DaemonSetLock) ReleaseMultiple() error {
 		}
 		ds.ObjectMeta.Annotations[dsl.annotation] = string(newAnnotationBytes)
 
-		_, err = dsl.client.AppsV1().DaemonSets(dsl.namespace).Update(context.TODO(), ds, metav1.UpdateOptions{})
+		_, err = dsl.client.AppsV1().DaemonSets(dsl.namespace).Update(ctx, ds, metav1.UpdateOptions{})
 		if err != nil {
 			if se, ok := err.(*errors.StatusError); ok && se.ErrStatus.Reason == metav1.StatusReasonConflict {
 				// Something else updated the resource between us reading and writing - try again soon
@@ -309,10 +309,10 @@ func (dsl *DaemonSetLock) ReleaseMultiple() error {
 }
 
 // GetDaemonSet returns the named DaemonSet resource from the DaemonSetLock's configured client
-func (dsl *DaemonSetLock) GetDaemonSet(sleep, timeout time.Duration) (*v1.DaemonSet, error) {
+func (dsl *DaemonSetLock) GetDaemonSet(ctx context.Context, sleep, timeout time.Duration) (*v1.DaemonSet, error) {
 	var ds *v1.DaemonSet
 	var lastError error
-	err := wait.PollImmediate(sleep, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, sleep, timeout, true, func(ctx context.Context) (bool, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		if ds, lastError = dsl.client.AppsV1().DaemonSets(dsl.namespace).Get(ctx, dsl.name, metav1.GetOptions{}); lastError != nil {

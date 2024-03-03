@@ -24,6 +24,8 @@ require (
 	k8s.io/kubectl v0.29.4
 )
 
+require github.com/oklog/run v1.1.0
+
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect

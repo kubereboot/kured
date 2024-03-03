@@ -1,12 +1,13 @@
 package main
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
+	"github.com/kubereboot/kured/pkg/alerts"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/kubereboot/kured/pkg/alerts"
 	assert "gotest.tools/v3/assert"
 
 	papi "github.com/prometheus/client_golang/api"
@@ -16,12 +17,14 @@ type BlockingChecker struct {
 	blocking bool
 }
 
-func (fbc BlockingChecker) isBlocked() bool {
+func (fbc BlockingChecker) isBlocked(_ context.Context) bool {
 	return fbc.blocking
 }
 
-var _ RebootBlocker = BlockingChecker{}       // Verify that Type implements Interface.
-var _ RebootBlocker = (*BlockingChecker)(nil) // Verify that *Type implements Interface.
+var (
+	_ RebootBlocker = BlockingChecker{}       // Verify that Type implements Interface.
+	_ RebootBlocker = (*BlockingChecker)(nil) // Verify that *Type implements Interface.
+)
 
 func Test_flagCheck(t *testing.T) {
 	var cmd *cobra.Command
@@ -155,7 +158,7 @@ func Test_rebootBlocked(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := rebootBlocked(tt.args.blockers...); got != tt.want {
+			if got := rebootBlocked(context.Background(), tt.args.blockers...); got != tt.want {
 				t.Errorf("rebootBlocked() = %v, want %v", got, tt.want)
 			}
 		})
@@ -275,7 +278,7 @@ func Test_rebootRequired(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := rebootRequired(tt.args.sentinelCommand); got != tt.want {
+			if got := rebootRequired(context.Background(), tt.args.sentinelCommand); got != tt.want {
 				t.Errorf("rebootRequired() = %v, want %v", got, tt.want)
 			}
 		})
@@ -303,8 +306,7 @@ func Test_rebootRequired_fatals(t *testing.T) {
 
 	for _, c := range cases {
 		fatal = false
-		rebootRequired(c.param)
+		rebootRequired(context.Background(), c.param)
 		assert.Equal(t, c.expectFatal, fatal)
 	}
-
 }
