@@ -83,12 +83,13 @@ var (
 	postRebootNodeLabels            []string
 	nodeID                          string
 	concurrency                     int
-
-	rebootDays    []string
-	rebootStart   string
-	rebootEnd     string
-	timezone      string
-	annotateNodes bool
+	alertManagerURL                 string
+	alertManagerToken               string
+	rebootDays                      []string
+	rebootStart                     string
+	rebootEnd                       string
+	timezone                        string
+	annotateNodes                   bool
 
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -206,6 +207,11 @@ func NewRootCommand() *cobra.Command {
 		"message template used to notify about a node being drained")
 	rootCmd.PersistentFlags().StringVar(&messageTemplateReboot, "message-template-reboot", "Rebooting node %s",
 		"message template used to notify about a node being rebooted")
+
+	rootCmd.PersistentFlags().StringVar(&alertManagerURL, "alert-manager-url", "",
+		"alertmanager URL for getting silencers")
+	rootCmd.PersistentFlags().StringVar(&alertManagerToken, "alert-manager-token", "",
+		"alertmanager token for authenticating")
 
 	rootCmd.PersistentFlags().StringArrayVar(&podSelectors, "blocking-pod-selector", nil,
 		"label selector identifying pods whose presence should prevent reboots")
@@ -387,6 +393,7 @@ func (pb PrometheusBlockingChecker) isBlocked() bool {
 	if count > 10 {
 		alertNames = append(alertNames[:10], "...")
 	}
+
 	if count > 0 {
 		log.Warnf("Reboot blocked: %d active alerts: %v", count, alertNames)
 		return true

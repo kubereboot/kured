@@ -98,3 +98,5 @@ spec:
 #            - --annotate-nodes=false
 #            - --lock-release-delay=30m
 #            - --log-format=text
+#            - --alert-manager-url=""
+#            - --alert-manager-token=""
