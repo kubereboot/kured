@@ -68,6 +68,7 @@ func (s *StatusEndpoint) Get() (*StatusResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+	request.Header.Add("Authentication", fmt.Sprintf("Bearer %s", s.Token))
 	response, err := s.Client.Client.Do(request)
 	if err != nil {
 		return nil, err
@@ -103,6 +104,7 @@ func (s *SilencesEndpoint) Get() ([]GettableSilence, error) {
 	if err != nil {
 		return nil, err
 	}
+	request.Header.Add("Authentication", fmt.Sprintf("Bearer %s", s.Token))
 	response, err := s.Client.Client.Do(request)
 	if err != nil {
 		return nil, err
