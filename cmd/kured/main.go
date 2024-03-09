@@ -744,9 +744,13 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 			log.Fatalf("Error retrieving node object via k8s API: %v", err)
 		}
 
-		if lastSuccessfulRebootWithinMinRebootPeriod(node) {
-			log.Infof("Last successful reboot within minimal reboot period")
-			continue
+		if minRebootPeriod > 0 {
+			if t, err := nextAllowedReboot(node); err != nil {
+				log.Warnf("Failed to determine next allowed reboot time: %s", err.Error())
+			} else if diff := t.Sub(time.Now()); diff > 0 {
+				log.Infof("Reboot not allowed until %s (%s)", t.String(), diff.String())
+				continue
+			}
 		}
 
 		if !rebootRequired(sentinelCommand) {
@@ -824,22 +828,15 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 	}
 }
 
-func lastSuccessfulRebootWithinMinRebootPeriod(node *v1.Node) bool {
-	if minRebootPeriod == 0 {
-		return false
-	}
-	if !annotateNodes {
-		return false
-	}
+func nextAllowedReboot(node *v1.Node) (time.Time, error) {
 	if v, ok := node.Annotations[KuredLastSuccessfulRebootAnnotation]; ok {
 		t, err := time.Parse(time.RFC3339, v)
 		if err != nil {
-			log.Warnf("failed to parse time %q in annotation %q: %s", v, KuredLastSuccessfulRebootAnnotation, err.Error())
-			return false
+			return time.Time{}, fmt.Errorf("failed to parse time %q in annotation %q: %w", v, KuredLastSuccessfulRebootAnnotation, err)
 		}
-		return time.Now().Before(t.Add(minRebootPeriod))
+		return t.Add(minRebootPeriod), nil
 	}
-	return false
+	return time.Time{}, fmt.Errorf("missing annotation %s", KuredLastSuccessfulRebootAnnotation)
 }
 
 // buildSentinelCommand creates the shell command line which will need wrapping to escape
