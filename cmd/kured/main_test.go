@@ -4,9 +4,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/kubereboot/kured/pkg/alerts"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/kubereboot/kured/pkg/alerts"
 	assert "gotest.tools/v3/assert"
 
 	papi "github.com/prometheus/client_golang/api"
@@ -164,8 +164,8 @@ func Test_rebootBlocked(t *testing.T) {
 
 func Test_buildHostCommand(t *testing.T) {
 	type args struct {
-		pid     int
-		command []string
+		nsenterCommand []string
+		command        []string
 	}
 	tests := []struct {
 		name string
@@ -174,13 +174,16 @@ func Test_buildHostCommand(t *testing.T) {
 	}{
 		{
 			name: "Ensure command will run with nsenter",
-			args: args{pid: 1, command: []string{"ls", "-Fal"}},
+			args: args{
+				nsenterCommand: []string{"/usr/bin/nsenter", "-m/proc/1/ns/mnt", "--"},
+				command:        []string{"ls", "-Fal"},
+			},
 			want: []string{"/usr/bin/nsenter", "-m/proc/1/ns/mnt", "--", "ls", "-Fal"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := buildHostCommand(tt.args.pid, tt.args.command); !reflect.DeepEqual(got, tt.want) {
+			if got := buildHostCommand(tt.args.nsenterCommand, tt.args.command); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("buildHostCommand() = %v, want %v", got, tt.want)
 			}
 		})
@@ -223,7 +226,7 @@ func Test_buildSentinelCommand(t *testing.T) {
 	}
 }
 
-func Test_parseRebootCommand(t *testing.T) {
+func Test_parseCommand(t *testing.T) {
 	type args struct {
 		rebootCommand string
 	}
@@ -239,11 +242,18 @@ func Test_parseRebootCommand(t *testing.T) {
 			},
 			want: []string{"/sbin/systemctl", "reboot"},
 		},
+		{
+			name: "Ensure nsenter command is properly parsed",
+			args: args{
+				rebootCommand: "/usr/bin/nsenter -m/proc/1/ns/mnt --",
+			},
+			want: []string{"/usr/bin/nsenter", "-m/proc/1/ns/mnt", "--"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := parseRebootCommand(tt.args.rebootCommand); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("parseRebootCommand() = %v, want %v", got, tt.want)
+			if got := parseCommand(tt.args.rebootCommand); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parseCommand() = %v, want %v", got, tt.want)
 			}
 		})
 	}

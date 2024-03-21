@@ -77,6 +77,7 @@ var (
 	messageTemplateUncordon         string
 	podSelectors                    []string
 	rebootCommand                   string
+	nsenterCommand                  string
 	rebootSignal                    int
 	logFormat                       string
 	preRebootNodeLabels             []string
@@ -187,6 +188,8 @@ func NewRootCommand() *cobra.Command {
 		"command for which a zero return code will trigger a reboot command")
 	rootCmd.PersistentFlags().StringVar(&rebootCommand, "reboot-command", "/bin/systemctl reboot",
 		"command to run when a reboot is required")
+	rootCmd.PersistentFlags().StringVar(&nsenterCommand, "nsenter-command", "/usr/bin/nsenter -m/proc/1/ns/mnt --",
+		"command to run to enter host namespace")
 	rootCmd.PersistentFlags().IntVar(&concurrency, "concurrency", 1,
 		"amount of nodes to concurrently reboot. Defaults to 1")
 	rootCmd.PersistentFlags().IntVar(&rebootSignal, "reboot-signal", sigTrminPlus5,
@@ -316,13 +319,11 @@ func flagToEnvVar(flag string) string {
 
 // buildHostCommand writes a new command to run in the host namespace
 // Rancher based need different pid
-func buildHostCommand(pid int, command []string) []string {
+func buildHostCommand(nsenterCommand, command []string) []string {
 
 	// From the container, we nsenter into the proper PID to run the hostCommand.
 	// For this, kured daemonset need to be configured with hostPID:true and privileged:true
-	cmd := []string{"/usr/bin/nsenter", fmt.Sprintf("-m/proc/%d/ns/mnt", pid), "--"}
-	cmd = append(cmd, command...)
-	return cmd
+	return append(nsenterCommand, command...)
 }
 
 func rebootRequired(sentinelCommand []string) bool {
@@ -817,9 +818,9 @@ func buildSentinelCommand(rebootSentinelFile string, rebootSentinelCommand strin
 	return []string{"test", "-f", rebootSentinelFile}
 }
 
-// parseRebootCommand creates the shell command line which will need wrapping to escape
+// parseCommand creates the shell command line which will need wrapping to escape
 // the container boundaries
-func parseRebootCommand(rebootCommand string) []string {
+func parseCommand(rebootCommand string) []string {
 	command, err := shlex.Split(rebootCommand)
 	if err != nil {
 		log.Fatalf("Error parsing provided reboot command: %v", err)
@@ -844,7 +845,8 @@ func root(cmd *cobra.Command, args []string) {
 	}
 
 	sentinelCommand := buildSentinelCommand(rebootSentinelFile, rebootSentinelCommand)
-	restartCommand := parseRebootCommand(rebootCommand)
+	restartCommand := parseCommand(rebootCommand)
+	nsenterCommand := parseCommand(nsenterCommand)
 
 	log.Infof("Node ID: %s", nodeID)
 	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
@@ -877,12 +879,12 @@ func root(cmd *cobra.Command, args []string) {
 	// To run those commands as it was the host, we'll use nsenter
 	// Relies on hostPID:true and privileged:true to enter host mount space
 	// PID set to 1, until we have a better discovery mechanism.
-	hostRestartCommand := buildHostCommand(1, restartCommand)
+	hostRestartCommand := buildHostCommand(nsenterCommand, restartCommand)
 
 	// Only wrap sentinel-command with nsenter, if a custom-command was configured, otherwise use the host-path mount
 	hostSentinelCommand := sentinelCommand
 	if rebootSentinelCommand != "" {
-		hostSentinelCommand = buildHostCommand(1, sentinelCommand)
+		hostSentinelCommand = buildHostCommand(nsenterCommand, sentinelCommand)
 	}
 
 	var booter reboot.Reboot
