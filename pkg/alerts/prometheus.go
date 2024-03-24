@@ -36,10 +36,9 @@ func NewPromClient(conf papi.Config) (*PromClient, error) {
 // filter by regexp means when the regex finds the alert-name; the alert is exluded from the
 // block-list and will NOT block rebooting. query by includeLabel means,
 // if the query finds an alert, it will include it to the block-list and it WILL block rebooting.
-func (p *PromClient) ActiveAlerts(filter *regexp.Regexp, firingOnly, filterMatchOnly bool) ([]string, error) {
-
+func (p *PromClient) ActiveAlerts(ctx context.Context, filter *regexp.Regexp, firingOnly, filterMatchOnly bool) ([]string, error) {
 	// get all alerts from prometheus
-	value, _, err := p.api.Query(context.Background(), "ALERTS", time.Now())
+	value, _, err := p.api.Query(ctx, "ALERTS", time.Now())
 	if err != nil {
 		return nil, err
 	}
