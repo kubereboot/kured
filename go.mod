@@ -2,7 +2,7 @@ module github.com/kubereboot/kured
 
 go 1.20
 
-replace golang.org/x/net => golang.org/x/net v0.17.0
+replace golang.org/x/net => golang.org/x/net v0.23.0
 
 replace github.com/emicklei/go-restful/v3 => github.com/emicklei/go-restful/v3 v3.10.2
 
@@ -87,7 +87,7 @@ require (
 	golang.org/x/oauth2 v0.18.0 // indirect
 	golang.org/x/sync v0.5.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
-	golang.org/x/term v0.15.0 // indirect
+	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
