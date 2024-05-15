@@ -111,9 +111,9 @@ jobs:
       fail-fast: false
       matrix:
         kubernetes:
-          - "1.27"
           - "1.28"
           - "1.29"
+          - "1.30"
     steps:
       - uses: actions/checkout@v4
       - name: Ensure go version
@@ -196,9 +196,9 @@ jobs:
       fail-fast: false
       matrix:
         kubernetes:
-          - "1.27"
           - "1.28"
           - "1.29"
+          - "1.30"
     steps:
       - uses: actions/checkout@v4
       - name: Ensure go version
@@ -282,9 +282,9 @@ jobs:
       fail-fast: false
       matrix:
         kubernetes:
-          - "1.27"
           - "1.28"
           - "1.29"
+          - "1.30"
     steps:
       - uses: actions/checkout@v4
       - name: Ensure go version
