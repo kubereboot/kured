@@ -426,7 +426,6 @@ func (kb KubernetesBlockingChecker) isBlocked(ctx context.Context) bool {
 }
 
 func rebootBlocked(ctx context.Context, blockers ...RebootBlocker) bool {
-	// TODO: can we do that concurrently
 	for _, blocker := range blockers {
 		if blocker.isBlocked(ctx) {
 			return true
