@@ -338,12 +338,14 @@ func rebootRequired(sentinelCommand []string) bool {
 			if cmd.ProcessState.ExitCode() != 1 {
 				log.Warnf("sentinel command ended with unexpected exit code: %v", cmd.ProcessState.ExitCode())
 			}
+			rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
 			return false
 		default:
 			// Something was grossly misconfigured, such as the command path being wrong.
 			log.Fatalf("Error invoking sentinel command: %v", err)
 		}
 	}
+	rebootRequiredGauge.WithLabelValues(nodeID).Set(1)
 	return true
 }
 
@@ -554,17 +556,6 @@ func uncordon(client *kubernetes.Clientset, node *v1.Node) error {
 		updateNodeLabels(client, node, postRebootNodeLabels)
 	}
 	return nil
-}
-
-func maintainRebootRequiredMetric(nodeID string, sentinelCommand []string) {
-	for {
-		if rebootRequired(sentinelCommand) {
-			rebootRequiredGauge.WithLabelValues(nodeID).Set(1)
-		} else {
-			rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
-		}
-		time.Sleep(time.Minute)
-	}
 }
 
 // nodeMeta is used to remember information across reboots
@@ -895,7 +886,6 @@ func root(cmd *cobra.Command, args []string) {
 	}
 
 	go rebootAsRequired(nodeID, booter, hostSentinelCommand, window, lockTTL, lockReleaseDelay)
-	go maintainRebootRequiredMetric(nodeID, hostSentinelCommand)
 
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", metricsHost, metricsPort), nil))
