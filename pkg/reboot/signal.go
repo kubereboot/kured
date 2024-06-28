@@ -1,6 +1,7 @@
 package reboot
 
 import (
+	"context"
 	"os"
 	"syscall"
 
@@ -19,7 +20,7 @@ func NewSignalReboot(nodeID string, signal int) *SignalRebootMethod {
 }
 
 // Reboot triggers the signal-reboot.
-func (c *SignalRebootMethod) Reboot() {
+func (c *SignalRebootMethod) Reboot(_ context.Context) {
 	log.Infof("Emit reboot-signal for node: %s", c.nodeID)
 
 	process, err := os.FindProcess(1)

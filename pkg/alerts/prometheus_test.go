@@ -1,10 +1,10 @@
 package alerts
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"net/http/httptest"
-
 	"regexp"
 	"testing"
 
@@ -27,7 +27,6 @@ type MockServerProperties struct {
 
 // NewMockServer sets up a new MockServer with properties ad starts the server.
 func NewMockServer(props ...MockServerProperties) *httptest.Server {
-
 	handler := http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			for _, proc := range props {
@@ -140,7 +139,6 @@ func TestActiveAlerts(t *testing.T) {
 		defer mockServer.Close()
 
 		t.Run(tc.it, func(t *testing.T) {
-
 			// regex filter
 			regex, _ := regexp.Compile(tc.rFilter)
 
@@ -150,7 +148,7 @@ func TestActiveAlerts(t *testing.T) {
 				log.Fatal(err)
 			}
 
-			result, err := p.ActiveAlerts(regex, tc.firingOnly, tc.filterMatchOnly)
+			result, err := p.ActiveAlerts(context.Background(), regex, tc.firingOnly, tc.filterMatchOnly)
 			if err != nil {
 				log.Fatal(err)
 			}
