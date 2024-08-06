@@ -30,6 +30,7 @@ import (
 	"github.com/google/shlex"
 
 	shoutrrr "github.com/containrrr/shoutrrr"
+	"github.com/kubereboot/kured/pkg/additionalfilters"
 	"github.com/kubereboot/kured/pkg/alerts"
 	"github.com/kubereboot/kured/pkg/daemonsetlock"
 	"github.com/kubereboot/kured/pkg/delaytick"
@@ -55,6 +56,7 @@ var (
 	metricsPort                     int
 	drainGracePeriod                int
 	drainPodSelector                string
+	drainResourceNameWithPrefixes   string
 	skipWaitForDeleteTimeoutSeconds int
 	dsNamespace                     string
 	dsName                          string
@@ -149,6 +151,8 @@ func NewRootCommand() *cobra.Command {
 		"time in seconds given to each pod to terminate gracefully, if negative, the default value specified in the pod will be used")
 	rootCmd.PersistentFlags().StringVar(&drainPodSelector, "drain-pod-selector", "",
 		"only drain pods with labels matching the selector (default: '', all pods)")
+	rootCmd.PersistentFlags().StringVar(&drainResourceNameWithPrefixes, "drain-resource-name-with-prefixes", "",
+		"only drain those pods whose resource name has the specified prefix (default: '', all pods)")
 	rootCmd.PersistentFlags().IntVar(&skipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", 0,
 		"when seconds is greater than zero, skip waiting for the pods whose deletion timestamp is older than N seconds while draining a node")
 	rootCmd.PersistentFlags().DurationVar(&drainDelay, "drain-delay", 0,
@@ -524,6 +528,12 @@ func drain(client *kubernetes.Clientset, node *v1.Node) error {
 		ErrOut:                          os.Stderr,
 		Out:                             os.Stdout,
 		Timeout:                         drainTimeout,
+	}
+
+	if len(drainResourceNameWithPrefixes) > 0 {
+		// Add resource name filter
+		rtf := additionalfilters.NewResourceNameFilter(drainResourceNameWithPrefixes)
+		drainer.AdditionalFilters = []kubectldrain.PodFilter{rtf.GetPodFilter()}
 	}
 
 	if err := kubectldrain.RunCordonOrUncordon(drainer, node, true); err != nil {
