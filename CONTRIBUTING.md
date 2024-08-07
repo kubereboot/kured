@@ -9,7 +9,7 @@ In any case, it will make sense to familiarise yourself with the main
 options, which is helpful for testing. The "building" section in
 particular makes sense if you are planning to contribute code.
 
-[slack]: README.md#getting-help
+[slack]: https://github.com/kubereboot/kured/blob/main/README.md#getting-help
 [issues]: https://github.com/kubereboot/kured/issues
 [documentation]: https://kured.dev/docs
 
