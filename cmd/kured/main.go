@@ -761,16 +761,23 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 			blockCheckers = append(blockCheckers, KubernetesBlockingChecker{client: client, nodename: nodeID, filter: podSelectors})
 		}
 
+		rebootBlocked := rebootBlocked(blockCheckers...)
+
 		var rebootRequiredBlockCondition string
-		if rebootBlocked(blockCheckers...) {
+		if rebootBlocked {
 			rebootRequiredBlockCondition = ", but blocked at this time"
-			continue
 		}
+
 		log.Infof("Reboot required%s", rebootRequiredBlockCondition)
 
 		if !holding(lock, &nodeMeta, concurrency > 1) && !acquire(lock, &nodeMeta, TTL, concurrency) {
 			// Prefer to not schedule pods onto this node to avoid draing the same pod multiple times.
 			preferNoScheduleTaint.Enable()
+			continue
+		}
+
+		if rebootBlocked {
+			// We've logged that the reboot is needed, but curently blocked, and have tainted the node.
 			continue
 		}
 
