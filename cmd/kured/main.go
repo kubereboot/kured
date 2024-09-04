@@ -770,14 +770,15 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 
 		log.Infof("Reboot required%s", rebootRequiredBlockCondition)
 
-		if !holding(lock, &nodeMeta, concurrency > 1) && !acquire(lock, &nodeMeta, TTL, concurrency) {
-			// Prefer to not schedule pods onto this node to avoid draing the same pod multiple times.
+		if rebootBlocked {
+			// Prefer to not schedule pods onto this node to avoid draining the same pod multiple times.
 			preferNoScheduleTaint.Enable()
+			// We've logged that the reboot is needed, but curently blocked, and have tainted the node.
 			continue
 		}
 
-		if rebootBlocked {
-			// We've logged that the reboot is needed, but curently blocked, and have tainted the node.
+		if !holding(lock, &nodeMeta, concurrency > 1) && !acquire(lock, &nodeMeta, TTL, concurrency) {
+			// If we can't acquire the lock, poll again
 			continue
 		}
 
