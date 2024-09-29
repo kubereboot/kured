@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/kubereboot/kured/pkg/blockers"
 	"github.com/kubereboot/kured/pkg/checkers"
 	"math/rand"
 	"net/http"
@@ -307,89 +308,6 @@ func bindFlags(cmd *cobra.Command, v *viper.Viper) {
 func flagToEnvVar(flag string) string {
 	envVarSuffix := strings.ToUpper(strings.ReplaceAll(flag, "-", "_"))
 	return fmt.Sprintf("%s_%s", EnvPrefix, envVarSuffix)
-}
-
-// RebootBlocker interface should be implemented by types
-// to know if their instantiations should block a reboot
-type RebootBlocker interface {
-	isBlocked() bool
-}
-
-// PrometheusBlockingChecker contains info for connecting
-// to prometheus, and can give info about whether a reboot should be blocked
-type PrometheusBlockingChecker struct {
-	// prometheusClient to make prometheus-go-client and api config available
-	// into the PrometheusBlockingChecker struct
-	promClient *alerts.PromClient
-	// regexp used to get alerts
-	filter *regexp.Regexp
-	// bool to indicate if only firing alerts should be considered
-	firingOnly bool
-	// bool to indicate that we're only blocking on alerts which match the filter
-	filterMatchOnly bool
-}
-
-// KubernetesBlockingChecker contains info for connecting
-// to k8s, and can give info about whether a reboot should be blocked
-type KubernetesBlockingChecker struct {
-	// client used to contact kubernetes API
-	client   *kubernetes.Clientset
-	nodename string
-	// lised used to filter pods (podSelector)
-	filter []string
-}
-
-func (pb PrometheusBlockingChecker) isBlocked() bool {
-	alertNames, err := pb.promClient.ActiveAlerts(pb.filter, pb.firingOnly, pb.filterMatchOnly)
-	if err != nil {
-		log.Warnf("Reboot blocked: prometheus query error: %v", err)
-		return true
-	}
-	count := len(alertNames)
-	if count > 10 {
-		alertNames = append(alertNames[:10], "...")
-	}
-	if count > 0 {
-		log.Warnf("Reboot blocked: %d active alerts: %v", count, alertNames)
-		return true
-	}
-	return false
-}
-
-func (kb KubernetesBlockingChecker) isBlocked() bool {
-	fieldSelector := fmt.Sprintf("spec.nodeName=%s,status.phase!=Succeeded,status.phase!=Failed,status.phase!=Unknown", kb.nodename)
-	for _, labelSelector := range kb.filter {
-		podList, err := kb.client.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{
-			LabelSelector: labelSelector,
-			FieldSelector: fieldSelector,
-			Limit:         10})
-		if err != nil {
-			log.Warnf("Reboot blocked: pod query error: %v", err)
-			return true
-		}
-
-		if len(podList.Items) > 0 {
-			podNames := make([]string, 0, len(podList.Items))
-			for _, pod := range podList.Items {
-				podNames = append(podNames, pod.Name)
-			}
-			if len(podList.Continue) > 0 {
-				podNames = append(podNames, "...")
-			}
-			log.Warnf("Reboot blocked: matching pods: %v", podNames)
-			return true
-		}
-	}
-	return false
-}
-
-func rebootBlocked(blockers ...RebootBlocker) bool {
-	for _, blocker := range blockers {
-		if blocker.isBlocked() {
-			return true
-		}
-	}
-	return false
 }
 
 func holding(lock *daemonsetlock.DaemonSetLock, metadata interface{}, isMultiLock bool) bool {
@@ -715,16 +633,16 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 			}
 		}
 
-		var blockCheckers []RebootBlocker
+		var blockCheckers []blockers.RebootBlocker
 		if prometheusURL != "" {
-			blockCheckers = append(blockCheckers, PrometheusBlockingChecker{promClient: promClient, filter: alertFilter, firingOnly: alertFiringOnly, filterMatchOnly: alertFilterMatchOnly})
+			blockCheckers = append(blockCheckers, blockers.PrometheusBlockingChecker{PromClient: promClient, Filter: alertFilter, FiringOnly: alertFiringOnly, FilterMatchOnly: alertFilterMatchOnly})
 		}
 		if podSelectors != nil {
-			blockCheckers = append(blockCheckers, KubernetesBlockingChecker{client: client, nodename: nodeID, filter: podSelectors})
+			blockCheckers = append(blockCheckers, blockers.KubernetesBlockingChecker{Client: client, Nodename: nodeID, Filter: podSelectors})
 		}
 
 		var rebootRequiredBlockCondition string
-		if rebootBlocked(blockCheckers...) {
+		if blockers.RebootBlocked(blockCheckers...) {
 			rebootRequiredBlockCondition = ", but blocked at this time"
 			continue
 		}
