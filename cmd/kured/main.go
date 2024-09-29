@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/kubereboot/kured/pkg/checkers"
 	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"reflect"
 	"regexp"
 	"sort"
@@ -309,28 +309,6 @@ func flagToEnvVar(flag string) string {
 	return fmt.Sprintf("%s_%s", EnvPrefix, envVarSuffix)
 }
 
-func rebootRequired(sentinelCommand []string) bool {
-	cmd := util.NewCommand(sentinelCommand[0], sentinelCommand[1:]...)
-	if err := cmd.Run(); err != nil {
-		switch err := err.(type) {
-		case *exec.ExitError:
-			// We assume a non-zero exit code means 'reboot not required', but of course
-			// the user could have misconfigured the sentinel command or something else
-			// went wrong during its execution. In that case, not entering a reboot loop
-			// is the right thing to do, and we are logging stdout/stderr of the command
-			// so it should be obvious what is wrong.
-			if cmd.ProcessState.ExitCode() != 1 {
-				log.Warnf("sentinel command ended with unexpected exit code: %v", cmd.ProcessState.ExitCode())
-			}
-			return false
-		default:
-			// Something was grossly misconfigured, such as the command path being wrong.
-			log.Fatalf("Error invoking sentinel command: %v", err)
-		}
-	}
-	return true
-}
-
 // RebootBlocker interface should be implemented by types
 // to know if their instantiations should block a reboot
 type RebootBlocker interface {
@@ -540,9 +518,9 @@ func uncordon(client *kubernetes.Clientset, node *v1.Node) error {
 	return nil
 }
 
-func maintainRebootRequiredMetric(nodeID string, sentinelCommand []string) {
+func maintainRebootRequiredMetric(nodeID string, checker checkers.Checker) {
 	for {
-		if rebootRequired(sentinelCommand) {
+		if checker.CheckRebootRequired() {
 			rebootRequiredGauge.WithLabelValues(nodeID).Set(1)
 		} else {
 			rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
@@ -630,7 +608,7 @@ func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []stri
 	}
 }
 
-func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, sentinelCommand []string, window *timewindow.TimeWindow, TTL time.Duration, releaseDelay time.Duration) {
+func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.Checker, window *timewindow.TimeWindow, TTL time.Duration, releaseDelay time.Duration) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Fatal(err)
@@ -671,7 +649,7 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, sentinelCommand [
 			// And (2) check if we previously annotated the node that it was in the process of being rebooted,
 			// And finally (3) if it has that annotation, to delete it.
 			// This indicates to other node tools running on the cluster that this node may be a candidate for maintenance
-			if annotateNodes && !rebootRequired(sentinelCommand) {
+			if annotateNodes && !checker.CheckRebootRequired() {
 				if _, ok := node.Annotations[KuredRebootInProgressAnnotation]; ok {
 					err := deleteNodeAnnotation(client, nodeID, KuredRebootInProgressAnnotation)
 					if err != nil {
@@ -690,7 +668,7 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, sentinelCommand [
 	preferNoScheduleTaint := taints.New(client, nodeID, preferNoScheduleTaintName, v1.TaintEffectPreferNoSchedule)
 
 	// Remove taint immediately during startup to quickly allow scheduling again.
-	if !rebootRequired(sentinelCommand) {
+	if !checker.CheckRebootRequired() {
 		preferNoScheduleTaint.Disable()
 	}
 
@@ -709,7 +687,7 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, sentinelCommand [
 			continue
 		}
 
-		if !rebootRequired(sentinelCommand) {
+		if !checker.CheckRebootRequired() {
 			log.Infof("Reboot not required")
 			preferNoScheduleTaint.Disable()
 			continue
@@ -788,19 +766,6 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, sentinelCommand [
 	}
 }
 
-// buildSentinelCommand creates the shell command line which will need wrapping to escape
-// the container boundaries
-func buildSentinelCommand(rebootSentinelFile string, rebootSentinelCommand string) []string {
-	if rebootSentinelCommand != "" {
-		cmd, err := shlex.Split(rebootSentinelCommand)
-		if err != nil {
-			log.Fatalf("Error parsing provided sentinel command: %v", err)
-		}
-		return cmd
-	}
-	return []string{"test", "-f", rebootSentinelFile}
-}
-
 func root(cmd *cobra.Command, args []string) {
 	if logFormat == "json" {
 		log.SetFormatter(&log.JSONFormatter{})
@@ -817,8 +782,6 @@ func root(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to build time window: %v", err)
 	}
 
-	sentinelCommand := buildSentinelCommand(rebootSentinelFile, rebootSentinelCommand)
-
 	log.Infof("Node ID: %s", nodeID)
 	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
 	if lockTTL > 0 {
@@ -834,7 +797,7 @@ func root(cmd *cobra.Command, args []string) {
 	log.Infof("PreferNoSchedule taint: %s", preferNoScheduleTaintName)
 	log.Infof("Blocking Pod Selectors: %v", podSelectors)
 	log.Infof("Reboot schedule: %v", window)
-	log.Infof("Reboot check command: %s every %v", sentinelCommand, period)
+	log.Infof("Reboot period %v", period)
 	log.Infof("Concurrency: %v", concurrency)
 	log.Infof("Reboot method: %s", rebootMethod)
 
@@ -855,18 +818,31 @@ func root(cmd *cobra.Command, args []string) {
 		log.Fatalf("Invalid reboot-method configured: %s", rebootMethod)
 	}
 
+	var checker checkers.Checker
+	// An override of rebootsentinelcommand means a privileged command
+	if rebootSentinelCommand != "" {
+		log.Infof("Sentinel checker is user provided command: %s", rebootSentinelCommand)
+		cmd, err := shlex.Split(rebootSentinelCommand)
+		if err != nil {
+			log.Fatalf("Error parsing provided sentinel command: %v", err)
+		}
+		checker = checkers.NsEnterRebootChecker{
+			CustomCheckCommand: cmd,
+			NamespacePid:       1,
+		}
+	} else {
+		log.Infof("Sentinel checker is (unprivileged) testing for the presence of: %s", rebootSentinelFile)
+		checker = checkers.UnprivilegedRebootChecker{
+			CheckCommand: []string{"test", "-f", rebootSentinelFile},
+		}
+	}
+
 	if annotateNodes {
 		log.Infof("Will annotate nodes during kured reboot operations")
 	}
 
-	// Only wrap sentinel-command with nsenter, if a custom-command was configured, otherwise use the host-path mount
-	hostSentinelCommand := sentinelCommand
-	if rebootSentinelCommand != "" {
-		hostSentinelCommand = util.PrivilegedHostCommand(1, sentinelCommand)
-	}
-
-	go rebootAsRequired(nodeID, rebooter, hostSentinelCommand, window, lockTTL, lockReleaseDelay)
-	go maintainRebootRequiredMetric(nodeID, hostSentinelCommand)
+	go rebootAsRequired(nodeID, rebooter, checker, window, lockTTL, lockReleaseDelay)
+	go maintainRebootRequiredMetric(nodeID, checker)
 
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", metricsHost, metricsPort), nil))
