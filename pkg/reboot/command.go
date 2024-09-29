@@ -5,21 +5,18 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// CommandRebootMethod holds context-information for a command reboot.
-type CommandRebootMethod struct {
-	nodeID        string
-	rebootCommand []string
+// CommandRebooter holds context-information for a command reboot.
+type CommandRebooter struct {
+	NodeID        string
+	RebootCommand []string
 }
 
 // NewCommandReboot creates a new command-rebooter which needs full privileges on the host.
-func NewCommandReboot(nodeID string, rebootCommand []string) *CommandRebootMethod {
-	return &CommandRebootMethod{nodeID: nodeID, rebootCommand: rebootCommand}
-}
 
 // Reboot triggers the command-reboot.
-func (c *CommandRebootMethod) Reboot() {
-	log.Infof("Running command: %s for node: %s", c.rebootCommand, c.nodeID)
-	if err := util.NewCommand(c.rebootCommand[0], c.rebootCommand[1:]...).Run(); err != nil {
+func (c CommandRebooter) Reboot() {
+	log.Infof("Running command: %s for node: %s", c.RebootCommand, c.NodeID)
+	if err := util.NewCommand(c.RebootCommand[0], c.RebootCommand[1:]...).Run(); err != nil {
 		log.Fatalf("Error invoking reboot command: %v", err)
 	}
 }

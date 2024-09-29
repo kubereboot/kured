@@ -108,11 +108,6 @@ const (
 	// EnvPrefix The environment variable prefix of all environment variables bound to our command line flags.
 	EnvPrefix = "KURED"
 
-	// MethodCommand is used as "--reboot-method" value when rebooting with the configured "--reboot-command"
-	MethodCommand = "command"
-	// MethodSignal is used as "--reboot-method" value when rebooting with a SIGRTMIN+5 signal.
-	MethodSignal = "signal"
-
 	sigTrminPlus5 = 34 + 5
 )
 
@@ -646,7 +641,7 @@ func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []stri
 	}
 }
 
-func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []string, window *timewindow.TimeWindow, TTL time.Duration, releaseDelay time.Duration) {
+func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, sentinelCommand []string, window *timewindow.TimeWindow, TTL time.Duration, releaseDelay time.Duration) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Fatal(err)
@@ -796,7 +791,7 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 			}
 		}
 
-		booter.Reboot()
+		rebooter.Reboot()
 		for {
 			log.Infof("Waiting for reboot")
 			time.Sleep(time.Minute)
@@ -817,16 +812,6 @@ func buildSentinelCommand(rebootSentinelFile string, rebootSentinelCommand strin
 	return []string{"test", "-f", rebootSentinelFile}
 }
 
-// parseRebootCommand creates the shell command line which will need wrapping to escape
-// the container boundaries
-func parseRebootCommand(rebootCommand string) []string {
-	command, err := shlex.Split(rebootCommand)
-	if err != nil {
-		log.Fatalf("Error parsing provided reboot command: %v", err)
-	}
-	return command
-}
-
 func root(cmd *cobra.Command, args []string) {
 	if logFormat == "json" {
 		log.SetFormatter(&log.JSONFormatter{})
@@ -844,7 +829,6 @@ func root(cmd *cobra.Command, args []string) {
 	}
 
 	sentinelCommand := buildSentinelCommand(rebootSentinelFile, rebootSentinelCommand)
-	restartCommand := parseRebootCommand(rebootCommand)
 
 	log.Infof("Node ID: %s", nodeID)
 	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
@@ -864,20 +848,32 @@ func root(cmd *cobra.Command, args []string) {
 	log.Infof("Reboot check command: %s every %v", sentinelCommand, period)
 	log.Infof("Concurrency: %v", concurrency)
 	log.Infof("Reboot method: %s", rebootMethod)
-	if rebootCommand == MethodCommand {
-		log.Infof("Reboot command: %s", restartCommand)
-	} else {
-		log.Infof("Reboot signal: %v", rebootSignal)
-	}
 
-	if annotateNodes {
-		log.Infof("Will annotate nodes during kured reboot operations")
+	restartCommand, err := shlex.Split(rebootCommand)
+	if err != nil {
+		log.Fatalf("Error parsing provided reboot command: %v", err)
 	}
 
 	// To run those commands as it was the host, we'll use nsenter
 	// Relies on hostPID:true and privileged:true to enter host mount space
 	// PID set to 1, until we have a better discovery mechanism.
-	hostRestartCommand := buildHostCommand(1, restartCommand)
+	privilegedRestartCommand := buildHostCommand(1, restartCommand)
+
+	var rebooter reboot.Rebooter
+	switch {
+	case rebootMethod == "command":
+		log.Infof("Reboot command: %s", restartCommand)
+		rebooter = reboot.CommandRebooter{NodeID: nodeID, RebootCommand: privilegedRestartCommand}
+	case rebootMethod == "signal":
+		log.Infof("Reboot signal: %v", rebootSignal)
+		rebooter = reboot.SignalRebooter{NodeID: nodeID, Signal: rebootSignal}
+	default:
+		log.Fatalf("Invalid reboot-method configured: %s", rebootMethod)
+	}
+
+	if annotateNodes {
+		log.Infof("Will annotate nodes during kured reboot operations")
+	}
 
 	// Only wrap sentinel-command with nsenter, if a custom-command was configured, otherwise use the host-path mount
 	hostSentinelCommand := sentinelCommand
@@ -885,16 +881,7 @@ func root(cmd *cobra.Command, args []string) {
 		hostSentinelCommand = buildHostCommand(1, sentinelCommand)
 	}
 
-	var booter reboot.Reboot
-	if rebootMethod == MethodCommand {
-		booter = reboot.NewCommandReboot(nodeID, hostRestartCommand)
-	} else if rebootMethod == MethodSignal {
-		booter = reboot.NewSignalReboot(nodeID, rebootSignal)
-	} else {
-		log.Fatalf("Invalid reboot-method configured: %s", rebootMethod)
-	}
-
-	go rebootAsRequired(nodeID, booter, hostSentinelCommand, window, lockTTL, lockReleaseDelay)
+	go rebootAsRequired(nodeID, rebooter, hostSentinelCommand, window, lockTTL, lockReleaseDelay)
 	go maintainRebootRequiredMetric(nodeID, hostSentinelCommand)
 
 	http.Handle("/metrics", promhttp.Handler())

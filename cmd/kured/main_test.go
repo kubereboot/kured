@@ -4,9 +4,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/kubereboot/kured/pkg/alerts"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/kubereboot/kured/pkg/alerts"
 	assert "gotest.tools/v3/assert"
 
 	papi "github.com/prometheus/client_golang/api"
@@ -218,32 +218,6 @@ func Test_buildSentinelCommand(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := buildSentinelCommand(tt.args.rebootSentinelFile, tt.args.rebootSentinelCommand); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("buildSentinelCommand() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_parseRebootCommand(t *testing.T) {
-	type args struct {
-		rebootCommand string
-	}
-	tests := []struct {
-		name string
-		args args
-		want []string
-	}{
-		{
-			name: "Ensure a reboot command is properly parsed",
-			args: args{
-				rebootCommand: "/sbin/systemctl reboot",
-			},
-			want: []string{"/sbin/systemctl", "reboot"},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := parseRebootCommand(tt.args.rebootCommand); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("parseRebootCommand() = %v, want %v", got, tt.want)
 			}
 		})
 	}
