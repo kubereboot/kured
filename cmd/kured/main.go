@@ -309,17 +309,6 @@ func flagToEnvVar(flag string) string {
 	return fmt.Sprintf("%s_%s", EnvPrefix, envVarSuffix)
 }
 
-// buildHostCommand writes a new command to run in the host namespace
-// Rancher based need different pid
-func buildHostCommand(pid int, command []string) []string {
-
-	// From the container, we nsenter into the proper PID to run the hostCommand.
-	// For this, kured daemonset need to be configured with hostPID:true and privileged:true
-	cmd := []string{"/usr/bin/nsenter", fmt.Sprintf("-m/proc/%d/ns/mnt", pid), "--"}
-	cmd = append(cmd, command...)
-	return cmd
-}
-
 func rebootRequired(sentinelCommand []string) bool {
 	cmd := util.NewCommand(sentinelCommand[0], sentinelCommand[1:]...)
 	if err := cmd.Run(); err != nil {
@@ -854,16 +843,11 @@ func root(cmd *cobra.Command, args []string) {
 		log.Fatalf("Error parsing provided reboot command: %v", err)
 	}
 
-	// To run those commands as it was the host, we'll use nsenter
-	// Relies on hostPID:true and privileged:true to enter host mount space
-	// PID set to 1, until we have a better discovery mechanism.
-	privilegedRestartCommand := buildHostCommand(1, restartCommand)
-
 	var rebooter reboot.Rebooter
 	switch {
 	case rebootMethod == "command":
 		log.Infof("Reboot command: %s", restartCommand)
-		rebooter = reboot.CommandRebooter{NodeID: nodeID, RebootCommand: privilegedRestartCommand}
+		rebooter = reboot.CommandRebooter{NodeID: nodeID, RebootCommand: util.PrivilegedHostCommand(1, restartCommand)}
 	case rebootMethod == "signal":
 		log.Infof("Reboot signal: %v", rebootSignal)
 		rebooter = reboot.SignalRebooter{NodeID: nodeID, Signal: rebootSignal}
@@ -878,7 +862,7 @@ func root(cmd *cobra.Command, args []string) {
 	// Only wrap sentinel-command with nsenter, if a custom-command was configured, otherwise use the host-path mount
 	hostSentinelCommand := sentinelCommand
 	if rebootSentinelCommand != "" {
-		hostSentinelCommand = buildHostCommand(1, sentinelCommand)
+		hostSentinelCommand = util.PrivilegedHostCommand(1, sentinelCommand)
 	}
 
 	go rebootAsRequired(nodeID, rebooter, hostSentinelCommand, window, lockTTL, lockReleaseDelay)
