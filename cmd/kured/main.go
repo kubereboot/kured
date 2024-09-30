@@ -244,14 +244,14 @@ func flagCheck(cmd *cobra.Command, args []string) {
 		notifyURL = stripQuotes(notifyURL)
 	case slackHookURL != "":
 		log.Warnf("Deprecated flag(s). Please use --notify-url flag instead.")
-		trataURL, err := url.Parse(stripQuotes(slackHookURL))
+		parsedURL, err := url.Parse(stripQuotes(slackHookURL))
 		if err != nil {
 			log.Warnf("slack-hook-url is not properly formatted... no notification will be sent: %v\n", err)
 		}
-		if len(strings.Split(strings.Trim(trataURL.Path, "/services/"), "/")) != 3 {
+		if len(strings.Split(strings.Trim(parsedURL.Path, "/services/"), "/")) != 3 {
 			log.Warnf("slack-hook-url is not properly formatted... no notification will be sent: unexpected number of / in URL\n")
 		} else {
-			notifyURL = fmt.Sprintf("slack://%s", strings.Trim(trataURL.Path, "/services/"))
+			notifyURL = fmt.Sprintf("slack://%s", strings.Trim(parsedURL.Path, "/services/"))
 		}
 	}
 
