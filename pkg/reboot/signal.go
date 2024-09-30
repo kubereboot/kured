@@ -9,20 +9,21 @@ import (
 
 // SignalRebooter holds context-information for a signal reboot.
 type SignalRebooter struct {
-	NodeID string
 	Signal int
 }
 
-// Reboot triggers the reboot signal using SIGTERMIN+5
+// Reboot triggers the reboot signal
 func (c SignalRebooter) Reboot() {
-	log.Infof("Emit reboot-signal for node: %s", c.NodeID)
+	log.Infof("Invoking signal: %v", c.Signal)
 
 	process, err := os.FindProcess(1)
 	if err != nil {
-		log.Fatalf("There was no systemd process found: %v", err)
+		log.Fatalf("Not running on Unix: %v", err)
 	}
 
 	err = process.Signal(syscall.Signal(c.Signal))
+	// Either PID does not exist, or the signal does not work. Hoping for
+	// a decent enough error.
 	if err != nil {
 		log.Fatalf("Signal of SIGRTMIN+5 failed: %v", err)
 	}

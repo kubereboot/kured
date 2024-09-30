@@ -705,7 +705,7 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 				log.Warnf("Error notifying: %v", err)
 			}
 		}
-
+		log.Infof("Triggering reboot for node %v", nodeID)
 		rebooter.Reboot()
 		for {
 			log.Infof("Waiting for reboot")
@@ -731,10 +731,10 @@ func root(cmd *cobra.Command, args []string) {
 	switch {
 	case rebootMethod == "command":
 		log.Infof("Reboot command: %s", restartCommand)
-		rebooter = reboot.CommandRebooter{NodeID: nodeID, RebootCommand: util.PrivilegedHostCommand(1, restartCommand)}
+		rebooter = reboot.CommandRebooter{RebootCommand: util.PrivilegedHostCommand(1, restartCommand)}
 	case rebootMethod == "signal":
 		log.Infof("Reboot signal: %v", rebootSignal)
-		rebooter = reboot.SignalRebooter{NodeID: nodeID, Signal: rebootSignal}
+		rebooter = reboot.SignalRebooter{Signal: rebootSignal}
 	default:
 		log.Fatalf("Invalid reboot-method configured: %s", rebootMethod)
 	}
