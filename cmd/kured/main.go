@@ -229,17 +229,22 @@ func NewRootCommand() *cobra.Command {
 	return rootCmd
 }
 
-// func that checks for deprecated slack-notification-related flags and node labels that do not match
+// func that checks for cmd line flags validity
 func flagCheck(cmd *cobra.Command, args []string) {
-	if slackHookURL != "" && notifyURL != "" {
-		log.Warnf("Cannot use both --notify-url and --slack-hook-url flags. Kured will use --notify-url flag only...")
+	if logFormat == "json" {
+		log.SetFormatter(&log.JSONFormatter{})
 	}
-	if notifyURL != "" {
+	if nodeID == "" {
+		log.Fatal("KURED_NODE_ID environment variable required")
+	}
+	switch {
+	case slackHookURL != "" && notifyURL != "":
+		log.Warnf("Cannot use both --notify-url and --slack-hook-url flags. Kured will use --notify-url flag only...")
+	case notifyURL != "":
 		notifyURL = stripQuotes(notifyURL)
-	} else if slackHookURL != "" {
-		slackHookURL = stripQuotes(slackHookURL)
+	case slackHookURL != "":
 		log.Warnf("Deprecated flag(s). Please use --notify-url flag instead.")
-		trataURL, err := url.Parse(slackHookURL)
+		trataURL, err := url.Parse(stripQuotes(slackHookURL))
 		if err != nil {
 			log.Warnf("slack-hook-url is not properly formatted... no notification will be sent: %v\n", err)
 		}
@@ -249,6 +254,7 @@ func flagCheck(cmd *cobra.Command, args []string) {
 			notifyURL = fmt.Sprintf("slack://%s", strings.Trim(trataURL.Path, "/services/"))
 		}
 	}
+
 	var preRebootNodeLabelKeys, postRebootNodeLabelKeys []string
 	for _, label := range preRebootNodeLabels {
 		preRebootNodeLabelKeys = append(preRebootNodeLabelKeys, strings.Split(label, "=")[0])
@@ -260,6 +266,32 @@ func flagCheck(cmd *cobra.Command, args []string) {
 	sort.Strings(postRebootNodeLabelKeys)
 	if !reflect.DeepEqual(preRebootNodeLabelKeys, postRebootNodeLabelKeys) {
 		log.Warnf("pre-reboot-node-labels keys and post-reboot-node-labels keys do not match. This may result in unexpected behaviour.")
+	}
+
+	// Not really validation, could stay in root command if necessary.
+	// However, using the information here makes it very explicit that
+	// root is only for the main business logic.
+	log.Infof("Kubernetes Reboot Daemon: %s", version)
+	log.Infof("Node ID: %s", nodeID)
+	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
+	if lockTTL > 0 {
+		log.Infof("Lock TTL set, lock will expire after: %v", lockTTL)
+	} else {
+		log.Info("Lock TTL not set, lock will remain until being released")
+	}
+	if lockReleaseDelay > 0 {
+		log.Infof("Lock release delay set, lock release will be delayed by: %v", lockReleaseDelay)
+	} else {
+		log.Info("Lock release delay not set, lock will be released immediately after rebooting")
+	}
+	log.Infof("PreferNoSchedule taint: %s", preferNoScheduleTaintName)
+	log.Infof("Blocking Pod Selectors: %v", podSelectors)
+	log.Infof("Reboot period %v", period)
+	log.Infof("Concurrency: %v", concurrency)
+	log.Infof("Reboot method: %s", rebootMethod)
+
+	if annotateNodes {
+		log.Infof("Will annotate nodes during kured reboot operations")
 	}
 }
 
@@ -685,39 +717,12 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 }
 
 func root(cmd *cobra.Command, args []string) {
-	if logFormat == "json" {
-		log.SetFormatter(&log.JSONFormatter{})
-	}
-
-	log.Infof("Kubernetes Reboot Daemon: %s", version)
-
-	if nodeID == "" {
-		log.Fatal("KURED_NODE_ID environment variable required")
-	}
 
 	window, err := timewindow.New(rebootDays, rebootStart, rebootEnd, timezone)
 	if err != nil {
 		log.Fatalf("Failed to build time window: %v", err)
 	}
-
-	log.Infof("Node ID: %s", nodeID)
-	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
-	if lockTTL > 0 {
-		log.Infof("Lock TTL set, lock will expire after: %v", lockTTL)
-	} else {
-		log.Info("Lock TTL not set, lock will remain until being released")
-	}
-	if lockReleaseDelay > 0 {
-		log.Infof("Lock release delay set, lock release will be delayed by: %v", lockReleaseDelay)
-	} else {
-		log.Info("Lock release delay not set, lock will be released immediately after rebooting")
-	}
-	log.Infof("PreferNoSchedule taint: %s", preferNoScheduleTaintName)
-	log.Infof("Blocking Pod Selectors: %v", podSelectors)
 	log.Infof("Reboot schedule: %v", window)
-	log.Infof("Reboot period %v", period)
-	log.Infof("Concurrency: %v", concurrency)
-	log.Infof("Reboot method: %s", rebootMethod)
 
 	restartCommand, err := shlex.Split(rebootCommand)
 	if err != nil {
@@ -753,10 +758,6 @@ func root(cmd *cobra.Command, args []string) {
 		checker = checkers.UnprivilegedRebootChecker{
 			CheckCommand: []string{"test", "-f", rebootSentinelFile},
 		}
-	}
-
-	if annotateNodes {
-		log.Infof("Will annotate nodes during kured reboot operations")
 	}
 
 	go rebootAsRequired(nodeID, rebooter, checker, window, lockTTL, lockReleaseDelay)

@@ -9,6 +9,7 @@ import (
 func Test_flagCheck(t *testing.T) {
 	var cmd *cobra.Command
 	var args []string
+	nodeID = "babar"
 	slackHookURL = "https://hooks.slack.com/services/BLABLABA12345/IAM931A0VERY/COMPLICATED711854TOKEN1SET"
 	expected := "slack://BLABLABA12345/IAM931A0VERY/COMPLICATED711854TOKEN1SET"
 	flagCheck(cmd, args)
