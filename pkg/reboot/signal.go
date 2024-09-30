@@ -28,3 +28,9 @@ func (c SignalRebooter) Reboot() {
 		log.Fatalf("Signal of SIGRTMIN+5 failed: %v", err)
 	}
 }
+
+// NewSignalRebooter is the constructor which sets the signal number.
+// The constructor does not yet validate any input. It should be done in a later commit.
+func NewSignalRebooter(sig int) *SignalRebooter {
+	return &SignalRebooter{Signal: sig}
+}

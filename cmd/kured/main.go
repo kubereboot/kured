@@ -35,7 +35,6 @@ import (
 	"github.com/kubereboot/kured/pkg/reboot"
 	"github.com/kubereboot/kured/pkg/taints"
 	"github.com/kubereboot/kured/pkg/timewindow"
-	"github.com/kubereboot/kured/pkg/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -722,19 +721,14 @@ func root(cmd *cobra.Command, args []string) {
 	}
 	log.Infof("Reboot schedule: %v", window)
 
-	restartCommand, err := shlex.Split(rebootCommand)
-	if err != nil {
-		log.Fatalf("Error parsing provided reboot command: %v", err)
-	}
-
 	var rebooter reboot.Rebooter
 	switch {
 	case rebootMethod == "command":
-		log.Infof("Reboot command: %s", restartCommand)
-		rebooter = reboot.CommandRebooter{RebootCommand: util.PrivilegedHostCommand(1, restartCommand)}
+		log.Infof("Reboot command: %s", rebootCommand)
+		rebooter = reboot.NewCommandRebooter(rebootCommand)
 	case rebootMethod == "signal":
 		log.Infof("Reboot signal: %v", rebootSignal)
-		rebooter = reboot.SignalRebooter{Signal: rebootSignal}
+		rebooter = reboot.NewSignalRebooter(rebootSignal)
 	default:
 		log.Fatalf("Invalid reboot-method configured: %s", rebootMethod)
 	}
