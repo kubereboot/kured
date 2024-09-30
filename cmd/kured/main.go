@@ -28,8 +28,6 @@ import (
 	"k8s.io/client-go/rest"
 	kubectldrain "k8s.io/kubectl/pkg/drain"
 
-	"github.com/google/shlex"
-
 	shoutrrr "github.com/containrrr/shoutrrr"
 	"github.com/kubereboot/kured/pkg/alerts"
 	"github.com/kubereboot/kured/pkg/daemonsetlock"
@@ -744,20 +742,11 @@ func root(cmd *cobra.Command, args []string) {
 	var checker checkers.Checker
 	// An override of rebootsentinelcommand means a privileged command
 	if rebootSentinelCommand != "" {
-		log.Infof("Sentinel checker is user provided command: %s", rebootSentinelCommand)
-		cmd, err := shlex.Split(rebootSentinelCommand)
-		if err != nil {
-			log.Fatalf("Error parsing provided sentinel command: %v", err)
-		}
-		checker = checkers.NsEnterRebootChecker{
-			CustomCheckCommand: cmd,
-			NamespacePid:       1,
-		}
+		log.Infof("Sentinel checker is (privileged) user provided command: %s", rebootSentinelCommand)
+		checker = checkers.NewCommandChecker(rebootSentinelCommand)
 	} else {
 		log.Infof("Sentinel checker is (unprivileged) testing for the presence of: %s", rebootSentinelFile)
-		checker = checkers.UnprivilegedRebootChecker{
-			CheckCommand: []string{"test", "-f", rebootSentinelFile},
-		}
+		checker = checkers.NewFileRebootChecker(rebootSentinelFile)
 	}
 
 	go rebootAsRequired(nodeID, rebooter, checker, window, lockTTL, lockReleaseDelay)
