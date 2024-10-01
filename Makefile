@@ -3,7 +3,7 @@
 
 TEMPDIR=./.tmp
 GORELEASER_CMD=$(TEMPDIR)/goreleaser
-DH_ORG=kubereboot
+DH_ORG ?= kubereboot
 VERSION=$(shell git rev-parse --short HEAD)
 SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
 
