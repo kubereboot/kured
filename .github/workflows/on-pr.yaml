@@ -145,7 +145,7 @@ jobs:
           EOF
 
       # Default name for helm/kind-action kind clusters is "chart-testing"
-      - name: Create kind cluster with 5 nodes
+      - name: Create kind cluster with 3 nodes
         uses: helm/kind-action@v1.10.0
         with:
           config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
@@ -169,7 +169,7 @@ jobs:
           max_attempts: 10
           retry_wait_seconds: 60
           # DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE should all be = to cluster_size
-          command: "kubectl get ds -n kube-system kured | grep -E 'kured.*5.*5.*5.*5.*5'"
+          command: "kubectl get ds -n kube-system kured | grep -E 'kured.*3.*3.*3.*3.*3'"
 
       - name: Create reboot sentinel files
         run: |
@@ -230,7 +230,7 @@ jobs:
           EOF
 
       # Default name for helm/kind-action kind clusters is "chart-testing"
-      - name: Create kind cluster with 5 nodes
+      - name: Create kind cluster with 3 nodes
         uses: helm/kind-action@v1.10.0
         with:
           config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
@@ -241,7 +241,7 @@ jobs:
 
       - name: Do not wait for an hour before detecting the rebootSentinel
         run: |
-          sed -i 's/#\(.*\)--period=1h/\1--period=30s/g' kured-ds-signal.yaml
+          sed -i 's/#\(.*\)--period=1h/\1--period=15s/g' kured-ds-signal.yaml
 
       - name: Install kured with kubectl
         run: |
@@ -254,7 +254,7 @@ jobs:
           max_attempts: 10
           retry_wait_seconds: 60
           # DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE should all be = to cluster_size
-          command: "kubectl get ds -n kube-system kured | grep -E 'kured.*5.*5.*5.*5.*5'"
+          command: "kubectl get ds -n kube-system kured | grep -E 'kured.*3.*3.*3.*3.*3'"
 
       - name: Create reboot sentinel files
         run: |
@@ -316,7 +316,7 @@ jobs:
           EOF
 
       # Default name for helm/kind-action kind clusters is "chart-testing"
-      - name: Create kind cluster with 5 nodes
+      - name: Create kind cluster with 3 nodes
         uses: helm/kind-action@v1.10.0
         with:
           config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
@@ -327,7 +327,7 @@ jobs:
 
       - name: Do not wait for an hour before detecting the rebootSentinel
         run: |
-          sed -i 's/#\(.*\)--period=1h/\1--period=30s/g' kured-ds.yaml
+          sed -i 's/#\(.*\)--period=1h/\1--period=15s/g' kured-ds.yaml
           sed -i 's/#\(.*\)--concurrency=1/\1--concurrency=2/g' kured-ds.yaml
 
       - name: Install kured with kubectl
@@ -341,7 +341,7 @@ jobs:
           max_attempts: 10
           retry_wait_seconds: 60
           # DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE should all be = to cluster_size
-          command: "kubectl get ds -n kube-system kured | grep -E 'kured.*5.*5.*5.*5.*5'"
+          command: "kubectl get ds -n kube-system kured | grep -E 'kured.*3.*3.*3.*3.*3'"
 
       - name: Create reboot sentinel files
         run: |
