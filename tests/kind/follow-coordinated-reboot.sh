@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-NODECOUNT=${NODECOUNT:-5}
+NODECOUNT=${NODECOUNT:-2}
 KUBECTL_CMD="${KUBECTL_CMD:-kubectl}"
 DEBUG="${DEBUG:-false}"
 CONTAINER_NAME_FORMAT=${CONTAINER_NAME_FORMAT:-"chart-testing-*"}
@@ -35,9 +35,11 @@ trap gather_logs_and_cleanup EXIT
 
 declare -A was_unschedulable
 declare -A has_recovered
-max_attempts="60"
-sleep_time=60
+max_attempts="200"
+sleep_time=5
 attempt_num=1
+
+# Get docker info of each of those kind containers. If one has crashed, restart it.
 
 set +o errexit
 echo "There are $NODECOUNT nodes in the cluster"
@@ -52,13 +54,14 @@ do
     #    cat "$tmp_dir"/node_output
     #fi
 
-    "$KUBECTL_CMD" get nodes -o custom-columns=NAME:.metadata.name,SCHEDULABLE:.spec.unschedulable --no-headers > "$tmp_dir"/node_output
+    "$KUBECTL_CMD" get nodes -o custom-columns=NAME:.metadata.name,SCHEDULABLE:.spec.unschedulable --no-headers | grep -v control-plane > "$tmp_dir"/node_output
     if [[ "$DEBUG" == "true" ]]; then
         # This is useful to see if a node gets stuck after drain, and doesn't
         # come back up.
         echo "Result of command $KUBECTL_CMD get nodes ... showing unschedulable nodes:"
         cat "$tmp_dir"/node_output
     fi
+
     while read -r node; do
         unschedulable=$(echo "$node" | grep true | cut -f 1 -d ' ')
         if [ -n "$unschedulable" ] && [ -z ${was_unschedulable["$unschedulable"]+x} ] ; then
@@ -70,6 +73,12 @@ do
             echo "$schedulable has recovered!"
             has_recovered["$schedulable"]=1
         fi
+
+        # If the container has crashed, restart it.
+        node_name=$(echo "$node" | cut -f 1 -d ' ')
+        stopped_container_id=$(docker container ls --filter=name="$node_name" --filter=status=exited -q)
+        if [ -n "$stopped_container_id" ]; then echo "Node $stopped_container_id needs restart"; docker start "$stopped_container_id"; echo "Container started."; fi
+
     done < "$tmp_dir"/node_output
 
     if [[ "${#has_recovered[@]}" == "$NODECOUNT" ]]; then
