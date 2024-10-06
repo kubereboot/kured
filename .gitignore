@@ -3,3 +3,5 @@ vendor
 build
 dist
 .tmp
+test.json
+tests/kind/testfiles/*.yaml

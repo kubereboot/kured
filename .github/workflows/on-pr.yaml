@@ -4,8 +4,8 @@ on:
   push:
 
 jobs:
-  pr-gotest:
-    name: Run go tests
+  pr-short-tests:
+    name: Run short go tests
     runs-on: ubuntu-latest
     steps:
       - name: checkout
@@ -16,39 +16,13 @@ jobs:
           go-version-file: 'go.mod'
           check-latest: true
       - name: run tests
-        run: go test -json ./... > test.json
+        run: make test
       - name: Annotate tests
         if: always()
         uses: guyarb/golang-test-annoations@v0.8.0
         with:
           test-results: test.json
 
-  pr-shellcheck:
-    name: Lint bash code with shellcheck
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Run ShellCheck
-      uses: bewuethr/shellcheck-action@v2
-
-  pr-lint-code:
-    name: Lint golang code
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Ensure go version
-      uses: actions/setup-go@v5
-      with:
-        go-version-file: 'go.mod'
-        check-latest: true
-    - name: Lint cmd folder
-      uses: Jerome1337/golint-action@v1.0.3
-      with:
-        golint-path: './cmd/...'
-    - name: Lint pkg folder
-      uses: Jerome1337/golint-action@v1.0.3
-      with:
-        golint-path: './pkg/...'
 
   pr-check-docs-links:
     name: Check docs for incorrect links
@@ -130,56 +104,13 @@ jobs:
       - name: Find current tag version
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         id: tags
-      - name: Build artifacts
-        run: |
-          VERSION="${{ steps.tags.outputs.sha_short }}" DH_ORG="${{ github.repository_owner }}" make image
-          VERSION="${{ steps.tags.outputs.sha_short }}" DH_ORG="${{ github.repository_owner }}" make manifest
-
-      - name: Workaround "Failed to attach 1 to compat systemd cgroup /actions_job/..." on gh actions
-        run: |
-          sudo bash << EOF
-              cp /etc/docker/daemon.json /etc/docker/daemon.json.old
-              echo '{}' > /etc/docker/daemon.json
-              systemctl restart docker || journalctl --no-pager -n 500
-              systemctl status docker
-          EOF
-
-      # Default name for helm/kind-action kind clusters is "chart-testing"
-      - name: Create kind cluster with 3 nodes
+      - name: Install kind
         uses: helm/kind-action@v1.10.0
         with:
-          config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
-          version: v0.14.0
-
-      - name: Preload previously built images onto kind cluster
-        run: kind load docker-image ghcr.io/${{ github.repository }}:${{ steps.tags.outputs.sha_short }} --name chart-testing
-
-      - name: Do not wait for an hour before detecting the rebootSentinel
-        run: |
-          sed -i 's/#\(.*\)--period=1h/\1--period=30s/g' kured-ds.yaml
-
-      - name: Install kured with kubectl
-        run: |
-          kubectl apply -f kured-rbac.yaml && kubectl apply -f kured-ds.yaml
-
-      - name: Ensure kured is ready
-        uses: nick-invision/retry@v3.0.0
-        with:
-          timeout_minutes: 10
-          max_attempts: 10
-          retry_wait_seconds: 60
-          # DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE should all be = to cluster_size
-          command: "kubectl get ds -n kube-system kured | grep -E 'kured.*3.*3.*3.*3.*3'"
-
-      - name: Create reboot sentinel files
-        run: |
-          ./tests/kind/create-reboot-sentinels.sh
-
-      - name: Follow reboot until success
-        env:
-          DEBUG: true
-        run: |
-          ./tests/kind/follow-coordinated-reboot.sh
+          install_only: true
+          version: v0.22.0
+      - name: Run specific e2e tests
+        run: make e2e-test ARGS="-run ^TestE2EWithCommand/${{ matrix.kubernetes }}"
 
 
   # This ensures the latest code works with the manifests built from tree.
@@ -215,57 +146,13 @@ jobs:
       - name: Find current tag version
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         id: tags
-      - name: Build artifacts
-        run: |
-          VERSION="${{ steps.tags.outputs.sha_short }}" DH_ORG="${{ github.repository_owner }}" make image
-          VERSION="${{ steps.tags.outputs.sha_short }}" DH_ORG="${{ github.repository_owner }}" make manifest
-
-      - name: Workaround "Failed to attach 1 to compat systemd cgroup /actions_job/..." on gh actions
-        run: |
-          sudo bash << EOF
-              cp /etc/docker/daemon.json /etc/docker/daemon.json.old
-              echo '{}' > /etc/docker/daemon.json
-              systemctl restart docker || journalctl --no-pager -n 500
-              systemctl status docker
-          EOF
-
-      # Default name for helm/kind-action kind clusters is "chart-testing"
-      - name: Create kind cluster with 3 nodes
+      - name: Install kind
         uses: helm/kind-action@v1.10.0
         with:
-          config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
-          version: v0.14.0
-
-      - name: Preload previously built images onto kind cluster
-        run: kind load docker-image ghcr.io/${{ github.repository }}:${{ steps.tags.outputs.sha_short }} --name chart-testing
-
-      - name: Do not wait for an hour before detecting the rebootSentinel
-        run: |
-          sed -i 's/#\(.*\)--period=1h/\1--period=15s/g' kured-ds-signal.yaml
-
-      - name: Install kured with kubectl
-        run: |
-          kubectl apply -f kured-rbac.yaml && kubectl apply -f kured-ds-signal.yaml
-
-      - name: Ensure kured is ready
-        uses: nick-invision/retry@v3.0.0
-        with:
-          timeout_minutes: 10
-          max_attempts: 10
-          retry_wait_seconds: 60
-          # DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE should all be = to cluster_size
-          command: "kubectl get ds -n kube-system kured | grep -E 'kured.*3.*3.*3.*3.*3'"
-
-      - name: Create reboot sentinel files
-        run: |
-          ./tests/kind/create-reboot-sentinels.sh
-
-      - name: Follow reboot until success
-        env:
-          DEBUG: true
-        run: |
-          ./tests/kind/follow-coordinated-reboot.sh
-
+          install_only: true
+          version: v0.22.0
+      - name: Run specific e2e tests
+        run: make e2e-test ARGS="-run ^TestE2EWithSignal/${{ matrix.kubernetes }}"
 
 
   # This ensures the latest code works with the manifests built from tree.
@@ -301,54 +188,10 @@ jobs:
       - name: Find current tag version
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         id: tags
-      - name: Build artifacts
-        run: |
-          VERSION="${{ steps.tags.outputs.sha_short }}" DH_ORG="${{ github.repository_owner }}" make image
-          VERSION="${{ steps.tags.outputs.sha_short }}" DH_ORG="${{ github.repository_owner }}" make manifest
-
-      - name: Workaround "Failed to attach 1 to compat systemd cgroup /actions_job/..." on gh actions
-        run: |
-          sudo bash << EOF
-              cp /etc/docker/daemon.json /etc/docker/daemon.json.old
-              echo '{}' > /etc/docker/daemon.json
-              systemctl restart docker || journalctl --no-pager -n 500
-              systemctl status docker
-          EOF
-
-      # Default name for helm/kind-action kind clusters is "chart-testing"
-      - name: Create kind cluster with 3 nodes
+      - name: Install kind
         uses: helm/kind-action@v1.10.0
         with:
-          config: .github/kind-cluster-${{ matrix.kubernetes }}.yaml
-          version: v0.14.0
-
-      - name: Preload previously built images onto kind cluster
-        run: kind load docker-image ghcr.io/${{ github.repository }}:${{ steps.tags.outputs.sha_short }} --name chart-testing
-
-      - name: Do not wait for an hour before detecting the rebootSentinel
-        run: |
-          sed -i 's/#\(.*\)--period=1h/\1--period=15s/g' kured-ds.yaml
-          sed -i 's/#\(.*\)--concurrency=1/\1--concurrency=2/g' kured-ds.yaml
-
-      - name: Install kured with kubectl
-        run: |
-          kubectl apply -f kured-rbac.yaml && kubectl apply -f kured-ds.yaml
-
-      - name: Ensure kured is ready
-        uses: nick-invision/retry@v3.0.0
-        with:
-          timeout_minutes: 10
-          max_attempts: 10
-          retry_wait_seconds: 60
-          # DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE should all be = to cluster_size
-          command: "kubectl get ds -n kube-system kured | grep -E 'kured.*3.*3.*3.*3.*3'"
-
-      - name: Create reboot sentinel files
-        run: |
-          ./tests/kind/create-reboot-sentinels.sh
-
-      - name: Follow reboot until success
-        env:
-          DEBUG: true
-        run: |
-          ./tests/kind/follow-coordinated-reboot.sh
+          install_only: true
+          version: v0.22.0
+      - name: Run specific e2e tests
+        run: make e2e-test ARGS="-run ^TestE2EConcurrentWithCommand/${{ matrix.kubernetes }}"
