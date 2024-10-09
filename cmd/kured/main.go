@@ -313,11 +313,11 @@ func validateNotificationURL(notifyURL string, slackHookURL string) string {
 		log.Warnf("Deprecated flag(s). Please use --notify-url flag instead.")
 		parsedURL, err := url.Parse(stripQuotes(slackHookURL))
 		if err != nil {
-			log.Warnf("slack-hook-url is not properly formatted... no notification will be sent: %v\n", err)
+			log.Errorf("slack-hook-url is not properly formatted... no notification will be sent: %v\n", err)
 			return ""
 		}
 		if len(strings.Split(strings.Trim(parsedURL.Path, "/services/"), "/")) != 3 {
-			log.Warnf("slack-hook-url is not properly formatted... no notification will be sent: unexpected number of / in URL\n")
+			log.Errorf("slack-hook-url is not properly formatted... no notification will be sent: unexpected number of / in URL\n")
 			return ""
 		}
 		return fmt.Sprintf("slack://%s", strings.Trim(parsedURL.Path, "/services/"))
