@@ -66,7 +66,7 @@ func TestCanAcquireMultiple(t *testing.T) {
 			current:   multiLockAnnotationValue{},
 			desired: multiLockAnnotationValue{
 				MaxOwners: 2,
-				LockAnnotations: []lockAnnotationValue{
+				LockAnnotations: []LockAnnotationValue{
 					{NodeID: node1Name},
 				},
 			},
@@ -80,13 +80,13 @@ func TestCanAcquireMultiple(t *testing.T) {
 			maxOwners: 2,
 			current: multiLockAnnotationValue{
 				MaxOwners: 2,
-				LockAnnotations: []lockAnnotationValue{
+				LockAnnotations: []LockAnnotationValue{
 					{NodeID: node2Name},
 				},
 			},
 			desired: multiLockAnnotationValue{
 				MaxOwners: 2,
-				LockAnnotations: []lockAnnotationValue{
+				LockAnnotations: []LockAnnotationValue{
 					{NodeID: node1Name},
 					{NodeID: node2Name},
 				},
@@ -101,7 +101,7 @@ func TestCanAcquireMultiple(t *testing.T) {
 			maxOwners: 2,
 			current: multiLockAnnotationValue{
 				MaxOwners: 2,
-				LockAnnotations: []lockAnnotationValue{
+				LockAnnotations: []LockAnnotationValue{
 					{
 						NodeID:  node2Name,
 						Created: time.Now().UTC().Add(-1 * time.Minute),
@@ -116,7 +116,7 @@ func TestCanAcquireMultiple(t *testing.T) {
 			},
 			desired: multiLockAnnotationValue{
 				MaxOwners: 2,
-				LockAnnotations: []lockAnnotationValue{
+				LockAnnotations: []LockAnnotationValue{
 					{NodeID: node2Name},
 					{NodeID: node3Name},
 				},
@@ -131,7 +131,7 @@ func TestCanAcquireMultiple(t *testing.T) {
 			maxOwners: 2,
 			current: multiLockAnnotationValue{
 				MaxOwners: 2,
-				LockAnnotations: []lockAnnotationValue{
+				LockAnnotations: []LockAnnotationValue{
 					{
 						NodeID:  node2Name,
 						Created: time.Now().UTC().Add(-1 * time.Hour),
@@ -146,7 +146,7 @@ func TestCanAcquireMultiple(t *testing.T) {
 			},
 			desired: multiLockAnnotationValue{
 				MaxOwners: 2,
-				LockAnnotations: []lockAnnotationValue{
+				LockAnnotations: []LockAnnotationValue{
 					{NodeID: node1Name},
 					{NodeID: node3Name},
 				},
@@ -161,7 +161,7 @@ func TestCanAcquireMultiple(t *testing.T) {
 			maxOwners: 2,
 			current: multiLockAnnotationValue{
 				MaxOwners: 2,
-				LockAnnotations: []lockAnnotationValue{
+				LockAnnotations: []LockAnnotationValue{
 					{
 						NodeID:  node2Name,
 						Created: time.Now().UTC().Add(-1 * time.Hour),
@@ -176,17 +176,17 @@ func TestCanAcquireMultiple(t *testing.T) {
 			},
 			desired: multiLockAnnotationValue{
 				MaxOwners: 2,
-				LockAnnotations: []lockAnnotationValue{
+				LockAnnotations: []LockAnnotationValue{
 					{NodeID: node1Name},
 				},
 			},
 			lockPossible: true,
 		},
 	}
-
+	nm := NodeMeta{Unschedulable: false}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			lockPossible, actual := testCase.daemonSetLock.canAcquireMultiple(testCase.current, struct{}{}, time.Minute, testCase.maxOwners)
+			lockPossible, actual := testCase.daemonSetLock.canAcquireMultiple(testCase.current, nm, time.Minute, testCase.maxOwners)
 			if lockPossible != testCase.lockPossible {
 				t.Fatalf(
 					"unexpected result for lock possible (got %t expected %t new annotation %v",
