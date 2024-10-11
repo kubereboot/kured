@@ -283,3 +283,54 @@ func TestE2EConcurrentWithCommand(t *testing.T) {
 		})
 	}
 }
+
+func TestCordonningIsKept(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
+	var kindClusterConfigs = []string{
+		"concurrency1",
+		"concurrency2",
+	}
+	// Iterate over each Kubernetes version
+	for _, version := range kindClusterConfigs {
+		version := version
+		// Define a subtest for each combination
+		t.Run(version, func(t *testing.T) {
+			t.Parallel() // Allow tests to run in parallel
+
+			randomInt := fmt.Sprintf(strconv.Itoa(rand.Intn(100)))
+			kindClusterName := fmt.Sprintf("kured-e2e-cordon-%v-%v", version, randomInt)
+			kindClusterConfigFile := fmt.Sprintf("../../.github/kind-cluster-next.yaml")
+			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
+
+			var manifest string
+			if version == "concurrency1" {
+				manifest = fmt.Sprintf("testfiles/kured-ds.yaml")
+			} else {
+				manifest = fmt.Sprintf("testfiles/kured-ds-concurrent.yaml")
+			}
+			k := NewKindTester(kindClusterName, kindClusterConfigFile, t, LocalImage(kuredDevImage), Deploy("../../kured-rbac.yaml"), Deploy(manifest))
+			defer k.FlushLog()
+
+			err := k.Create()
+			if err != nil {
+				t.Fatalf("Error creating cluster %v", err)
+			}
+			defer func(k *KindTest) {
+				err := k.Destroy()
+				if err != nil {
+					t.Fatalf("Error destroying cluster %v", err)
+				}
+			}(k)
+
+			k.Write([]byte("Now running e2e tests"))
+
+			if err := k.RunCmd("bash", "testfiles/node-stays-as-cordonned.sh", kindContext); err != nil {
+				t.Fatalf("node did not reboot in time: %v", err)
+			}
+		})
+	}
+}
