@@ -1,6 +1,6 @@
 module github.com/kubereboot/kured
 
-go 1.21
+go 1.22
 
 replace golang.org/x/net => golang.org/x/net v0.23.0
 
