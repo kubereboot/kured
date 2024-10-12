@@ -1,24 +1,24 @@
 .DEFAULT: all
 .PHONY: all clean image minikube-publish manifest test kured-all
 
-TEMPDIR=./.tmp
-GORELEASER_CMD=$(TEMPDIR)/goreleaser
+HACKDIR=./hack/bin
+GORELEASER_CMD=$(HACKDIR)/goreleaser
 DH_ORG ?= kubereboot
 VERSION=$(shell git rev-parse --short HEAD)
 SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
 
 all: image
 
-$(TEMPDIR):
-	mkdir -p $(TEMPDIR)
+$(HACKDIR):
+	mkdir -p $(HACKDIR)
 
 .PHONY: bootstrap-tools
-bootstrap-tools: $(TEMPDIR)
-	command -v .tmp/goreleaser || VERSION=v1.24.0 TMPDIR=.tmp bash .github/scripts/goreleaser-install.sh
-	command -v  .tmp/syft || curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b .tmp v1.0.1
-	command -v  .tmp/cosign || curl -sSfL https://github.com/sigstore/cosign/releases/download/v2.2.3/cosign-linux-amd64 -o .tmp/cosign
-	command -v  .tmp/shellcheck || (curl -sSfL https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.x86_64.tar.xz | tar -J -v -x shellcheck-stable/shellcheck && mv shellcheck-stable/shellcheck .tmp/shellcheck && rmdir shellcheck-stable)
-	chmod +x .tmp/goreleaser .tmp/cosign .tmp/syft .tmp/shellcheck
+bootstrap-tools: $(HACKDIR)
+	command -v $(HACKDIR)/goreleaser || VERSION=v1.24.0 TMPDIR=$(HACKDIR) bash hack/installers/goreleaser-install.sh
+	command -v  $(HACKDIR)/syft || curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b $(HACKDIR) v1.0.1
+	command -v  $(HACKDIR)/cosign || curl -sSfL https://github.com/sigstore/cosign/releases/download/v2.2.3/cosign-linux-amd64 -o $(HACKDIR)/cosign
+	command -v  $(HACKDIR)/shellcheck || (curl -sSfL https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.x86_64.tar.xz | tar -J -v -x shellcheck-stable/shellcheck && mv shellcheck-stable/shellcheck $(HACKDIR)/shellcheck && rmdir shellcheck-stable)
+	chmod +x $(HACKDIR)/goreleaser $(HACKDIR)/cosign $(HACKDIR)/syft $(HACKDIR)/shellcheck
 	# go install honnef.co/go/tools/cmd/staticcheck@latest
 
 clean:
@@ -67,5 +67,5 @@ test: bootstrap-tools
 	echo "Running short go tests"
 	go test -test.short -json ./... > test.json
 	echo "Running shellcheck"
-	find . -name '*.sh' -exec .tmp/shellcheck  {} \;
+	find . -name '*.sh' | xargs -n1 $(HACKDIR)/shellcheck
 	# Need to add staticcheck to replace golint as golint is deprecated, and staticcheck is the recommendation
