@@ -13,11 +13,12 @@ type CommandRebooter struct {
 }
 
 // Reboot triggers the reboot command
-func (c CommandRebooter) Reboot() {
+func (c CommandRebooter) Reboot() error {
 	log.Infof("Invoking command: %s", c.RebootCommand)
 	if err := util.NewCommand(c.RebootCommand[0], c.RebootCommand[1:]...).Run(); err != nil {
-		log.Fatalf("Error invoking reboot command: %v", err)
+		return fmt.Errorf("error invoking reboot command %s: %v", c.RebootCommand, err)
 	}
+	return nil
 }
 
 // NewCommandRebooter is the constructor to create a CommandRebooter from a string not

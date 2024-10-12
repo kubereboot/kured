@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"syscall"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // SignalRebooter holds context-information for a signal reboot.
@@ -14,20 +12,19 @@ type SignalRebooter struct {
 }
 
 // Reboot triggers the reboot signal
-func (c SignalRebooter) Reboot() {
-	log.Infof("Invoking signal: %v", c.Signal)
-
+func (c SignalRebooter) Reboot() error {
 	process, err := os.FindProcess(1)
 	if err != nil {
-		log.Fatalf("Not running on Unix: %v", err)
+		return fmt.Errorf("not running on Unix: %v", err)
 	}
 
 	err = process.Signal(syscall.Signal(c.Signal))
 	// Either PID does not exist, or the signal does not work. Hoping for
 	// a decent enough error.
 	if err != nil {
-		log.Fatalf("Signal of SIGRTMIN+5 failed: %v", err)
+		return fmt.Errorf("signal of SIGRTMIN+5 failed: %v", err)
 	}
+	return nil
 }
 
 // NewSignalRebooter is the constructor which sets the signal number.

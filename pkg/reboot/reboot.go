@@ -10,7 +10,7 @@ import (
 // The Reboot method does not expect any return, yet should
 // most likely be refactored in the future to return an error
 type Rebooter interface {
-	Reboot()
+	Reboot() error
 }
 
 // NewRebooter validates the rebootMethod, rebootCommand, and rebootSignal input,
