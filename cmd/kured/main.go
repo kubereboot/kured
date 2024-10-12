@@ -7,21 +7,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/containrrr/shoutrrr"
 	"github.com/kubereboot/kured/internal/daemonsetlock"
-	"github.com/kubereboot/kured/internal/delaytick"
 	"github.com/kubereboot/kured/internal/taints"
 	"github.com/kubereboot/kured/internal/timewindow"
-	"math/rand"
-	"net/http"
-	"net/url"
-	"os"
-	"reflect"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
-
-	"github.com/containrrr/shoutrrr"
 	"github.com/kubereboot/kured/pkg/blockers"
 	"github.com/kubereboot/kured/pkg/checkers"
 	"github.com/kubereboot/kured/pkg/reboot"
@@ -36,6 +25,14 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	kubectldrain "k8s.io/kubectl/pkg/drain"
+	"net/http"
+	"net/url"
+	"os"
+	"reflect"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
 )
 
 var (
@@ -136,8 +133,8 @@ func main() {
 		"delay reboot for this duration (default: 0, disabled)")
 	flag.StringVar(&rebootMethod, "reboot-method", "command",
 		"method to use for reboots. Available: command")
-	flag.DurationVar(&period, "period", time.Minute*60,
-		"sentinel check period")
+	flag.DurationVar(&period, "period", time.Minute,
+		"period at which the main operations are done")
 	flag.StringVar(&dsNamespace, "ds-namespace", "kube-system",
 		"namespace containing daemonset on which to place lock")
 	flag.StringVar(&dsName, "ds-name", "kured",
@@ -244,7 +241,8 @@ func main() {
 	log.Infof("Reboot schedule: %v", window)
 
 	log.Infof("Reboot method: %s", rebootMethod)
-	rebooter, err := reboot.NewRebooter(rebootMethod, rebootCommand, rebootSignal)
+
+	rebooter, err := reboot.NewRebooter(rebootMethod, rebootCommand, rebootSignal, rebootDelay)
 	if err != nil {
 		log.Fatalf("Failed to build rebooter: %v", err)
 	}
@@ -284,7 +282,7 @@ func main() {
 	}
 	lock := daemonsetlock.New(client, nodeID, dsNamespace, dsName, lockAnnotation, lockTTL, concurrency, lockReleaseDelay)
 
-	go rebootAsRequired(nodeID, rebooter, rebootChecker, blockCheckers, window, lock, client)
+	go rebootAsRequired(nodeID, rebooter, rebootChecker, blockCheckers, window, lock, client, period)
 
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", metricsHost, metricsPort), nil)) // #nosec G114
@@ -551,41 +549,79 @@ func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []stri
 	}
 }
 
-func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.Checker, blockCheckers []blockers.RebootBlocker, window *timewindow.TimeWindow, lock daemonsetlock.Lock, client *kubernetes.Clientset) {
+func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.Checker, blockCheckers []blockers.RebootBlocker, window *timewindow.TimeWindow, lock daemonsetlock.Lock, client *kubernetes.Clientset, period time.Duration) {
 
-	source := rand.NewSource(time.Now().UnixNano())
-	tick := delaytick.New(source, 1*time.Minute)
-	for range tick {
-		holding, lockData, err := lock.Holding()
-		if err != nil {
-			log.Errorf("Error testing lock: %v", err)
-		}
-		if holding {
+	preferNoScheduleTaint := taints.New(client, nodeID, preferNoScheduleTaintName, v1.TaintEffectPreferNoSchedule)
+
+	// No reason to delay the first ticks.
+	// On top of it, we used to leak a goroutine, which was never garbage collected.
+	// Starting on go1.23, with Tick, we would have that goroutine garbage collected.
+	c := time.Tick(period)
+	for range c {
+
+		rebootRequired := checker.RebootRequired()
+		if !rebootRequired {
+			rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
+			// Now cleaning up post reboot
+
+			// Quickly allow rescheduling.
+			// The node could be still cordonned anyway
+			preferNoScheduleTaint.Disable()
+
+			// Test API server first. If cannot get node, we should not do anything.
 			node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 			if err != nil {
-				log.Errorf("Error retrieving node object via k8s API: %v", err)
+				log.Infof("Error retrieving node object via k8s API: %v", err)
 				continue
 			}
 
-			if !lockData.Metadata.Unschedulable {
-				err = uncordon(client, node)
-				if err != nil {
-					log.Errorf("Unable to uncordon %s: %v, will continue to hold lock and retry uncordon", node.GetName(), err)
-					continue
-				}
+			// Get lock data to know if need to uncordon the node
+			// to get the node back to its previous state
+			// TODO: Need to move to another method to check the current data of the lock relevant for this node
+			holding, lockData, err := lock.Holding()
+			if err != nil {
+				log.Infof("Error checking lock - Not applying any action: %v", err)
+				continue
+			}
 
-				if notifyURL != "" {
-					if err := shoutrrr.Send(notifyURL, fmt.Sprintf(messageTemplateUncordon, nodeID)); err != nil {
-						log.Warnf("Error notifying: %v", err)
+			// we check if holding ONLY to know if lockData is valid.
+			// When moving to fetch lockData as a separate method, remove
+			// this whole condition.
+			// However, it means that Release()
+			// need to behave idempotently regardless or not the lock is
+			// held, but that's an ideal state.
+			// what we should simply do is reconcile the lock data
+			// with the node spec. But behind the scenes its a bug
+			// if it's not holding due to an error
+			if holding && !lockData.Metadata.Unschedulable {
+				// Split into two lines to remember I need to remove the first
+				// condition ;)
+				if node.Spec.Unschedulable != lockData.Metadata.Unschedulable && lockData.Metadata.Unschedulable == false {
+					err = uncordon(client, node)
+					if err != nil {
+						log.Infof("Unable to uncordon %s: %v, will continue to hold lock and retry uncordon", node.GetName(), err)
+						continue
+					}
+					// TODO, modify the actions to directly log and notify, instead of individual methods giving
+					// an incomplete view of the lifecycle
+					if notifyURL != "" {
+						if err := shoutrrr.Send(notifyURL, fmt.Sprintf(messageTemplateUncordon, nodeID)); err != nil {
+							log.Warnf("Error notifying: %v", err)
+						}
 					}
 				}
+
 			}
-			// If we're holding the lock we know we've tried, in a prior run, to reboot
-			// So (1) we want to confirm that the reboot succeeded practically ( !rebootRequired() )
-			// And (2) check if we previously annotated the node that it was in the process of being rebooted,
-			// And finally (3) if it has that annotation, to delete it.
-			// This indicates to other node tools running on the cluster that this node may be a candidate for maintenance
-			if annotateNodes && !checker.RebootRequired() {
+
+			// Releasing lock earlier is nice for other nodes
+			err = lock.Release()
+			if err != nil {
+				log.Infof("Error releasing lock, will retry: %v", err)
+				continue
+			}
+			// Regardless or not we are holding the lock
+			// The node should not say it's still in progress if the reboot is done
+			if annotateNodes {
 				if _, ok := node.Annotations[KuredRebootInProgressAnnotation]; ok {
 					err := deleteNodeAnnotation(client, nodeID, KuredRebootInProgressAnnotation)
 					if err != nil {
@@ -594,125 +630,97 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 				}
 			}
 
-			err = lock.Release()
-			if err != nil {
-				log.Errorf("Error releasing lock, will retry: %v", err)
+		} else {
+			rebootRequiredGauge.WithLabelValues(nodeID).Set(1)
+
+			// Act on reboot required.
+			if !window.Contains(time.Now()) {
+				log.Debugf("Reboot required for node %v, but outside maintenance window", nodeID)
 				continue
 			}
-		}
-		break
-	}
+			// moved up, because we should not put an annotation "Going to be rebooting", if
+			// we know well that this won't reboot. TBD as some ppl might have another opinion.
+			if blocked, names := blockers.RebootBlocked(blockCheckers...); blocked {
+				log.Infof("Reboot blocked by %v", strings.Join(names, ", "))
+				continue
+			}
 
-	preferNoScheduleTaint := taints.New(client, nodeID, preferNoScheduleTaintName, v1.TaintEffectPreferNoSchedule)
+			// Test API server first. If cannot get node, we should not do anything.
+			node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
+			if err != nil {
+				log.Debugf("Error retrieving node object via k8s API: %v", err)
+				continue
+			}
+			// nodeMeta contains the node Metadata that should be included in the lock
+			nodeMeta := daemonsetlock.NodeMeta{Unschedulable: node.Spec.Unschedulable}
 
-	// Remove taint immediately during startup to quickly allow scheduling again.
-	// Also update the metric at startup (after lock shenanigans)
-	if !checker.RebootRequired() {
-		rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
-		preferNoScheduleTaint.Disable()
-	}
+			var timeNowString string
+			if annotateNodes {
+				if _, ok := node.Annotations[KuredRebootInProgressAnnotation]; !ok {
+					timeNowString = time.Now().Format(time.RFC3339)
+					// Annotate this node to indicate that "I am going to be rebooted!"
+					// so that other node maintenance tools running on the cluster are aware that this node is in the process of a "state transition"
+					annotations := map[string]string{KuredRebootInProgressAnnotation: timeNowString}
+					// & annotate this node with a timestamp so that other node maintenance tools know how long it's been since this node has been marked for reboot
+					annotations[KuredMostRecentRebootNeededAnnotation] = timeNowString
+					err := addNodeAnnotations(client, nodeID, annotations)
+					if err != nil {
+						continue
+					}
+				}
+			}
 
-	source = rand.NewSource(time.Now().UnixNano())
-	tick = delaytick.New(source, period)
-	for range tick {
-		if !window.Contains(time.Now()) {
-			// Remove taint outside the reboot time window to allow for normal operation.
-			preferNoScheduleTaint.Disable()
-			continue
-		}
+			// Prefer to not schedule pods onto this node to avoid draing the same pod multiple times.
+			preferNoScheduleTaint.Enable()
 
-		if !checker.RebootRequired() {
-			log.Infof("Reboot not required")
-			rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
-			preferNoScheduleTaint.Disable()
-			continue
-		}
-		rebootRequiredGauge.WithLabelValues(nodeID).Set(1)
+			// This could be merged into a single idempotent "Acquire" lock
+			holding, _, err := lock.Holding()
+			if err != nil {
+				log.Debugf("Error testing lock: %v", err)
+				continue
+			}
 
-		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
-		if err != nil {
-			log.Fatalf("Error retrieving node object via k8s API: %v", err)
-		}
-
-		nodeMeta := daemonsetlock.NodeMeta{Unschedulable: node.Spec.Unschedulable}
-
-		var timeNowString string
-		if annotateNodes {
-			if _, ok := node.Annotations[KuredRebootInProgressAnnotation]; !ok {
-				timeNowString = time.Now().Format(time.RFC3339)
-				// Annotate this node to indicate that "I am going to be rebooted!"
-				// so that other node maintenance tools running on the cluster are aware that this node is in the process of a "state transition"
-				annotations := map[string]string{KuredRebootInProgressAnnotation: timeNowString}
-				// & annotate this node with a timestamp so that other node maintenance tools know how long it's been since this node has been marked for reboot
-				annotations[KuredMostRecentRebootNeededAnnotation] = timeNowString
-				err := addNodeAnnotations(client, nodeID, annotations)
+			if !holding {
+				acquired, holder, err := lock.Acquire(nodeMeta)
 				if err != nil {
+					log.Debugf("Error acquiring lock: %v", err)
+					continue
+				}
+				if !acquired {
+					log.Infof("Lock already held by %v, will retry", holder)
 					continue
 				}
 			}
-		}
 
-		var rebootRequiredBlockCondition string
-		if blockers.RebootBlocked(blockCheckers...) {
-			rebootRequiredBlockCondition = ", but blocked at this time"
-			continue
-		}
-		log.Infof("Reboot required%s", rebootRequiredBlockCondition)
-
-		holding, _, err := lock.Holding()
-		if err != nil {
-			log.Errorf("Error testing lock: %v", err)
-		}
-
-		if !holding {
-			acquired, holder, err := lock.Acquire(nodeMeta)
+			err = drain(client, node)
 			if err != nil {
-				log.Errorf("Error acquiring lock: %v", err)
-			}
-			if !acquired {
-				log.Warnf("Lock already held: %v", holder)
-				// Prefer to not schedule pods onto this node to avoid draining the same pod multiple times.
-				preferNoScheduleTaint.Enable()
-				continue
-			}
-		}
-
-		err = drain(client, node)
-		if err != nil {
-			if !forceReboot {
-				log.Errorf("Unable to cordon or drain %s: %v, will release lock and retry cordon and drain before rebooting when lock is next acquired", node.GetName(), err)
-				err = lock.Release()
-				if err != nil {
-					log.Errorf("Error releasing lock: %v", err)
-				}
-				log.Infof("Performing a best-effort uncordon after failed cordon and drain")
-				err := uncordon(client, node)
+				if !forceReboot {
+					log.Infof("Unable to cordon or drain %s: %v, will force-reboot by releasing lock and uncordon until next success", node.GetName(), err)
+					err = lock.Release()
+					if err != nil {
+						log.Infof("Error in best-effort releasing lock: %v", err)
+					}
+					log.Infof("Performing a best-effort uncordon after failed cordon and drain")
+					err := uncordon(client, node)
 				if err != nil {
 					log.Errorf("Failed to uncordon %s: %v", node.GetName(), err)
 				}
-				continue
+					continue
+				}
 			}
-		}
-
-		if rebootDelay > 0 {
-			log.Infof("Delaying reboot for %v", rebootDelay)
-			time.Sleep(rebootDelay)
-		}
-
-		if notifyURL != "" {
-			if err := shoutrrr.Send(notifyURL, fmt.Sprintf(messageTemplateReboot, nodeID)); err != nil {
-				log.Warnf("Error notifying: %v", err)
+			if notifyURL != "" {
+				if err := shoutrrr.Send(notifyURL, fmt.Sprintf(messageTemplateReboot, nodeID)); err != nil {
+					log.Infof("Error notifying: %v", err)
+				}
 			}
-		}
-		log.Infof("Triggering reboot for node %v", nodeID)
 
-		err = rebooter.Reboot()
-		if err != nil {
-			log.Fatalf("Unable to reboot node: %v", err)
-		}
-		for {
-			log.Infof("Waiting for reboot")
-			time.Sleep(time.Minute)
+			log.Infof("Triggering reboot for node %v", nodeID)
+
+			rebooter.Reboot()
+			for {
+				log.Infof("Waiting for reboot")
+				time.Sleep(time.Minute)
+			}
 		}
 	}
 }

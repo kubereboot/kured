@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/sirupsen/logrus"
+	"time"
 )
 
 // Rebooter is the standard interface to use to execute
@@ -20,15 +21,26 @@ type Rebooter interface {
 
 // NewRebooter validates the rebootMethod, rebootCommand, and rebootSignal input,
 // then chains to the right constructor.
-func NewRebooter(rebootMethod string, rebootCommand string, rebootSignal int) (Rebooter, error) {
+func NewRebooter(rebootMethod string, rebootCommand string, rebootSignal int, rebootDelay time.Duration) (Rebooter, error) {
 	switch rebootMethod {
 	case "command":
 		logrus.Infof("Reboot command: %s", rebootCommand)
-		return NewCommandRebooter(rebootCommand)
+		return NewCommandRebooter(rebootCommand, rebootDelay)
 	case "signal":
 		logrus.Infof("Reboot signal: %d", rebootSignal)
-		return NewSignalRebooter(rebootSignal)
+		return NewSignalRebooter(rebootSignal, rebootDelay)
 	default:
 		return nil, fmt.Errorf("invalid reboot-method configured %s, expected signal or command", rebootMethod)
+	}
+}
+
+type GenericRebooter struct {
+	RebootDelay time.Duration
+}
+
+func (g GenericRebooter) DelayReboot() {
+	if g.RebootDelay > 0 {
+		logrus.Infof("Delayed reboot for %s", g.RebootDelay)
+		time.Sleep(g.RebootDelay)
 	}
 }

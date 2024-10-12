@@ -3,20 +3,22 @@ package reboot
 import (
 	"bytes"
 	"fmt"
-	"os/exec"
-	"strings"
-
 	"github.com/google/shlex"
 	log "github.com/sirupsen/logrus"
+	"os/exec"
+	"strings"
+	"time"
 )
 
 // CommandRebooter holds context-information for a reboot with command
 type CommandRebooter struct {
 	RebootCommand []string
+	GenericRebooter
 }
 
 // Reboot triggers the reboot command
 func (c CommandRebooter) Reboot() error {
+	c.DelayReboot()
 	log.Infof("Invoking command: %s", c.RebootCommand)
 
 	bufStdout := new(bytes.Buffer)
@@ -35,7 +37,7 @@ func (c CommandRebooter) Reboot() error {
 // NewCommandRebooter is the constructor to create a CommandRebooter from a string not
 // yet shell lexed. You can skip this constructor if you parse the data correctly first
 // when instantiating a CommandRebooter instance.
-func NewCommandRebooter(rebootCommand string) (*CommandRebooter, error) {
+func NewCommandRebooter(rebootCommand string, rebootDelay time.Duration) (*CommandRebooter, error) {
 	if rebootCommand == "" {
 		return nil, fmt.Errorf("no reboot command specified")
 	}
@@ -45,5 +47,10 @@ func NewCommandRebooter(rebootCommand string) (*CommandRebooter, error) {
 		return nil, fmt.Errorf("error %v when parsing reboot command %s", err, rebootCommand)
 	}
 	cmd = append(cmd, parsedCommand...)
-	return &CommandRebooter{RebootCommand: cmd}, nil
+	return &CommandRebooter{
+		RebootCommand: cmd,
+		GenericRebooter: GenericRebooter{
+			RebootDelay: rebootDelay,
+		},
+	}, nil
 }

@@ -57,7 +57,7 @@ func Test_rebootBlocked(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := RebootBlocked(tt.args.blockers...); got != tt.want {
+			if got, _ := RebootBlocked(tt.args.blockers...); got != tt.want {
 				t.Errorf("rebootBlocked() = %v, want %v", got, tt.want)
 			}
 		})
