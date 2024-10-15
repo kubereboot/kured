@@ -44,7 +44,7 @@ All Kured repositories are kept under <https://github.com/kubereboot>. To find t
 ### Kured code
 
 - Kured's main code can be found in the [`cmd`](cmd) and [`pkg`](pkg) directories
-- Its smoke tests are in the [`tests`](tests) directory
+- Its e2e tests are in the [`tests`](tests) directory
 - We use [GoReleaser to build](.goreleaser.yml).
 - Every PR and tagged release is tested by [Kind in GitHub workflows](.github/workflows).
 
@@ -75,12 +75,19 @@ efbb0c3: Document version compatibility in release notes
 
 Search the git log for inspiration for your cases.
 
-Please update our `.github/workflows` with the new k8s images, starting by
-the creation of a `.github/kind-cluster-<version>.yaml`, then updating
-our workflows with the new versions.
+Please update our `.github/workflows` with the new k8s images.
 
-Once you updated everything, make sure you update the support matrix in
-the [installation docs](https://kured.dev/docs/installation/) as well.
+For that, run the following:
+
+`cp .github/kind-cluster-current.yaml .github/kind-cluster-previous.yaml`
+`cp .github/kind-cluster-next.yaml .github/kind-cluster-current.yaml`
+
+Then edit `.github/kind-cluster-next.yaml` to point to the new version.
+
+This will make the full test matrix updated (the CI and the test code).
+
+Once your code passes all tests, update the support matrix in
+the [installation docs](https://kured.dev/docs/installation/).
 
 ### Updating other dependencies
 
@@ -147,6 +154,13 @@ To test your code manually, follow the section Manual testing.
 
 ## Manual (release) testing
 
+### Quick Golang code testing
+
+Please run `make test` to run only the basic tests. It gives a good
+idea of the code behaviour.
+
+### Manual functional testing
+
 Before `kured` is released, we want to make sure it still works fine on the
 previous, current and next minor version of Kubernetes (with respect to the
 `client-go` & `kubectl` dependencies in use). For local testing e.g.
@@ -162,11 +176,7 @@ results, if you login to a node and run:
 sudo touch /var/run/reboot-required
 ```
 
-### Example of golang testing
-
-Please run `make test`. You should have `golint` installed.
-
-### Example of testing with `minikube`
+### Example of functional testing with `minikube`
 
 A test-run with `minikube` could look like this:
 
@@ -212,6 +222,15 @@ kind create cluster --config .github/kind-cluster-<k8s-version>.yaml
 # check if reboot is working fine
 ./tests/kind/follow-coordinated-reboot.sh
 
+```
+
+### Example of testing with `kind` and `make`
+
+A test-run with `kind` and `make` can be done with the following command:
+
+```cli
+# Build kured:dev image, build manifests, and run the "long" go tests
+make e2e-test
 ```
 
 ## Publishing a new kured release

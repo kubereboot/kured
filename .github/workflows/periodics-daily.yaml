@@ -12,7 +12,7 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
       - name: run tests
-        run: go test -json ./... > test.json
+        run: make test
       - name: Annotate tests
         if: always()
         uses: guyarb/golang-test-annoations@v0.8.0
