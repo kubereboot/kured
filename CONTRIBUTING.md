@@ -233,6 +233,16 @@ A test-run with `kind` and `make` can be done with the following command:
 make e2e-test
 ```
 
+You can alter test behaviour by passing arguments to this command.
+A few examples below:
+
+```shell
+# Run only TestE2EWithSignal test for the kubernetes version named "current" (see kind file)
+make e2e-test ARGS="-run ^TestE2EWithSignal/current"
+# Run all tests but make sure to extend the timeout, for slower machines.
+make e2e-test ARGS="-timeout 1200s'
+```
+
 ## Publishing a new kured release
 
 ### Prepare Documentation
