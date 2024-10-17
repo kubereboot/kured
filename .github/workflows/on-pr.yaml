@@ -62,7 +62,7 @@ jobs:
       - name: Build image
         run: VERSION="${{ steps.tags.outputs.sha_short }}" DH_ORG="${{ github.repository_owner }}" make image
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@5681af892cd0f4997658e2bacc62bd0a894cf564
+        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2
         with:
           image-ref: 'ghcr.io/${{ github.repository }}:${{ steps.tags.outputs.sha_short }}'
           format: 'table'
