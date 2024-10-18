@@ -4,10 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/kubereboot/kured/internal"
-	"github.com/kubereboot/kured/pkg/blockers"
-	"github.com/kubereboot/kured/pkg/checkers"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -19,8 +15,17 @@ import (
 	"time"
 
 	"github.com/containrrr/shoutrrr"
+	"github.com/kubereboot/kured/internal"
+	"github.com/kubereboot/kured/pkg/blockers"
+	"github.com/kubereboot/kured/pkg/checkers"
+	"github.com/kubereboot/kured/pkg/daemonsetlock"
+	"github.com/kubereboot/kured/pkg/delaytick"
+	"github.com/kubereboot/kured/pkg/reboot"
+	"github.com/kubereboot/kured/pkg/taints"
+	"github.com/kubereboot/kured/pkg/timewindow"
 	papi "github.com/prometheus/client_golang/api"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	flag "github.com/spf13/pflag"
 	v1 "k8s.io/api/core/v1"
@@ -29,13 +34,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	kubectldrain "k8s.io/kubectl/pkg/drain"
-
-	"github.com/kubereboot/kured/pkg/alerts"
-	"github.com/kubereboot/kured/pkg/daemonsetlock"
-	"github.com/kubereboot/kured/pkg/delaytick"
-	"github.com/kubereboot/kured/pkg/reboot"
-	"github.com/kubereboot/kured/pkg/taints"
-	"github.com/kubereboot/kured/pkg/timewindow"
 )
 
 var (
@@ -609,12 +607,6 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 		preferNoScheduleTaint.Disable()
 	}
 
-	// instantiate prometheus client
-	promClient, err := alerts.NewPromClient(papi.Config{Address: prometheusURL})
-	if err != nil {
-		log.Fatal("Unable to create prometheus client: ", err)
-	}
-
 	source = rand.NewSource(time.Now().UnixNano())
 	tick = delaytick.New(source, period)
 	for range tick {
@@ -655,10 +647,10 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 
 		var blockCheckers []blockers.RebootBlocker
 		if prometheusURL != "" {
-			blockCheckers = append(blockCheckers, blockers.PrometheusBlockingChecker{PromClient: promClient, Filter: alertFilter.Regexp, FiringOnly: alertFiringOnly, FilterMatchOnly: alertFilterMatchOnly})
+			blockCheckers = append(blockCheckers, blockers.NewPrometheusBlockingChecker(papi.Config{Address: prometheusURL}, alertFilter.Regexp, alertFiringOnly, alertFilterMatchOnly))
 		}
 		if podSelectors != nil {
-			blockCheckers = append(blockCheckers, blockers.KubernetesBlockingChecker{Client: client, Nodename: nodeID, Filter: podSelectors})
+			blockCheckers = append(blockCheckers, blockers.NewKubernetesBlockingChecker(client, nodeID, podSelectors))
 		}
 
 		var rebootRequiredBlockCondition string

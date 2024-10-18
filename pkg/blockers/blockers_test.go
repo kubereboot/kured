@@ -1,7 +1,6 @@
 package blockers
 
 import (
-	"github.com/kubereboot/kured/pkg/alerts"
 	papi "github.com/prometheus/client_golang/api"
 	"testing"
 )
@@ -20,8 +19,7 @@ func Test_rebootBlocked(t *testing.T) {
 	blockingChecker := BlockingChecker{blocking: true}
 
 	// Instantiate a prometheusClient with a broken_url
-	promClient, _ := alerts.NewPromClient(papi.Config{Address: "broken_url"})
-	brokenPrometheusClient := PrometheusBlockingChecker{PromClient: promClient, Filter: nil, FiringOnly: false}
+	brokenPrometheusClient := NewPrometheusBlockingChecker(papi.Config{Address: "broken_url"}, nil, false, false)
 
 	type args struct {
 		blockers []RebootBlocker

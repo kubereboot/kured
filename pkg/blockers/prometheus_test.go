@@ -1,4 +1,4 @@
-package alerts
+package blockers
 
 import (
 	"log"
@@ -145,12 +145,9 @@ func TestActiveAlerts(t *testing.T) {
 			regex, _ := regexp.Compile(tc.rFilter)
 
 			// instantiate the prometheus client with the mockserver-address
-			p, err := NewPromClient(api.Config{Address: mockServer.URL})
-			if err != nil {
-				log.Fatal(err)
-			}
+			p := NewPrometheusBlockingChecker(api.Config{Address: mockServer.URL}, regex, tc.firingOnly, tc.filterMatchOnly)
 
-			result, err := p.ActiveAlerts(regex, tc.firingOnly, tc.filterMatchOnly)
+			result, err := p.ActiveAlerts()
 			if err != nil {
 				log.Fatal(err)
 			}
