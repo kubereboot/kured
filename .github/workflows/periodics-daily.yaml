@@ -12,10 +12,10 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
       - name: run tests
-        run: go test -json ./... > test.json
+        run: make test
       - name: Annotate tests
         if: always()
-        uses: guyarb/golang-test-annoations@v0.7.0
+        uses: guyarb/golang-test-annoations@v0.8.0
         with:
           test-results: test.json
 
@@ -41,7 +41,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Link Checker
-      uses: lycheeverse/lychee-action@c053181aa0c3d17606addfe97a9075a32723548a
+      uses: lycheeverse/lychee-action@7cd0af4c74a61395d455af97419279d86aafaede
       env:
         GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       with:
@@ -68,9 +68,9 @@ jobs:
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         id: tags
       - name: Build artifacts
-        run: VERSION="${{ steps.tags.outputs.sha_short }}" make image
+        run: VERSION="${{ steps.tags.outputs.sha_short }}" DH_ORG="${{ github.repository_owner }}" make image
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@84384bd6e777ef152729993b8145ea352e9dd3ef
+        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2
         with:
           image-ref: 'ghcr.io/${{ github.repository }}:${{ steps.tags.outputs.sha_short }}'
           format: 'table'
