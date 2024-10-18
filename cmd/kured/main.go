@@ -84,11 +84,12 @@ var (
 	nodeID                          string
 	concurrency                     int
 
-	rebootDays    []string
-	rebootStart   string
-	rebootEnd     string
-	timezone      string
-	annotateNodes bool
+	rebootDays      []string
+	rebootStart     string
+	rebootEnd       string
+	timezone        string
+	minRebootPeriod time.Duration
+	annotateNodes   bool
 
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -105,6 +106,8 @@ const (
 	KuredRebootInProgressAnnotation string = "weave.works/kured-reboot-in-progress"
 	// KuredMostRecentRebootNeededAnnotation is the canonical string value for the kured most-recent-reboot-needed annotation
 	KuredMostRecentRebootNeededAnnotation string = "weave.works/kured-most-recent-reboot-needed"
+	// KuredLastSuccessfulRebootAnnotation is the canonical string value for the kured last-successful-reboot annotation
+	KuredLastSuccessfulRebootAnnotation string = "weave.works/kured-last-successful-reboot"
 	// EnvPrefix The environment variable prefix of all environment variables bound to our command line flags.
 	EnvPrefix = "KURED"
 
@@ -135,7 +138,8 @@ func NewRootCommand() *cobra.Command {
 		Short:             "Kubernetes Reboot Daemon",
 		PersistentPreRunE: bindViper,
 		PreRun:            flagCheck,
-		Run:               root}
+		Run:               root,
+	}
 
 	rootCmd.PersistentFlags().StringVar(&nodeID, "node-id", "",
 		"node name kured runs on, should be passed down from spec.nodeName via KURED_NODE_ID environment variable")
@@ -218,6 +222,8 @@ func NewRootCommand() *cobra.Command {
 		"schedule reboot only before this time of day")
 	rootCmd.PersistentFlags().StringVar(&timezone, "time-zone", "UTC",
 		"use this timezone for schedule inputs")
+	rootCmd.PersistentFlags().DurationVar(&minRebootPeriod, "min-reboot-period", 0,
+		"the minimal duration between reboots of a node. Requires --annotate-nodes")
 
 	rootCmd.PersistentFlags().BoolVar(&annotateNodes, "annotate-nodes", false,
 		"if set, the annotations 'weave.works/kured-reboot-in-progress' and 'weave.works/kured-most-recent-reboot-needed' will be given to nodes undergoing kured reboots")
@@ -264,6 +270,9 @@ func flagCheck(cmd *cobra.Command, args []string) {
 	sort.Strings(postRebootNodeLabelKeys)
 	if !reflect.DeepEqual(preRebootNodeLabelKeys, postRebootNodeLabelKeys) {
 		log.Warnf("pre-reboot-node-labels keys and post-reboot-node-labels keys do not match. This may result in unexpected behaviour.")
+	}
+	if !annotateNodes && minRebootPeriod != 0 {
+		log.Warn("Cannot use --min-reboot-period without --annotate-nodes. This will ignore the min-reboot-period value")
 	}
 }
 
@@ -317,7 +326,6 @@ func flagToEnvVar(flag string) string {
 // buildHostCommand writes a new command to run in the host namespace
 // Rancher based need different pid
 func buildHostCommand(pid int, command []string) []string {
-
 	// From the container, we nsenter into the proper PID to run the hostCommand.
 	// For this, kured daemonset need to be configured with hostPID:true and privileged:true
 	cmd := []string{"/usr/bin/nsenter", fmt.Sprintf("-m/proc/%d/ns/mnt", pid), "--"}
@@ -377,6 +385,30 @@ type KubernetesBlockingChecker struct {
 	filter []string
 }
 
+type MinimumRebootPeriodChecker struct {
+	client   *kubernetes.Clientset
+	nodename string
+}
+
+func (mpb MinimumRebootPeriodChecker) isBlocked() bool {
+	if minRebootPeriod <= 0 {
+		return false
+	}
+	node, err := mpb.client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
+	if err != nil {
+		log.Errorf("Error retrieving node object via k8s API: %s", err)
+		return true
+	}
+	if t, err := nextAllowedReboot(node); err != nil {
+		log.Warnf("Failed to determine next allowed reboot time: %s", err.Error())
+		return false
+	} else if diff := t.Sub(time.Now()); diff > 0 {
+		log.Infof("Reboot blocked: not allowed until %s (%s)", t.String(), diff.String())
+		return true
+	}
+	return false
+}
+
 func (pb PrometheusBlockingChecker) isBlocked() bool {
 	alertNames, err := pb.promClient.ActiveAlerts(pb.filter, pb.firingOnly, pb.filterMatchOnly)
 	if err != nil {
@@ -400,7 +432,8 @@ func (kb KubernetesBlockingChecker) isBlocked() bool {
 		podList, err := kb.client.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{
 			LabelSelector: labelSelector,
 			FieldSelector: fieldSelector,
-			Limit:         10})
+			Limit:         10,
+		})
 		if err != nil {
 			log.Warnf("Reboot blocked: pod query error: %v", err)
 			return true
@@ -694,6 +727,11 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 						continue
 					}
 				}
+				if minRebootPeriod != 0 {
+					if err := addNodeAnnotations(client, nodeID, map[string]string{KuredLastSuccessfulRebootAnnotation: time.Now().Format(time.RFC3339)}); err != nil {
+						continue
+					}
+				}
 			}
 			throttle(releaseDelay)
 			release(lock, concurrency > 1)
@@ -725,16 +763,17 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 			continue
 		}
 
+		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
+		if err != nil {
+			log.Fatalf("Error retrieving node object via k8s API: %v", err)
+		}
+
 		if !rebootRequired(sentinelCommand) {
 			log.Infof("Reboot not required")
 			preferNoScheduleTaint.Disable()
 			continue
 		}
 
-		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
-		if err != nil {
-			log.Fatalf("Error retrieving node object via k8s API: %v", err)
-		}
 		nodeMeta.Unschedulable = node.Spec.Unschedulable
 
 		var timeNowString string
@@ -759,6 +798,9 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 		}
 		if podSelectors != nil {
 			blockCheckers = append(blockCheckers, KubernetesBlockingChecker{client: client, nodename: nodeID, filter: podSelectors})
+		}
+		if minRebootPeriod >= 0 {
+			blockCheckers = append(blockCheckers, MinimumRebootPeriodChecker{client: client, nodename: nodeID})
 		}
 
 		var rebootRequiredBlockCondition string
@@ -802,6 +844,17 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 			time.Sleep(time.Minute)
 		}
 	}
+}
+
+func nextAllowedReboot(node *v1.Node) (time.Time, error) {
+	if v, ok := node.Annotations[KuredLastSuccessfulRebootAnnotation]; ok {
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			return time.Time{}, fmt.Errorf("failed to parse time %q in annotation %q: %w", v, KuredLastSuccessfulRebootAnnotation, err)
+		}
+		return t.Add(minRebootPeriod), nil
+	}
+	return time.Time{}, fmt.Errorf("missing annotation %s", KuredLastSuccessfulRebootAnnotation)
 }
 
 // buildSentinelCommand creates the shell command line which will need wrapping to escape
