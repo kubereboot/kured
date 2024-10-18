@@ -85,13 +85,11 @@ jobs:
 
       - name: Generate SBOM
         run: |
-          .tmp/syft ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }} -o spdx > kured.sbom
+          hack/bin/syft ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }} -o spdx > kured.sbom
 
       - name: Sign and attest artifacts
         run: |
-          .tmp/cosign sign -y -r ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
-
-          .tmp/cosign sign-blob -y --output-signature kured.sbom.sig kured.sbom
-
-          .tmp/cosign attest -y --type spdx --predicate kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
-          .tmp/cosign attach sbom --type spdx --sbom kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
+          hack/bin/cosign sign -y -r ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
+          hack/bin/cosign sign-blob -y --output-signature kured.sbom.sig kured.sbom
+          hack/bin/cosign attest -y --type spdx --predicate kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
+          hack/bin/cosign attach sbom --type spdx --sbom kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
