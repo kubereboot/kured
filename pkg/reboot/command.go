@@ -1,25 +1,68 @@
 package reboot
 
 import (
-	"github.com/kubereboot/kured/pkg/util"
+	"fmt"
+	"github.com/google/shlex"
 	log "github.com/sirupsen/logrus"
+	"os/exec"
+	"time"
 )
 
-// CommandRebootMethod holds context-information for a command reboot.
-type CommandRebootMethod struct {
-	nodeID        string
-	rebootCommand []string
+// CommandRebooter holds context-information for a reboot with command
+type CommandRebooter struct {
+	RebootCommand []string
+	GenericRebooter
 }
 
-// NewCommandReboot creates a new command-rebooter which needs full privileges on the host.
-func NewCommandReboot(nodeID string, rebootCommand []string) *CommandRebootMethod {
-	return &CommandRebootMethod{nodeID: nodeID, rebootCommand: rebootCommand}
+// Reboot triggers the reboot command
+func (c CommandRebooter) Reboot() error {
+	c.DelayReboot()
+
+	log.Infof("Invoking command: %s", c.RebootCommand)
+	cmd := exec.Command(c.RebootCommand[0], c.RebootCommand[1:]...)
+	cmd.Stdout = log.NewEntry(log.StandardLogger()).
+		WithField("cmd", cmd.Args[0]).
+		WithField("std", "out").
+		WriterLevel(log.InfoLevel)
+
+	cmd.Stderr = log.NewEntry(log.StandardLogger()).
+		WithField("cmd", cmd.Args[0]).
+		WithField("std", "err").
+		WriterLevel(log.WarnLevel)
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("error invoking reboot command %v", err)
+	}
+	return nil
 }
 
-// Reboot triggers the command-reboot.
-func (c *CommandRebootMethod) Reboot() {
-	log.Infof("Running command: %s for node: %s", c.rebootCommand, c.nodeID)
-	if err := util.NewCommand(c.rebootCommand[0], c.rebootCommand[1:]...).Run(); err != nil {
-		log.Fatalf("Error invoking reboot command: %v", err)
+// NewCommandRebooter is the constructor to create a CommandRebooter from a string not
+// yet shell lexed. You can skip this constructor if you parse the data correctly first
+// when instantiating a CommandRebooter instance.
+func NewCommandRebooter(rebootCommand string, rebootDelay time.Duration, privileged bool, pid int) *CommandRebooter {
+	cmd, err := shlex.Split(rebootCommand)
+	if err != nil {
+		log.Fatalf("Error parsing provided reboot command: %v", err)
+	}
+
+	if privileged {
+		if pid < 1 {
+			log.Fatalf("Incorrect PID number")
+		}
+		cmdline := []string{"/usr/bin/nsenter", fmt.Sprintf("-m/proc/%d/ns/mnt", pid), "--"}
+		cmdline = append(cmdline, cmd...)
+
+		return &CommandRebooter{
+			RebootCommand: cmdline,
+			GenericRebooter: GenericRebooter{
+				RebootDelay: rebootDelay,
+			},
+		}
+	}
+	return &CommandRebooter{
+		RebootCommand: cmd,
+		GenericRebooter: GenericRebooter{
+			RebootDelay: rebootDelay,
+		},
 	}
 }
