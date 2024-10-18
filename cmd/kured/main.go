@@ -385,6 +385,30 @@ type KubernetesBlockingChecker struct {
 	filter []string
 }
 
+type MinimumRebootPeriodChecker struct {
+	client   *kubernetes.Clientset
+	nodename string
+}
+
+func (mpb MinimumRebootPeriodChecker) isBlocked() bool {
+	if minRebootPeriod <= 0 {
+		return false
+	}
+	node, err := mpb.client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
+	if err != nil {
+		log.Errorf("Error retrieving node object via k8s API: %s", err)
+		return true
+	}
+	if t, err := nextAllowedReboot(node); err != nil {
+		log.Warnf("Failed to determine next allowed reboot time: %s", err.Error())
+		return false
+	} else if diff := t.Sub(time.Now()); diff > 0 {
+		log.Infof("Reboot blocked: not allowed until %s (%s)", t.String(), diff.String())
+		return true
+	}
+	return false
+}
+
 func (pb PrometheusBlockingChecker) isBlocked() bool {
 	alertNames, err := pb.promClient.ActiveAlerts(pb.filter, pb.firingOnly, pb.filterMatchOnly)
 	if err != nil {
@@ -744,15 +768,6 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 			log.Fatalf("Error retrieving node object via k8s API: %v", err)
 		}
 
-		if minRebootPeriod > 0 {
-			if t, err := nextAllowedReboot(node); err != nil {
-				log.Warnf("Failed to determine next allowed reboot time: %s", err.Error())
-			} else if diff := t.Sub(time.Now()); diff > 0 {
-				log.Infof("Reboot not allowed until %s (%s)", t.String(), diff.String())
-				continue
-			}
-		}
-
 		if !rebootRequired(sentinelCommand) {
 			log.Infof("Reboot not required")
 			preferNoScheduleTaint.Disable()
@@ -783,6 +798,9 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 		}
 		if podSelectors != nil {
 			blockCheckers = append(blockCheckers, KubernetesBlockingChecker{client: client, nodename: nodeID, filter: podSelectors})
+		}
+		if minRebootPeriod >= 0 {
+			blockCheckers = append(blockCheckers, MinimumRebootPeriodChecker{client: client, nodename: nodeID})
 		}
 
 		var rebootRequiredBlockCondition string
