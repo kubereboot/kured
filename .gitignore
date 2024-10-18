@@ -2,7 +2,6 @@ cmd/kured/kured
 vendor
 build
 dist
-.tmp
 test.json
 tests/kind/testfiles/*.yaml
 hack/bin/
