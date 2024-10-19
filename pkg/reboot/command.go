@@ -1,6 +1,8 @@
 package reboot
 
 import (
+	"context"
+
 	"github.com/kubereboot/kured/pkg/util"
 	log "github.com/sirupsen/logrus"
 )
@@ -17,9 +19,9 @@ func NewCommandReboot(nodeID string, rebootCommand []string) *CommandRebootMetho
 }
 
 // Reboot triggers the command-reboot.
-func (c *CommandRebootMethod) Reboot() {
+func (c *CommandRebootMethod) Reboot(ctx context.Context) {
 	log.Infof("Running command: %s for node: %s", c.rebootCommand, c.nodeID)
-	if err := util.NewCommand(c.rebootCommand[0], c.rebootCommand[1:]...).Run(); err != nil {
+	if err := util.NewCommand(ctx, c.rebootCommand[0], c.rebootCommand[1:]...).Run(); err != nil {
 		log.Fatalf("Error invoking reboot command: %v", err)
 	}
 }
