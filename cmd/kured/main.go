@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"os"
 	"reflect"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -60,7 +59,7 @@ var (
 	lockReleaseDelay                time.Duration
 	prometheusURL                   string
 	preferNoScheduleTaintName       string
-	alertFilter                     *regexp.Regexp
+	alertFilter                     regexpValue
 	alertFilterMatchOnly            bool
 	alertFiringOnly                 bool
 	rebootSentinelFile              string
@@ -150,7 +149,7 @@ func main() {
 		"delay lock release for this duration (default: 0, disabled)")
 	flag.StringVar(&prometheusURL, "prometheus-url", "",
 		"Prometheus instance to probe for active alerts")
-	flag.Var(&regexpValue{&alertFilter}, "alert-filter-regexp",
+	flag.Var(&alertFilter, "alert-filter-regexp",
 		"alert names to ignore when checking for active alerts")
 	flag.BoolVar(&alertFilterMatchOnly, "alert-filter-match-only", false,
 		"Only block if the alert-filter-regexp matches active alerts")
@@ -655,7 +654,7 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 
 		var blockCheckers []blockers.RebootBlocker
 		if prometheusURL != "" {
-			blockCheckers = append(blockCheckers, blockers.PrometheusBlockingChecker{PromClient: promClient, Filter: alertFilter, FiringOnly: alertFiringOnly, FilterMatchOnly: alertFilterMatchOnly})
+			blockCheckers = append(blockCheckers, blockers.PrometheusBlockingChecker{PromClient: promClient, Filter: alertFilter.Regexp, FiringOnly: alertFiringOnly, FilterMatchOnly: alertFilterMatchOnly})
 		}
 		if podSelectors != nil {
 			blockCheckers = append(blockCheckers, blockers.KubernetesBlockingChecker{Client: client, Nodename: nodeID, Filter: podSelectors})
