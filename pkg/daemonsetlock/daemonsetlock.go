@@ -115,16 +115,14 @@ func New(client *kubernetes.Clientset, nodeID, namespace, name, annotation strin
 func (dsl *DaemonSetLock) GetDaemonSet(sleep, timeout time.Duration) (*v1.DaemonSet, error) {
 	var ds *v1.DaemonSet
 	var lastError error
-	err := wait.PollImmediate(sleep, timeout, func() (bool, error) {
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
+	err := wait.PollUntilContextTimeout(context.Background(), sleep, timeout, true, func(ctx context.Context) (bool, error) {
 		if ds, lastError = dsl.client.AppsV1().DaemonSets(dsl.namespace).Get(ctx, dsl.name, metav1.GetOptions{}); lastError != nil {
 			return false, nil
 		}
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Timed out trying to get daemonset %s in namespace %s: %v", dsl.name, dsl.namespace, lastError)
+		return nil, fmt.Errorf("timed out trying to get daemonset %s in namespace %s: %v", dsl.name, dsl.namespace, lastError)
 	}
 	return ds, nil
 }
