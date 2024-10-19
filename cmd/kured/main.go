@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/kubereboot/kured/internal"
 	"github.com/kubereboot/kured/pkg/blockers"
 	"github.com/kubereboot/kured/pkg/checkers"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -17,7 +18,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containrrr/shoutrrr"
 	papi "github.com/prometheus/client_golang/api"
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	flag "github.com/spf13/pflag"
 	v1 "k8s.io/api/core/v1"
@@ -27,14 +30,12 @@ import (
 	"k8s.io/client-go/rest"
 	kubectldrain "k8s.io/kubectl/pkg/drain"
 
-	shoutrrr "github.com/containrrr/shoutrrr"
 	"github.com/kubereboot/kured/pkg/alerts"
 	"github.com/kubereboot/kured/pkg/daemonsetlock"
 	"github.com/kubereboot/kured/pkg/delaytick"
 	"github.com/kubereboot/kured/pkg/reboot"
 	"github.com/kubereboot/kured/pkg/taints"
 	"github.com/kubereboot/kured/pkg/timewindow"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -243,12 +244,12 @@ func main() {
 	log.Infof("Reboot schedule: %v", window)
 
 	log.Infof("Reboot method: %s", rebootMethod)
-	rebooter, err := reboot.NewRebooter(rebootMethod, rebootCommand, rebootSignal)
+	rebooter, err := internal.NewRebooter(rebootMethod, rebootCommand, rebootSignal)
 	if err != nil {
 		log.Fatalf("Failed to build rebooter: %v", err)
 	}
 
-	rebootChecker, err := checkers.NewRebootChecker(rebootSentinelCommand, rebootSentinelFile)
+	rebootChecker, err := internal.NewRebootChecker(rebootSentinelCommand, rebootSentinelFile)
 	if err != nil {
 		log.Fatalf("Failed to build reboot checker: %v", err)
 	}

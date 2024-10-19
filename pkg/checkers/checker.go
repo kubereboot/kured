@@ -23,16 +23,6 @@ type FileRebootChecker struct {
 	FilePath string
 }
 
-func NewRebootChecker(rebootSentinelCommand string, rebootSentinelFile string) (Checker, error) {
-	// An override of rebootSentinelCommand means a privileged command
-	if rebootSentinelCommand != "" {
-		log.Infof("Sentinel checker is (privileged) user provided command: %s", rebootSentinelCommand)
-		return NewCommandChecker(rebootSentinelCommand)
-	}
-	log.Infof("Sentinel checker is (unprivileged) testing for the presence of: %s", rebootSentinelFile)
-	return NewFileRebootChecker(rebootSentinelFile)
-}
-
 // RebootRequired checks the file presence
 // needs refactoring to also return an error, instead of leaking it inside the code.
 // This needs refactoring to get rid of NewCommand
