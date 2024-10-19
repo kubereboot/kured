@@ -33,7 +33,7 @@ func Test_rebootRequired(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := CommandChecker{CheckCommand: tt.args.sentinelCommand, NamespacePid: 1, Privileged: false}
-			if got := a.CheckRebootRequired(); got != tt.want {
+			if got := a.RebootRequired(); got != tt.want {
 				t.Errorf("rebootRequired() = %v, want %v", got, tt.want)
 			}
 		})
@@ -62,7 +62,7 @@ func Test_rebootRequired_fatals(t *testing.T) {
 	for _, c := range cases {
 		fatal = false
 		a := CommandChecker{CheckCommand: c.param, NamespacePid: 1, Privileged: false}
-		a.CheckRebootRequired()
+		a.RebootRequired()
 		assert.Equal(t, c.expectFatal, fatal)
 	}
 

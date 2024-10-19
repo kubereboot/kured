@@ -244,26 +244,14 @@ func main() {
 	log.Infof("Reboot schedule: %v", window)
 
 	log.Infof("Reboot method: %s", rebootMethod)
-	var rebooter reboot.Rebooter
-	switch {
-	case rebootMethod == "command":
-		log.Infof("Reboot command: %s", rebootCommand)
-		rebooter = reboot.NewCommandRebooter(rebootCommand)
-	case rebootMethod == "signal":
-		log.Infof("Reboot signal: %v", rebootSignal)
-		rebooter = reboot.NewSignalRebooter(rebootSignal)
-	default:
-		log.Fatalf("Invalid reboot-method configured: %s", rebootMethod)
+	rebooter, err := reboot.NewRebooter(rebootMethod, rebootCommand, rebootSignal)
+	if err != nil {
+		log.Fatalf("Failed to build rebooter: %v", err)
 	}
 
-	var checker checkers.Checker
-	// An override of rebootSentinelCommand means a privileged command
-	if rebootSentinelCommand != "" {
-		log.Infof("Sentinel checker is (privileged) user provided command: %s", rebootSentinelCommand)
-		checker = checkers.NewCommandChecker(rebootSentinelCommand)
-	} else {
-		log.Infof("Sentinel checker is (unprivileged) testing for the presence of: %s", rebootSentinelFile)
-		checker = checkers.NewFileRebootChecker(rebootSentinelFile)
+	rebootChecker, err := checkers.NewRebootChecker(rebootSentinelCommand, rebootSentinelFile)
+	if err != nil {
+		log.Fatalf("Failed to build reboot checker: %v", err)
 	}
 
 	config, err := rest.InClusterConfig()
@@ -289,8 +277,8 @@ func main() {
 	}
 	lock := daemonsetlock.New(client, nodeID, dsNamespace, dsName, lockAnnotation, lockTTL, concurrency, lockReleaseDelay)
 
-	go rebootAsRequired(nodeID, rebooter, checker, window, lock, client)
-	go maintainRebootRequiredMetric(nodeID, checker)
+	go rebootAsRequired(nodeID, rebooter, rebootChecker, window, lock, client)
+	go maintainRebootRequiredMetric(nodeID, rebootChecker)
 
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", metricsHost, metricsPort), nil))
@@ -477,7 +465,7 @@ func uncordon(client *kubernetes.Clientset, node *v1.Node) error {
 
 func maintainRebootRequiredMetric(nodeID string, checker checkers.Checker) {
 	for {
-		if checker.CheckRebootRequired() {
+		if checker.RebootRequired() {
 			rebootRequiredGauge.WithLabelValues(nodeID).Set(1)
 		} else {
 			rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
@@ -594,7 +582,7 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 			// And (2) check if we previously annotated the node that it was in the process of being rebooted,
 			// And finally (3) if it has that annotation, to delete it.
 			// This indicates to other node tools running on the cluster that this node may be a candidate for maintenance
-			if annotateNodes && !checker.CheckRebootRequired() {
+			if annotateNodes && !checker.RebootRequired() {
 				if _, ok := node.Annotations[KuredRebootInProgressAnnotation]; ok {
 					err := deleteNodeAnnotation(client, nodeID, KuredRebootInProgressAnnotation)
 					if err != nil {
@@ -617,7 +605,7 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 	preferNoScheduleTaint := taints.New(client, nodeID, preferNoScheduleTaintName, v1.TaintEffectPreferNoSchedule)
 
 	// Remove taint immediately during startup to quickly allow scheduling again.
-	if !checker.CheckRebootRequired() {
+	if !checker.RebootRequired() {
 		preferNoScheduleTaint.Disable()
 	}
 
@@ -636,7 +624,7 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 			continue
 		}
 
-		if !checker.CheckRebootRequired() {
+		if !checker.RebootRequired() {
 			log.Infof("Reboot not required")
 			preferNoScheduleTaint.Disable()
 			continue

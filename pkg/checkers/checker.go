@@ -1,6 +1,7 @@
 package checkers
 
 import (
+	"fmt"
 	"github.com/google/shlex"
 	"github.com/kubereboot/kured/pkg/util"
 	log "github.com/sirupsen/logrus"
@@ -13,7 +14,7 @@ import (
 // CheckRebootRequired method which returns a single boolean
 // clarifying whether a reboot is expected or not.
 type Checker interface {
-	CheckRebootRequired() bool
+	RebootRequired() bool
 }
 
 // FileRebootChecker is the default reboot checker.
@@ -22,11 +23,21 @@ type FileRebootChecker struct {
 	FilePath string
 }
 
-// CheckRebootRequired checks the file presence
+func NewRebootChecker(rebootSentinelCommand string, rebootSentinelFile string) (Checker, error) {
+	// An override of rebootSentinelCommand means a privileged command
+	if rebootSentinelCommand != "" {
+		log.Infof("Sentinel checker is (privileged) user provided command: %s", rebootSentinelCommand)
+		return NewCommandChecker(rebootSentinelCommand)
+	}
+	log.Infof("Sentinel checker is (unprivileged) testing for the presence of: %s", rebootSentinelFile)
+	return NewFileRebootChecker(rebootSentinelFile)
+}
+
+// RebootRequired checks the file presence
 // needs refactoring to also return an error, instead of leaking it inside the code.
 // This needs refactoring to get rid of NewCommand
 // This needs refactoring to only contain file location, instead of CheckCommand
-func (rc FileRebootChecker) CheckRebootRequired() bool {
+func (rc FileRebootChecker) RebootRequired() bool {
 	if _, err := os.Stat(rc.FilePath); err == nil {
 		return true
 	}
@@ -35,10 +46,10 @@ func (rc FileRebootChecker) CheckRebootRequired() bool {
 
 // NewFileRebootChecker is the constructor for the file based reboot checker
 // TODO: Add extra input validation on filePath string here
-func NewFileRebootChecker(filePath string) *FileRebootChecker {
+func NewFileRebootChecker(filePath string) (*FileRebootChecker, error) {
 	return &FileRebootChecker{
 		FilePath: filePath,
-	}
+	}, nil
 }
 
 // CommandChecker is using a custom command to check
@@ -51,10 +62,10 @@ type CommandChecker struct {
 	Privileged   bool
 }
 
-// CheckRebootRequired for CommandChecker runs a command without returning
+// RebootRequired for CommandChecker runs a command without returning
 // any eventual error. THis should be later refactored to remove the util wrapper
 // and return the errors, instead of logging them here.
-func (rc CommandChecker) CheckRebootRequired() bool {
+func (rc CommandChecker) RebootRequired() bool {
 	var cmdline []string
 	if rc.Privileged {
 		cmdline = util.PrivilegedHostCommand(rc.NamespacePid, rc.CheckCommand)
@@ -84,14 +95,14 @@ func (rc CommandChecker) CheckRebootRequired() bool {
 
 // NewCommandChecker is the constructor for the commandChecker, and by default
 // runs new commands in a privileged fashion.
-func NewCommandChecker(sentinelCommand string) *CommandChecker {
+func NewCommandChecker(sentinelCommand string) (*CommandChecker, error) {
 	cmd, err := shlex.Split(sentinelCommand)
 	if err != nil {
-		log.Fatalf("Error parsing provided sentinel command: %v", err)
+		return nil, fmt.Errorf("error parsing provided sentinel command: %v", err)
 	}
 	return &CommandChecker{
 		CheckCommand: cmd,
 		NamespacePid: 1,
 		Privileged:   true,
-	}
+	}, nil
 }

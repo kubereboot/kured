@@ -1,6 +1,7 @@
 package reboot
 
 import (
+	"fmt"
 	"os"
 	"syscall"
 
@@ -31,6 +32,9 @@ func (c SignalRebooter) Reboot() {
 
 // NewSignalRebooter is the constructor which sets the signal number.
 // The constructor does not yet validate any input. It should be done in a later commit.
-func NewSignalRebooter(sig int) *SignalRebooter {
-	return &SignalRebooter{Signal: sig}
+func NewSignalRebooter(sig int) (*SignalRebooter, error) {
+	if sig < 1 {
+		return nil, fmt.Errorf("invalid signal: %v", sig)
+	}
+	return &SignalRebooter{Signal: sig}, nil
 }
