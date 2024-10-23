@@ -240,15 +240,18 @@ make e2e-test
 Ensure the [compatibility matrix](https://kured.dev/docs/installation/) is
 updated to the new version you want to release.
 
-### Create a tag on the repo
+### Update the manifests with the new version
 
-Before going further, we should freeze the code for a release, by
-tagging the code. The Github-Action should start a new job and push
-the new image to the registry.
+Create a commit updating the manifest with future image [like this one](https://github.com/kubereboot/kured/commit/58091f6145771f426b4b9e012a43a9c847af2560).
 
-### Create the combined manifest
+### Create the new version tag on the repo
 
-Now create the `kured-<release>-dockerhub.yaml` for e.g. `1.3.0`:
+Tag the previously created commit with the future release version.
+The Github Actions workflow will push the new image to the registry.
+
+### Create the combined manifest for the new version
+
+Now create the `kured-<new version>-dockerhub.yaml` for e.g. `1.3.0`:
 
 ```sh
 VERSION=1.3.0
@@ -258,13 +261,23 @@ cat kured-rbac.yaml > "$MANIFEST"
 cat kured-ds.yaml >> "$MANIFEST"
 ```
 
-### Publish release artifacts
+### Publish new version release artifacts
 
-Now you can head to the GitHub UI, use the version number as tag and upload the
-`kured-<release>-dockerhub.yaml` file.
+Now you can head to the GitHub UI for releases, drafting a new
+release. Chose, as tag, the new version number.
+
+Click to generate the release notes.
+
+Fill, as name, "Kured <new version>".
+
+Edit the generated text.
 
 Please describe what's new and noteworthy in the release notes, list the PRs
 that landed and give a shout-out to everyone who contributed.
-
 Please also note down on which releases the upcoming `kured` release was
-tested on. (Check old release notes if you're unsure.)
+tested on or what it supports. (Check old release notes if you're unsure.)
+
+Before clicking on publishing release, upload the yaml manifest
+(`kured-<new version>-dockerhub.yaml`) file.
+
+Click on publish the release and set as the latest release.
