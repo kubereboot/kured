@@ -8,37 +8,32 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"reflect"
-	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/containrrr/shoutrrr"
+	"github.com/kubereboot/kured/internal"
+	"github.com/kubereboot/kured/pkg/blockers"
+	"github.com/kubereboot/kured/pkg/checkers"
+	"github.com/kubereboot/kured/pkg/daemonsetlock"
+	"github.com/kubereboot/kured/pkg/delaytick"
+	"github.com/kubereboot/kured/pkg/reboot"
+	"github.com/kubereboot/kured/pkg/taints"
+	"github.com/kubereboot/kured/pkg/timewindow"
 	papi "github.com/prometheus/client_golang/api"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
+	flag "github.com/spf13/pflag"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	kubectldrain "k8s.io/kubectl/pkg/drain"
-
-	"github.com/google/shlex"
-
-	shoutrrr "github.com/containrrr/shoutrrr"
-	"github.com/kubereboot/kured/pkg/alerts"
-	"github.com/kubereboot/kured/pkg/daemonsetlock"
-	"github.com/kubereboot/kured/pkg/delaytick"
-	"github.com/kubereboot/kured/pkg/reboot"
-	"github.com/kubereboot/kured/pkg/taints"
-	"github.com/kubereboot/kured/pkg/timewindow"
-	"github.com/kubereboot/kured/pkg/util"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
@@ -63,7 +58,7 @@ var (
 	lockReleaseDelay                time.Duration
 	prometheusURL                   string
 	preferNoScheduleTaintName       string
-	alertFilter                     *regexp.Regexp
+	alertFilter                     regexpValue
 	alertFilterMatchOnly            bool
 	alertFiringOnly                 bool
 	rebootSentinelFile              string
@@ -108,11 +103,6 @@ const (
 	// EnvPrefix The environment variable prefix of all environment variables bound to our command line flags.
 	EnvPrefix = "KURED"
 
-	// MethodCommand is used as "--reboot-method" value when rebooting with the configured "--reboot-command"
-	MethodCommand = "command"
-	// MethodSignal is used as "--reboot-method" value when rebooting with a SIGRTMIN+5 signal.
-	MethodSignal = "signal"
-
 	sigTrminPlus5 = 34 + 5
 )
 
@@ -121,138 +111,178 @@ func init() {
 }
 
 func main() {
-	cmd := NewRootCommand()
 
-	if err := cmd.Execute(); err != nil {
-		log.Fatal(err)
-	}
-}
-
-// NewRootCommand construct the Cobra root command
-func NewRootCommand() *cobra.Command {
-	rootCmd := &cobra.Command{
-		Use:               "kured",
-		Short:             "Kubernetes Reboot Daemon",
-		PersistentPreRunE: bindViper,
-		PreRun:            flagCheck,
-		Run:               root}
-
-	rootCmd.PersistentFlags().StringVar(&nodeID, "node-id", "",
+	flag.StringVar(&nodeID, "node-id", "",
 		"node name kured runs on, should be passed down from spec.nodeName via KURED_NODE_ID environment variable")
-	rootCmd.PersistentFlags().BoolVar(&forceReboot, "force-reboot", false,
+	flag.BoolVar(&forceReboot, "force-reboot", false,
 		"force a reboot even if the drain fails or times out")
-	rootCmd.PersistentFlags().StringVar(&metricsHost, "metrics-host", "",
+	flag.StringVar(&metricsHost, "metrics-host", "",
 		"host where metrics will listen")
-	rootCmd.PersistentFlags().IntVar(&metricsPort, "metrics-port", 8080,
+	flag.IntVar(&metricsPort, "metrics-port", 8080,
 		"port number where metrics will listen")
-	rootCmd.PersistentFlags().IntVar(&drainGracePeriod, "drain-grace-period", -1,
+	flag.IntVar(&drainGracePeriod, "drain-grace-period", -1,
 		"time in seconds given to each pod to terminate gracefully, if negative, the default value specified in the pod will be used")
-	rootCmd.PersistentFlags().StringVar(&drainPodSelector, "drain-pod-selector", "",
+	flag.StringVar(&drainPodSelector, "drain-pod-selector", "",
 		"only drain pods with labels matching the selector (default: '', all pods)")
-	rootCmd.PersistentFlags().IntVar(&skipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", 0,
+	flag.IntVar(&skipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", 0,
 		"when seconds is greater than zero, skip waiting for the pods whose deletion timestamp is older than N seconds while draining a node")
-	rootCmd.PersistentFlags().DurationVar(&drainDelay, "drain-delay", 0,
+	flag.DurationVar(&drainDelay, "drain-delay", 0,
 		"delay drain for this duration (default: 0, disabled)")
-	rootCmd.PersistentFlags().DurationVar(&drainTimeout, "drain-timeout", 0,
+	flag.DurationVar(&drainTimeout, "drain-timeout", 0,
 		"timeout after which the drain is aborted (default: 0, infinite time)")
-	rootCmd.PersistentFlags().DurationVar(&rebootDelay, "reboot-delay", 0,
+	flag.DurationVar(&rebootDelay, "reboot-delay", 0,
 		"delay reboot for this duration (default: 0, disabled)")
-	rootCmd.PersistentFlags().StringVar(&rebootMethod, "reboot-method", "command",
+	flag.StringVar(&rebootMethod, "reboot-method", "command",
 		"method to use for reboots. Available: command")
-	rootCmd.PersistentFlags().DurationVar(&period, "period", time.Minute*60,
+	flag.DurationVar(&period, "period", time.Minute*60,
 		"sentinel check period")
-	rootCmd.PersistentFlags().StringVar(&dsNamespace, "ds-namespace", "kube-system",
+	flag.StringVar(&dsNamespace, "ds-namespace", "kube-system",
 		"namespace containing daemonset on which to place lock")
-	rootCmd.PersistentFlags().StringVar(&dsName, "ds-name", "kured",
+	flag.StringVar(&dsName, "ds-name", "kured",
 		"name of daemonset on which to place lock")
-	rootCmd.PersistentFlags().StringVar(&lockAnnotation, "lock-annotation", KuredNodeLockAnnotation,
+	flag.StringVar(&lockAnnotation, "lock-annotation", KuredNodeLockAnnotation,
 		"annotation in which to record locking node")
-	rootCmd.PersistentFlags().DurationVar(&lockTTL, "lock-ttl", 0,
+	flag.DurationVar(&lockTTL, "lock-ttl", 0,
 		"expire lock annotation after this duration (default: 0, disabled)")
-	rootCmd.PersistentFlags().DurationVar(&lockReleaseDelay, "lock-release-delay", 0,
+	flag.DurationVar(&lockReleaseDelay, "lock-release-delay", 0,
 		"delay lock release for this duration (default: 0, disabled)")
-	rootCmd.PersistentFlags().StringVar(&prometheusURL, "prometheus-url", "",
+	flag.StringVar(&prometheusURL, "prometheus-url", "",
 		"Prometheus instance to probe for active alerts")
-	rootCmd.PersistentFlags().Var(&regexpValue{&alertFilter}, "alert-filter-regexp",
+	flag.Var(&alertFilter, "alert-filter-regexp",
 		"alert names to ignore when checking for active alerts")
-	rootCmd.PersistentFlags().BoolVar(&alertFilterMatchOnly, "alert-filter-match-only", false,
+	flag.BoolVar(&alertFilterMatchOnly, "alert-filter-match-only", false,
 		"Only block if the alert-filter-regexp matches active alerts")
-	rootCmd.PersistentFlags().BoolVar(&alertFiringOnly, "alert-firing-only", false,
+	flag.BoolVar(&alertFiringOnly, "alert-firing-only", false,
 		"only consider firing alerts when checking for active alerts")
-	rootCmd.PersistentFlags().StringVar(&rebootSentinelFile, "reboot-sentinel", "/var/run/reboot-required",
+	flag.StringVar(&rebootSentinelFile, "reboot-sentinel", "/var/run/reboot-required",
 		"path to file whose existence triggers the reboot command")
-	rootCmd.PersistentFlags().StringVar(&preferNoScheduleTaintName, "prefer-no-schedule-taint", "",
+	flag.StringVar(&preferNoScheduleTaintName, "prefer-no-schedule-taint", "",
 		"Taint name applied during pending node reboot (to prevent receiving additional pods from other rebooting nodes). Disabled by default. Set e.g. to \"weave.works/kured-node-reboot\" to enable tainting.")
-	rootCmd.PersistentFlags().StringVar(&rebootSentinelCommand, "reboot-sentinel-command", "",
+	flag.StringVar(&rebootSentinelCommand, "reboot-sentinel-command", "",
 		"command for which a zero return code will trigger a reboot command")
-	rootCmd.PersistentFlags().StringVar(&rebootCommand, "reboot-command", "/bin/systemctl reboot",
+	flag.StringVar(&rebootCommand, "reboot-command", "/bin/systemctl reboot",
 		"command to run when a reboot is required")
-	rootCmd.PersistentFlags().IntVar(&concurrency, "concurrency", 1,
+	flag.IntVar(&concurrency, "concurrency", 1,
 		"amount of nodes to concurrently reboot. Defaults to 1")
-	rootCmd.PersistentFlags().IntVar(&rebootSignal, "reboot-signal", sigTrminPlus5,
+	flag.IntVar(&rebootSignal, "reboot-signal", sigTrminPlus5,
 		"signal to use for reboot, SIGRTMIN+5 by default.")
-
-	rootCmd.PersistentFlags().StringVar(&slackHookURL, "slack-hook-url", "",
+	flag.StringVar(&slackHookURL, "slack-hook-url", "",
 		"slack hook URL for reboot notifications [deprecated in favor of --notify-url]")
-	rootCmd.PersistentFlags().StringVar(&slackUsername, "slack-username", "kured",
+	flag.StringVar(&slackUsername, "slack-username", "kured",
 		"slack username for reboot notifications")
-	rootCmd.PersistentFlags().StringVar(&slackChannel, "slack-channel", "",
+	flag.StringVar(&slackChannel, "slack-channel", "",
 		"slack channel for reboot notifications")
-	rootCmd.PersistentFlags().StringVar(&notifyURL, "notify-url", "",
+	flag.StringVar(&notifyURL, "notify-url", "",
 		"notify URL for reboot notifications (cannot use with --slack-hook-url flags)")
-	rootCmd.PersistentFlags().StringVar(&messageTemplateUncordon, "message-template-uncordon", "Node %s rebooted & uncordoned successfully!",
+	flag.StringVar(&messageTemplateUncordon, "message-template-uncordon", "Node %s rebooted & uncordoned successfully!",
 		"message template used to notify about a node being successfully uncordoned")
-	rootCmd.PersistentFlags().StringVar(&messageTemplateDrain, "message-template-drain", "Draining node %s",
+	flag.StringVar(&messageTemplateDrain, "message-template-drain", "Draining node %s",
 		"message template used to notify about a node being drained")
-	rootCmd.PersistentFlags().StringVar(&messageTemplateReboot, "message-template-reboot", "Rebooting node %s",
+	flag.StringVar(&messageTemplateReboot, "message-template-reboot", "Rebooting node %s",
 		"message template used to notify about a node being rebooted")
-
-	rootCmd.PersistentFlags().StringArrayVar(&podSelectors, "blocking-pod-selector", nil,
+	flag.StringArrayVar(&podSelectors, "blocking-pod-selector", nil,
 		"label selector identifying pods whose presence should prevent reboots")
-
-	rootCmd.PersistentFlags().StringSliceVar(&rebootDays, "reboot-days", timewindow.EveryDay,
+	flag.StringSliceVar(&rebootDays, "reboot-days", timewindow.EveryDay,
 		"schedule reboot on these days")
-	rootCmd.PersistentFlags().StringVar(&rebootStart, "start-time", "0:00",
+	flag.StringVar(&rebootStart, "start-time", "0:00",
 		"schedule reboot only after this time of day")
-	rootCmd.PersistentFlags().StringVar(&rebootEnd, "end-time", "23:59:59",
+	flag.StringVar(&rebootEnd, "end-time", "23:59:59",
 		"schedule reboot only before this time of day")
-	rootCmd.PersistentFlags().StringVar(&timezone, "time-zone", "UTC",
+	flag.StringVar(&timezone, "time-zone", "UTC",
 		"use this timezone for schedule inputs")
-
-	rootCmd.PersistentFlags().BoolVar(&annotateNodes, "annotate-nodes", false,
+	flag.BoolVar(&annotateNodes, "annotate-nodes", false,
 		"if set, the annotations 'weave.works/kured-reboot-in-progress' and 'weave.works/kured-most-recent-reboot-needed' will be given to nodes undergoing kured reboots")
-
-	rootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "text",
+	flag.StringVar(&logFormat, "log-format", "text",
 		"use text or json log format")
-
-	rootCmd.PersistentFlags().StringSliceVar(&preRebootNodeLabels, "pre-reboot-node-labels", nil,
+	flag.StringSliceVar(&preRebootNodeLabels, "pre-reboot-node-labels", nil,
 		"labels to add to nodes before cordoning")
-	rootCmd.PersistentFlags().StringSliceVar(&postRebootNodeLabels, "post-reboot-node-labels", nil,
+	flag.StringSliceVar(&postRebootNodeLabels, "post-reboot-node-labels", nil,
 		"labels to add to nodes after uncordoning")
 
-	return rootCmd
+	flag.Parse()
+
+	// Load flags from environment variables
+	LoadFromEnv()
+
+	log.Infof("Kubernetes Reboot Daemon: %s", version)
+
+	if logFormat == "json" {
+		log.SetFormatter(&log.JSONFormatter{})
+	}
+
+	if nodeID == "" {
+		log.Fatal("KURED_NODE_ID environment variable required")
+	}
+	log.Infof("Node ID: %s", nodeID)
+
+	notifyURL = validateNotificationURL(notifyURL, slackHookURL)
+
+	err := validateNodeLabels(preRebootNodeLabels, postRebootNodeLabels)
+	if err != nil {
+		log.Warnf(err.Error())
+	}
+
+	log.Infof("PreferNoSchedule taint: %s", preferNoScheduleTaintName)
+
+	// This should be printed from blocker list instead of only blocking pod selectors
+	log.Infof("Blocking Pod Selectors: %v", podSelectors)
+
+	log.Infof("Reboot period %v", period)
+	log.Infof("Concurrency: %v", concurrency)
+
+	if annotateNodes {
+		log.Infof("Will annotate nodes during kured reboot operations")
+	}
+
+	// Now call the rest of the main loop.
+	window, err := timewindow.New(rebootDays, rebootStart, rebootEnd, timezone)
+	if err != nil {
+		log.Fatalf("Failed to build time window: %v", err)
+	}
+	log.Infof("Reboot schedule: %v", window)
+
+	log.Infof("Reboot method: %s", rebootMethod)
+	rebooter, err := internal.NewRebooter(rebootMethod, rebootCommand, rebootSignal)
+	if err != nil {
+		log.Fatalf("Failed to build rebooter: %v", err)
+	}
+
+	rebootChecker, err := internal.NewRebootChecker(rebootSentinelCommand, rebootSentinelFile)
+	if err != nil {
+		log.Fatalf("Failed to build reboot checker: %v", err)
+	}
+
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
+	if lockTTL > 0 {
+		log.Infof("Lock TTL set, lock will expire after: %v", lockTTL)
+	} else {
+		log.Info("Lock TTL not set, lock will remain until being released")
+	}
+	if lockReleaseDelay > 0 {
+		log.Infof("Lock release delay set, lock release will be delayed by: %v", lockReleaseDelay)
+	} else {
+		log.Info("Lock release delay not set, lock will be released immediately after rebooting")
+	}
+	lock := daemonsetlock.New(client, nodeID, dsNamespace, dsName, lockAnnotation, lockTTL, concurrency, lockReleaseDelay)
+
+	go rebootAsRequired(nodeID, rebooter, rebootChecker, window, lock, client)
+	go maintainRebootRequiredMetric(nodeID, rebootChecker)
+
+	http.Handle("/metrics", promhttp.Handler())
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", metricsHost, metricsPort), nil))
 }
 
-// func that checks for deprecated slack-notification-related flags and node labels that do not match
-func flagCheck(cmd *cobra.Command, args []string) {
-	if slackHookURL != "" && notifyURL != "" {
-		log.Warnf("Cannot use both --notify-url and --slack-hook-url flags. Kured will use --notify-url flag only...")
-	}
-	if notifyURL != "" {
-		notifyURL = stripQuotes(notifyURL)
-	} else if slackHookURL != "" {
-		slackHookURL = stripQuotes(slackHookURL)
-		log.Warnf("Deprecated flag(s). Please use --notify-url flag instead.")
-		trataURL, err := url.Parse(slackHookURL)
-		if err != nil {
-			log.Warnf("slack-hook-url is not properly formatted... no notification will be sent: %v\n", err)
-		}
-		if len(strings.Split(strings.Trim(trataURL.Path, "/services/"), "/")) != 3 {
-			log.Warnf("slack-hook-url is not properly formatted... no notification will be sent: unexpected number of / in URL\n")
-		} else {
-			notifyURL = fmt.Sprintf("slack://%s", strings.Trim(trataURL.Path, "/services/"))
-		}
-	}
+func validateNodeLabels(preRebootNodeLabels []string, postRebootNodeLabels []string) error {
 	var preRebootNodeLabelKeys, postRebootNodeLabelKeys []string
 	for _, label := range preRebootNodeLabels {
 		preRebootNodeLabelKeys = append(preRebootNodeLabelKeys, strings.Split(label, "=")[0])
@@ -263,8 +293,95 @@ func flagCheck(cmd *cobra.Command, args []string) {
 	sort.Strings(preRebootNodeLabelKeys)
 	sort.Strings(postRebootNodeLabelKeys)
 	if !reflect.DeepEqual(preRebootNodeLabelKeys, postRebootNodeLabelKeys) {
-		log.Warnf("pre-reboot-node-labels keys and post-reboot-node-labels keys do not match. This may result in unexpected behaviour.")
+		return fmt.Errorf("pre-reboot-node-labels keys and post-reboot-node-labels keys do not match, resulting in unexpected behaviour")
 	}
+
+	return nil
+}
+
+func validateNotificationURL(notifyURL string, slackHookURL string) string {
+	switch {
+	case slackHookURL != "" && notifyURL != "":
+		log.Warnf("Cannot use both --notify-url (given: %v) and --slack-hook-url (given: %v) flags. Kured will only use --notify-url flag", slackHookURL, notifyURL)
+		return validateNotificationURL(notifyURL, "")
+	case notifyURL != "":
+		return stripQuotes(notifyURL)
+	case slackHookURL != "":
+		log.Warnf("Deprecated flag(s). Please use --notify-url flag instead.")
+		parsedURL, err := url.Parse(stripQuotes(slackHookURL))
+		if err != nil {
+			log.Errorf("slack-hook-url is not properly formatted... no notification will be sent: %v\n", err)
+			return ""
+		}
+		if len(strings.Split(strings.Trim(parsedURL.Path, "/services/"), "/")) != 3 {
+			log.Errorf("slack-hook-url is not properly formatted... no notification will be sent: unexpected number of / in URL\n")
+			return ""
+		}
+		return fmt.Sprintf("slack://%s", strings.Trim(parsedURL.Path, "/services/"))
+	}
+	return ""
+}
+
+// LoadFromEnv attempts to load environment variables corresponding to flags.
+// It looks for an environment variable with the uppercase version of the flag name (prefixed by EnvPrefix).
+func LoadFromEnv() {
+	flag.VisitAll(func(f *flag.Flag) {
+		envVarName := fmt.Sprintf("%s_%s", EnvPrefix, strings.ToUpper(strings.ReplaceAll(f.Name, "-", "_")))
+
+		if envValue, exists := os.LookupEnv(envVarName); exists {
+			switch f.Value.Type() {
+			case "int":
+				if parsedVal, err := strconv.Atoi(envValue); err == nil {
+					err := flag.Set(f.Name, strconv.Itoa(parsedVal))
+					if err != nil {
+						fmt.Printf("cannot set flag %s from env var named %s", f.Name, envVarName)
+						os.Exit(1)
+					} // Set int flag
+				} else {
+					fmt.Printf("Invalid value for env var named %s", envVarName)
+					os.Exit(1)
+				}
+			case "string":
+				err := flag.Set(f.Name, envValue)
+				if err != nil {
+					fmt.Printf("cannot set flag %s from env{%s}: %s\n", f.Name, envVarName, envValue)
+					os.Exit(1)
+				} // Set string flag
+			case "bool":
+				if parsedVal, err := strconv.ParseBool(envValue); err == nil {
+					err := flag.Set(f.Name, strconv.FormatBool(parsedVal))
+					if err != nil {
+						fmt.Printf("cannot set flag %s from env{%s}: %s\n", f.Name, envVarName, envValue)
+						os.Exit(1)
+					} // Set boolean flag
+				} else {
+					fmt.Printf("Invalid value for %s: %s\n", envVarName, envValue)
+					os.Exit(1)
+				}
+			case "duration":
+				// Set duration from the environment variable (e.g., "1h30m")
+				if _, err := time.ParseDuration(envValue); err == nil {
+					flag.Set(f.Name, envValue)
+				} else {
+					fmt.Printf("Invalid duration for %s: %s\n", envVarName, envValue)
+					os.Exit(1)
+				}
+			case "regexp":
+				// For regexp, set it from the environment variable
+				flag.Set(f.Name, envValue)
+			case "stringSlice":
+				// For stringSlice, split the environment variable by commas and set it
+				err := flag.Set(f.Name, envValue)
+				if err != nil {
+					fmt.Printf("cannot set flag %s from env{%s}: %s\n", f.Name, envVarName, envValue)
+					os.Exit(1)
+				}
+			default:
+				fmt.Printf("Unsupported flag type for %s\n", f.Name)
+			}
+		}
+	})
+
 }
 
 // stripQuotes removes any literal single or double quote chars that surround a string
@@ -278,218 +395,6 @@ func stripQuotes(str string) string {
 	}
 	// return the original string if it has a length of zero or one
 	return str
-}
-
-// bindViper initializes viper and binds command flags with environment variables
-func bindViper(cmd *cobra.Command, args []string) error {
-	v := viper.New()
-
-	v.SetEnvPrefix(EnvPrefix)
-	v.AutomaticEnv()
-	bindFlags(cmd, v)
-
-	return nil
-}
-
-// bindFlags binds each cobra flag to its associated viper configuration (environment variable)
-func bindFlags(cmd *cobra.Command, v *viper.Viper) {
-	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		// Environment variables can't have dashes in them, so bind them to their equivalent keys with underscores
-		if strings.Contains(f.Name, "-") {
-			v.BindEnv(f.Name, flagToEnvVar(f.Name))
-		}
-
-		// Apply the viper config value to the flag when the flag is not set and viper has a value
-		if !f.Changed && v.IsSet(f.Name) {
-			val := v.Get(f.Name)
-			log.Infof("Binding %s command flag to environment variable: %s", f.Name, flagToEnvVar(f.Name))
-			cmd.Flags().Set(f.Name, fmt.Sprintf("%v", val))
-		}
-	})
-}
-
-// flagToEnvVar converts command flag name to equivalent environment variable name
-func flagToEnvVar(flag string) string {
-	envVarSuffix := strings.ToUpper(strings.ReplaceAll(flag, "-", "_"))
-	return fmt.Sprintf("%s_%s", EnvPrefix, envVarSuffix)
-}
-
-// buildHostCommand writes a new command to run in the host namespace
-// Rancher based need different pid
-func buildHostCommand(pid int, command []string) []string {
-
-	// From the container, we nsenter into the proper PID to run the hostCommand.
-	// For this, kured daemonset need to be configured with hostPID:true and privileged:true
-	cmd := []string{"/usr/bin/nsenter", fmt.Sprintf("-m/proc/%d/ns/mnt", pid), "--"}
-	cmd = append(cmd, command...)
-	return cmd
-}
-
-func rebootRequired(sentinelCommand []string) bool {
-	cmd := util.NewCommand(sentinelCommand[0], sentinelCommand[1:]...)
-	if err := cmd.Run(); err != nil {
-		switch err := err.(type) {
-		case *exec.ExitError:
-			// We assume a non-zero exit code means 'reboot not required', but of course
-			// the user could have misconfigured the sentinel command or something else
-			// went wrong during its execution. In that case, not entering a reboot loop
-			// is the right thing to do, and we are logging stdout/stderr of the command
-			// so it should be obvious what is wrong.
-			if cmd.ProcessState.ExitCode() != 1 {
-				log.Warnf("sentinel command ended with unexpected exit code: %v", cmd.ProcessState.ExitCode())
-			}
-			return false
-		default:
-			// Something was grossly misconfigured, such as the command path being wrong.
-			log.Fatalf("Error invoking sentinel command: %v", err)
-		}
-	}
-	return true
-}
-
-// RebootBlocker interface should be implemented by types
-// to know if their instantiations should block a reboot
-type RebootBlocker interface {
-	isBlocked() bool
-}
-
-// PrometheusBlockingChecker contains info for connecting
-// to prometheus, and can give info about whether a reboot should be blocked
-type PrometheusBlockingChecker struct {
-	// prometheusClient to make prometheus-go-client and api config available
-	// into the PrometheusBlockingChecker struct
-	promClient *alerts.PromClient
-	// regexp used to get alerts
-	filter *regexp.Regexp
-	// bool to indicate if only firing alerts should be considered
-	firingOnly bool
-	// bool to indicate that we're only blocking on alerts which match the filter
-	filterMatchOnly bool
-}
-
-// KubernetesBlockingChecker contains info for connecting
-// to k8s, and can give info about whether a reboot should be blocked
-type KubernetesBlockingChecker struct {
-	// client used to contact kubernetes API
-	client   *kubernetes.Clientset
-	nodename string
-	// lised used to filter pods (podSelector)
-	filter []string
-}
-
-func (pb PrometheusBlockingChecker) isBlocked() bool {
-	alertNames, err := pb.promClient.ActiveAlerts(pb.filter, pb.firingOnly, pb.filterMatchOnly)
-	if err != nil {
-		log.Warnf("Reboot blocked: prometheus query error: %v", err)
-		return true
-	}
-	count := len(alertNames)
-	if count > 10 {
-		alertNames = append(alertNames[:10], "...")
-	}
-	if count > 0 {
-		log.Warnf("Reboot blocked: %d active alerts: %v", count, alertNames)
-		return true
-	}
-	return false
-}
-
-func (kb KubernetesBlockingChecker) isBlocked() bool {
-	fieldSelector := fmt.Sprintf("spec.nodeName=%s,status.phase!=Succeeded,status.phase!=Failed,status.phase!=Unknown", kb.nodename)
-	for _, labelSelector := range kb.filter {
-		podList, err := kb.client.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{
-			LabelSelector: labelSelector,
-			FieldSelector: fieldSelector,
-			Limit:         10})
-		if err != nil {
-			log.Warnf("Reboot blocked: pod query error: %v", err)
-			return true
-		}
-
-		if len(podList.Items) > 0 {
-			podNames := make([]string, 0, len(podList.Items))
-			for _, pod := range podList.Items {
-				podNames = append(podNames, pod.Name)
-			}
-			if len(podList.Continue) > 0 {
-				podNames = append(podNames, "...")
-			}
-			log.Warnf("Reboot blocked: matching pods: %v", podNames)
-			return true
-		}
-	}
-	return false
-}
-
-func rebootBlocked(blockers ...RebootBlocker) bool {
-	for _, blocker := range blockers {
-		if blocker.isBlocked() {
-			return true
-		}
-	}
-	return false
-}
-
-func holding(lock *daemonsetlock.DaemonSetLock, metadata interface{}, isMultiLock bool) bool {
-	var holding bool
-	var err error
-	if isMultiLock {
-		holding, err = lock.TestMultiple()
-	} else {
-		holding, err = lock.Test(metadata)
-	}
-	if err != nil {
-		log.Fatalf("Error testing lock: %v", err)
-	}
-	if holding {
-		log.Infof("Holding lock")
-	}
-	return holding
-}
-
-func acquire(lock *daemonsetlock.DaemonSetLock, metadata interface{}, TTL time.Duration, maxOwners int) bool {
-	var holding bool
-	var holder string
-	var err error
-	if maxOwners > 1 {
-		var holders []string
-		holding, holders, err = lock.AcquireMultiple(metadata, TTL, maxOwners)
-		holder = strings.Join(holders, ",")
-	} else {
-		holding, holder, err = lock.Acquire(metadata, TTL)
-	}
-	switch {
-	case err != nil:
-		log.Fatalf("Error acquiring lock: %v", err)
-		return false
-	case !holding:
-		log.Warnf("Lock already held: %v", holder)
-		return false
-	default:
-		log.Infof("Acquired reboot lock")
-		return true
-	}
-}
-
-func throttle(releaseDelay time.Duration) {
-	if releaseDelay > 0 {
-		log.Infof("Delaying lock release by %v", releaseDelay)
-		time.Sleep(releaseDelay)
-	}
-}
-
-func release(lock *daemonsetlock.DaemonSetLock, isMultiLock bool) {
-	log.Infof("Releasing lock")
-
-	var err error
-	if isMultiLock {
-		err = lock.ReleaseMultiple()
-	} else {
-		err = lock.Release()
-	}
-	if err != nil {
-		log.Fatalf("Error releasing lock: %v", err)
-	}
 }
 
 func drain(client *kubernetes.Clientset, node *v1.Node) error {
@@ -556,20 +461,15 @@ func uncordon(client *kubernetes.Clientset, node *v1.Node) error {
 	return nil
 }
 
-func maintainRebootRequiredMetric(nodeID string, sentinelCommand []string) {
+func maintainRebootRequiredMetric(nodeID string, checker checkers.Checker) {
 	for {
-		if rebootRequired(sentinelCommand) {
+		if checker.RebootRequired() {
 			rebootRequiredGauge.WithLabelValues(nodeID).Set(1)
 		} else {
 			rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
 		}
 		time.Sleep(time.Minute)
 	}
-}
-
-// nodeMeta is used to remember information across reboots
-type nodeMeta struct {
-	Unschedulable bool `json:"unschedulable"`
 }
 
 func addNodeAnnotations(client *kubernetes.Clientset, nodeID string, annotations map[string]string) error {
@@ -646,30 +546,23 @@ func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []stri
 	}
 }
 
-func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []string, window *timewindow.TimeWindow, TTL time.Duration, releaseDelay time.Duration) {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
+func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.Checker, window *timewindow.TimeWindow, lock daemonsetlock.Lock, client *kubernetes.Clientset) {
 
-	client, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	lock := daemonsetlock.New(client, nodeID, dsNamespace, dsName, lockAnnotation)
-
-	nodeMeta := nodeMeta{}
 	source := rand.NewSource(time.Now().UnixNano())
 	tick := delaytick.New(source, 1*time.Minute)
 	for range tick {
-		if holding(lock, &nodeMeta, concurrency > 1) {
+		holding, lockData, err := lock.Holding()
+		if err != nil {
+			log.Errorf("Error testing lock: %v", err)
+		}
+		if holding {
 			node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 			if err != nil {
 				log.Errorf("Error retrieving node object via k8s API: %v", err)
 				continue
 			}
-			if !nodeMeta.Unschedulable {
+
+			if !lockData.Metadata.Unschedulable {
 				err = uncordon(client, node)
 				if err != nil {
 					log.Errorf("Unable to uncordon %s: %v, will continue to hold lock and retry uncordon", node.GetName(), err)
@@ -687,7 +580,7 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 			// And (2) check if we previously annotated the node that it was in the process of being rebooted,
 			// And finally (3) if it has that annotation, to delete it.
 			// This indicates to other node tools running on the cluster that this node may be a candidate for maintenance
-			if annotateNodes && !rebootRequired(sentinelCommand) {
+			if annotateNodes && !checker.RebootRequired() {
 				if _, ok := node.Annotations[KuredRebootInProgressAnnotation]; ok {
 					err := deleteNodeAnnotation(client, nodeID, KuredRebootInProgressAnnotation)
 					if err != nil {
@@ -695,8 +588,12 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 					}
 				}
 			}
-			throttle(releaseDelay)
-			release(lock, concurrency > 1)
+
+			err = lock.Release()
+			if err != nil {
+				log.Errorf("Error releasing lock, will retry: %v", err)
+				continue
+			}
 			break
 		} else {
 			break
@@ -706,14 +603,8 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 	preferNoScheduleTaint := taints.New(client, nodeID, preferNoScheduleTaintName, v1.TaintEffectPreferNoSchedule)
 
 	// Remove taint immediately during startup to quickly allow scheduling again.
-	if !rebootRequired(sentinelCommand) {
+	if !checker.RebootRequired() {
 		preferNoScheduleTaint.Disable()
-	}
-
-	// instantiate prometheus client
-	promClient, err := alerts.NewPromClient(papi.Config{Address: prometheusURL})
-	if err != nil {
-		log.Fatal("Unable to create prometheus client: ", err)
 	}
 
 	source = rand.NewSource(time.Now().UnixNano())
@@ -725,7 +616,7 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 			continue
 		}
 
-		if !rebootRequired(sentinelCommand) {
+		if !checker.RebootRequired() {
 			log.Infof("Reboot not required")
 			preferNoScheduleTaint.Disable()
 			continue
@@ -735,7 +626,8 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 		if err != nil {
 			log.Fatalf("Error retrieving node object via k8s API: %v", err)
 		}
-		nodeMeta.Unschedulable = node.Spec.Unschedulable
+
+		nodeMeta := daemonsetlock.NodeMeta{Unschedulable: node.Spec.Unschedulable}
 
 		var timeNowString string
 		if annotateNodes {
@@ -753,32 +645,47 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 			}
 		}
 
-		var blockCheckers []RebootBlocker
+		var blockCheckers []blockers.RebootBlocker
 		if prometheusURL != "" {
-			blockCheckers = append(blockCheckers, PrometheusBlockingChecker{promClient: promClient, filter: alertFilter, firingOnly: alertFiringOnly, filterMatchOnly: alertFilterMatchOnly})
+			blockCheckers = append(blockCheckers, blockers.NewPrometheusBlockingChecker(papi.Config{Address: prometheusURL}, alertFilter.Regexp, alertFiringOnly, alertFilterMatchOnly))
 		}
 		if podSelectors != nil {
-			blockCheckers = append(blockCheckers, KubernetesBlockingChecker{client: client, nodename: nodeID, filter: podSelectors})
+			blockCheckers = append(blockCheckers, blockers.NewKubernetesBlockingChecker(client, nodeID, podSelectors))
 		}
 
 		var rebootRequiredBlockCondition string
-		if rebootBlocked(blockCheckers...) {
+		if blockers.RebootBlocked(blockCheckers...) {
 			rebootRequiredBlockCondition = ", but blocked at this time"
 			continue
 		}
 		log.Infof("Reboot required%s", rebootRequiredBlockCondition)
 
-		if !holding(lock, &nodeMeta, concurrency > 1) && !acquire(lock, &nodeMeta, TTL, concurrency) {
-			// Prefer to not schedule pods onto this node to avoid draing the same pod multiple times.
-			preferNoScheduleTaint.Enable()
-			continue
+		holding, _, err := lock.Holding()
+		if err != nil {
+			log.Errorf("Error testing lock: %v", err)
+		}
+
+		if !holding {
+			acquired, holder, err := lock.Acquire(nodeMeta)
+			if err != nil {
+				log.Errorf("Error acquiring lock: %v", err)
+			}
+			if !acquired {
+				log.Warnf("Lock already held: %v", holder)
+				// Prefer to not schedule pods onto this node to avoid draing the same pod multiple times.
+				preferNoScheduleTaint.Enable()
+				continue
+			}
 		}
 
 		err = drain(client, node)
 		if err != nil {
 			if !forceReboot {
 				log.Errorf("Unable to cordon or drain %s: %v, will release lock and retry cordon and drain before rebooting when lock is next acquired", node.GetName(), err)
-				release(lock, concurrency > 1)
+				err = lock.Release()
+				if err != nil {
+					log.Errorf("Error releasing lock: %v", err)
+				}
 				log.Infof("Performing a best-effort uncordon after failed cordon and drain")
 				uncordon(client, node)
 				continue
@@ -795,108 +702,15 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 				log.Warnf("Error notifying: %v", err)
 			}
 		}
+		log.Infof("Triggering reboot for node %v", nodeID)
 
-		booter.Reboot()
+		err = rebooter.Reboot()
+		if err != nil {
+			log.Fatalf("Unable to reboot node: %v", err)
+		}
 		for {
 			log.Infof("Waiting for reboot")
 			time.Sleep(time.Minute)
 		}
 	}
-}
-
-// buildSentinelCommand creates the shell command line which will need wrapping to escape
-// the container boundaries
-func buildSentinelCommand(rebootSentinelFile string, rebootSentinelCommand string) []string {
-	if rebootSentinelCommand != "" {
-		cmd, err := shlex.Split(rebootSentinelCommand)
-		if err != nil {
-			log.Fatalf("Error parsing provided sentinel command: %v", err)
-		}
-		return cmd
-	}
-	return []string{"test", "-f", rebootSentinelFile}
-}
-
-// parseRebootCommand creates the shell command line which will need wrapping to escape
-// the container boundaries
-func parseRebootCommand(rebootCommand string) []string {
-	command, err := shlex.Split(rebootCommand)
-	if err != nil {
-		log.Fatalf("Error parsing provided reboot command: %v", err)
-	}
-	return command
-}
-
-func root(cmd *cobra.Command, args []string) {
-	if logFormat == "json" {
-		log.SetFormatter(&log.JSONFormatter{})
-	}
-
-	log.Infof("Kubernetes Reboot Daemon: %s", version)
-
-	if nodeID == "" {
-		log.Fatal("KURED_NODE_ID environment variable required")
-	}
-
-	window, err := timewindow.New(rebootDays, rebootStart, rebootEnd, timezone)
-	if err != nil {
-		log.Fatalf("Failed to build time window: %v", err)
-	}
-
-	sentinelCommand := buildSentinelCommand(rebootSentinelFile, rebootSentinelCommand)
-	restartCommand := parseRebootCommand(rebootCommand)
-
-	log.Infof("Node ID: %s", nodeID)
-	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
-	if lockTTL > 0 {
-		log.Infof("Lock TTL set, lock will expire after: %v", lockTTL)
-	} else {
-		log.Info("Lock TTL not set, lock will remain until being released")
-	}
-	if lockReleaseDelay > 0 {
-		log.Infof("Lock release delay set, lock release will be delayed by: %v", lockReleaseDelay)
-	} else {
-		log.Info("Lock release delay not set, lock will be released immediately after rebooting")
-	}
-	log.Infof("PreferNoSchedule taint: %s", preferNoScheduleTaintName)
-	log.Infof("Blocking Pod Selectors: %v", podSelectors)
-	log.Infof("Reboot schedule: %v", window)
-	log.Infof("Reboot check command: %s every %v", sentinelCommand, period)
-	log.Infof("Concurrency: %v", concurrency)
-	log.Infof("Reboot method: %s", rebootMethod)
-	if rebootCommand == MethodCommand {
-		log.Infof("Reboot command: %s", restartCommand)
-	} else {
-		log.Infof("Reboot signal: %v", rebootSignal)
-	}
-
-	if annotateNodes {
-		log.Infof("Will annotate nodes during kured reboot operations")
-	}
-
-	// To run those commands as it was the host, we'll use nsenter
-	// Relies on hostPID:true and privileged:true to enter host mount space
-	// PID set to 1, until we have a better discovery mechanism.
-	hostRestartCommand := buildHostCommand(1, restartCommand)
-
-	// Only wrap sentinel-command with nsenter, if a custom-command was configured, otherwise use the host-path mount
-	hostSentinelCommand := sentinelCommand
-	if rebootSentinelCommand != "" {
-		hostSentinelCommand = buildHostCommand(1, sentinelCommand)
-	}
-
-	var booter reboot.Reboot
-	if rebootMethod == MethodCommand {
-		booter = reboot.NewCommandReboot(nodeID, hostRestartCommand)
-	} else if rebootMethod == MethodSignal {
-		booter = reboot.NewSignalReboot(nodeID, rebootSignal)
-	} else {
-		log.Fatalf("Invalid reboot-method configured: %s", rebootMethod)
-	}
-
-	go rebootAsRequired(nodeID, booter, hostSentinelCommand, window, lockTTL, lockReleaseDelay)
-	go maintainRebootRequiredMetric(nodeID, hostSentinelCommand)
-
-	http.Handle("/metrics", promhttp.Handler())
-	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", metricsHost, metricsPort), nil))
 }

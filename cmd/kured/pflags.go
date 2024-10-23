@@ -5,14 +5,14 @@ import (
 )
 
 type regexpValue struct {
-	value **regexp.Regexp
+	*regexp.Regexp
 }
 
 func (rev *regexpValue) String() string {
-	if *rev.value == nil {
+	if rev.Regexp == nil {
 		return ""
 	}
-	return (*rev.value).String()
+	return rev.Regexp.String()
 }
 
 func (rev *regexpValue) Set(s string) error {
@@ -20,12 +20,11 @@ func (rev *regexpValue) Set(s string) error {
 	if err != nil {
 		return err
 	}
-
-	*rev.value = value
-
+	rev.Regexp = value
 	return nil
 }
 
+// Type method returns the type of the flag as a string
 func (rev *regexpValue) Type() string {
-	return "regexp.Regexp"
+	return "regexp"
 }
