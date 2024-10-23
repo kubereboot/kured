@@ -788,6 +788,18 @@ func rebootAsRequired(nodeID string, booter reboot.Reboot, sentinelCommand []str
 		if rebootDelay > 0 {
 			log.Infof("Delaying reboot for %v", rebootDelay)
 			time.Sleep(rebootDelay)
+
+			log.Infof("Making sure %s is drained before reboot", node.GetName())
+			err = drain(client, node)
+			if err != nil {
+				if !forceReboot {
+					log.Errorf("Unable to cordon or drain %s: %v, will release lock and retry cordon and drain before rebooting when lock is next acquired", node.GetName(), err)
+					release(lock, concurrency > 1)
+					log.Infof("Performing a best-effort uncordon after failed cordon and drain")
+					uncordon(client, node)
+					continue
+				}
+			}
 		}
 
 		if notifyURL != "" {
