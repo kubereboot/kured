@@ -1,3 +1,14 @@
 exemptions:
   - check: analytics
     reason: "We don't track people"
+extra:
+  clomonitor_name: "kured"
+  summary_personas: SREs, Cloud Architects, Platform Engineers, DevOps Engineer, DevOps practitioners
+  summary_tags: reboot, node management
+  summary_use_case: >-
+    TODO
+  summary_business_use_case: >-
+    TODO
+  summary_release_rate: Release aligned with kubernetes minor releases, happening after new kind image is released.
+  summary_integrations: >-
+    Linux, systemd, Docker, Containerd, CRI-O, Podman, Ubuntu, unattended-upgrade, Rancher.
