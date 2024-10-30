@@ -1,3 +1,0 @@
-# https://pkg.go.dev/vuln/GO-2024-3106
-# Will be automatically fixed when we'll use golang 1.22.7
-CVE-2024-34156
