@@ -88,6 +88,7 @@ jobs:
           - "TestE2EWithCommand"
           - "TestE2EWithSignal"
           - "TestE2EConcurrentWithCommand"
+          - "TestE2EConcurrentWithSignal"
         kubernetes_version:
           - "previous"
           - "current"
