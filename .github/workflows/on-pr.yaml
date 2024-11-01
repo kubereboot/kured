@@ -127,6 +127,7 @@ jobs:
         testname:
           - "TestCordonningIsKept/concurrency1"
           - "TestCordonningIsKept/concurrency2"
+          - "TestE2EBlocker/podblocker"
     steps:
       - uses: actions/checkout@v4
       - name: Ensure go version
@@ -148,5 +149,9 @@ jobs:
         with:
           install_only: true
           version: v0.22.0
+          # Keep this until v1.31 (or superior) becomes the default kubectl version for the kind-action.
+          # It is used in podblocker shell script test to use --all-pods.
+          # If the podblocker e2e test relies on another way, this can also be removed.
+          kubectl_version: v1.31.0
       - name: Run specific e2e tests
         run: make e2e-test ARGS="-run ^${{ matrix.testname }}"
