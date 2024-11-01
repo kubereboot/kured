@@ -286,7 +286,6 @@ func main() {
 	lock := daemonsetlock.New(client, nodeID, dsNamespace, dsName, lockAnnotation, lockTTL, concurrency, lockReleaseDelay)
 
 	go rebootAsRequired(nodeID, rebooter, rebootChecker, blockCheckers, window, lock, client)
-	go maintainRebootRequiredMetric(nodeID, rebootChecker)
 
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", metricsHost, metricsPort), nil)) // #nosec G114
@@ -479,17 +478,6 @@ func uncordon(client *kubernetes.Clientset, node *v1.Node) error {
 	return nil
 }
 
-func maintainRebootRequiredMetric(nodeID string, checker checkers.Checker) {
-	for {
-		if checker.RebootRequired() {
-			rebootRequiredGauge.WithLabelValues(nodeID).Set(1)
-		} else {
-			rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
-		}
-		time.Sleep(time.Minute)
-	}
-}
-
 func addNodeAnnotations(client *kubernetes.Clientset, nodeID string, annotations map[string]string) error {
 	node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 	if err != nil {
@@ -619,7 +607,9 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 	preferNoScheduleTaint := taints.New(client, nodeID, preferNoScheduleTaintName, v1.TaintEffectPreferNoSchedule)
 
 	// Remove taint immediately during startup to quickly allow scheduling again.
+	// Also update the metric at startup (after lock shenanigans)
 	if !checker.RebootRequired() {
+		rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
 		preferNoScheduleTaint.Disable()
 	}
 
@@ -634,9 +624,11 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 
 		if !checker.RebootRequired() {
 			log.Infof("Reboot not required")
+			rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
 			preferNoScheduleTaint.Disable()
 			continue
 		}
+		rebootRequiredGauge.WithLabelValues(nodeID).Set(1)
 
 		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 		if err != nil {
