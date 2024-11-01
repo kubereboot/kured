@@ -344,15 +344,15 @@ func TestCordonningIsKept(t *testing.T) {
 		"concurrency1",
 		"concurrency2",
 	}
-	// Iterate over each Kubernetes version
-	for _, version := range kindClusterConfigs {
-		version := version
+	// Iterate over each test variant
+	for _, variant := range kindClusterConfigs {
+		variant := variant
 		// Define a subtest for each combination
-		t.Run(version, func(t *testing.T) {
+		t.Run(variant, func(t *testing.T) {
 			t.Parallel() // Allow tests to run in parallel
 
 			randomInt := fmt.Sprintf(strconv.Itoa(rand.Intn(100)))
-			kindClusterName := fmt.Sprintf("kured-e2e-cordon-%v-%v", version, randomInt)
+			kindClusterName := fmt.Sprintf("kured-e2e-cordon-%v-%v", variant, randomInt)
 			kindClusterConfigFile := fmt.Sprintf("../../.github/kind-cluster-next.yaml")
 			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
 
@@ -393,19 +393,19 @@ func TestE2EBlocker(t *testing.T) {
 	var kindClusterConfigs = []string{
 		"podblocker",
 	}
-	// Iterate over each Kubernetes version
-	for _, version := range kindClusterConfigs {
-		version := version
+	// Iterate over each variant of the test
+	for _, variant := range kindClusterConfigs {
+		variant := variant
 		// Define a subtest for each combination
-		t.Run(version, func(t *testing.T) {
+		t.Run(variant, func(t *testing.T) {
 			t.Parallel() // Allow tests to run in parallel
 
 			randomInt := fmt.Sprintf(strconv.Itoa(rand.Intn(100)))
-			kindClusterName := fmt.Sprintf("kured-e2e-cordon-%v-%v", version, randomInt)
+			kindClusterName := fmt.Sprintf("kured-e2e-cordon-%v-%v", variant, randomInt)
 			kindClusterConfigFile := fmt.Sprintf("../../.github/kind-cluster-next.yaml")
 			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
 
-			k := NewKindTester(kindClusterName, kindClusterConfigFile, t, LocalImage(kuredDevImage), Deploy("../../kured-rbac.yaml"), Deploy(fmt.Sprintf("testfiles/kured-ds-%v.yaml", version)))
+			k := NewKindTester(kindClusterName, kindClusterConfigFile, t, LocalImage(kuredDevImage), Deploy("../../kured-rbac.yaml"), Deploy(fmt.Sprintf("testfiles/kured-ds-%v.yaml", variant)))
 			defer k.FlushLog()
 
 			err := k.Create()
@@ -421,7 +421,7 @@ func TestE2EBlocker(t *testing.T) {
 
 			k.Write([]byte("Now running e2e tests"))
 
-			if err := k.RunCmd("bash", fmt.Sprintf("testfiles/%v.sh",version), kindContext); err != nil {
+			if err := k.RunCmd("bash", fmt.Sprintf("testfiles/%v.sh",variant), kindContext); err != nil {
 				t.Fatalf("node blocker test did not succeed: %v", err)
 			}
 		})
