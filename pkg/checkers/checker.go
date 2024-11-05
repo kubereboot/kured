@@ -1,9 +1,9 @@
 package checkers
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/google/shlex"
-	"github.com/kubereboot/kured/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"os"
 	"os/exec"
@@ -44,7 +44,7 @@ func NewFileRebootChecker(filePath string) (*FileRebootChecker, error) {
 
 // CommandChecker is using a custom command to check
 // if a reboot is required. There are two modes of behaviour,
-// if Privileged is granted, the NamespacePid is used to enter
+// if Privileged is granted, the NamespacePid is used to nsenter
 // the given PID's namespace.
 type CommandChecker struct {
 	CheckCommand []string
@@ -53,16 +53,15 @@ type CommandChecker struct {
 }
 
 // RebootRequired for CommandChecker runs a command without returning
-// any eventual error. THis should be later refactored to remove the util wrapper
-// and return the errors, instead of logging them here.
+// any eventual error. This should be later refactored to return the errors,
+// instead of logging and fataling them here.
 func (rc CommandChecker) RebootRequired() bool {
-	var cmdline []string
-	if rc.Privileged {
-		cmdline = util.PrivilegedHostCommand(rc.NamespacePid, rc.CheckCommand)
-	} else {
-		cmdline = rc.CheckCommand
-	}
-	cmd := util.NewCommand(cmdline[0], cmdline[1:]...)
+	bufStdout := new(bytes.Buffer)
+	bufStderr := new(bytes.Buffer)
+	cmd := exec.Command(rc.CheckCommand[0], rc.CheckCommand[1:]...)
+	cmd.Stdout = bufStdout
+	cmd.Stderr = bufStderr
+
 	if err := cmd.Run(); err != nil {
 		switch err := err.(type) {
 		case *exec.ExitError:
@@ -80,19 +79,30 @@ func (rc CommandChecker) RebootRequired() bool {
 			log.Fatalf("Error invoking sentinel command: %v", err)
 		}
 	}
+	log.Info("checking if reboot is required", "cmd", cmd.Args, "stdout", bufStdout, "stderr", bufStderr)
 	return true
 }
 
 // NewCommandChecker is the constructor for the commandChecker, and by default
 // runs new commands in a privileged fashion.
-func NewCommandChecker(sentinelCommand string) (*CommandChecker, error) {
-	cmd, err := shlex.Split(sentinelCommand)
+// Privileged means wrapping the command with nsenter.
+// It allows to run a command from systemd's namespace for example (pid 1)
+// This relies on hostPID:true and privileged:true to enter host mount space
+// For info, rancher based need different pid, which should be user given.
+// until we have a better discovery mechanism.
+func NewCommandChecker(sentinelCommand string, pid int, privileged bool) (*CommandChecker, error) {
+	var cmd []string
+	if privileged {
+		cmd = append(cmd, "/usr/bin/nsenter", fmt.Sprintf("-m/proc/%d/ns/mnt", pid), "--")
+	}
+	parsedCommand, err := shlex.Split(sentinelCommand)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing provided sentinel command: %v", err)
 	}
+	cmd = append(cmd, parsedCommand...)
 	return &CommandChecker{
 		CheckCommand: cmd,
-		NamespacePid: 1,
-		Privileged:   true,
+		NamespacePid: pid,
+		Privileged:   privileged,
 	}, nil
 }
