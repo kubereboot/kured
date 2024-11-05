@@ -24,16 +24,16 @@ bootstrap-tools: $(HACKDIR)
 clean:
 	rm -rf ./dist
 
-kured:
+kured: bootstrap-tools
 	$(GORELEASER_CMD) build --clean --single-target --snapshot
 
-kured-all:
+kured-all: bootstrap-tools
 	$(GORELEASER_CMD) build --clean --snapshot
 
-kured-release-tag:
+kured-release-tag: bootstrap-tools
 	$(GORELEASER_CMD) release --clean
 
-kured-release-snapshot:
+kured-release-snapshot: bootstrap-tools
 	$(GORELEASER_CMD) release --clean --snapshot
 
 image: kured
