@@ -28,7 +28,7 @@ func NewRebootChecker(rebootSentinelCommand string, rebootSentinelFile string) (
 	// An override of rebootSentinelCommand means a privileged command
 	if rebootSentinelCommand != "" {
 		log.Infof("Sentinel checker is (privileged) user provided command: %s", rebootSentinelCommand)
-		return checkers.NewCommandChecker(rebootSentinelCommand)
+		return checkers.NewCommandChecker(rebootSentinelCommand, 1, true)
 	}
 	log.Infof("Sentinel checker is (unprivileged) testing for the presence of: %s", rebootSentinelFile)
 	return checkers.NewFileRebootChecker(rebootSentinelFile)
