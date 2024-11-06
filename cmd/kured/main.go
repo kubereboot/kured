@@ -48,6 +48,7 @@ var (
 	period                          time.Duration
 	metricsHost                     string
 	metricsPort                     int
+	pprofEnabled                    bool
 	drainGracePeriod                int
 	drainPodSelector                string
 	skipWaitForDeleteTimeoutSeconds int
@@ -120,6 +121,8 @@ func main() {
 		"host where metrics will listen")
 	flag.IntVar(&metricsPort, "metrics-port", 8080,
 		"port number where metrics will listen")
+	flag.BoolVar(&pprofEnabled, "pprof-enabled", false,
+		"enable /debug/pprof on metrics port")
 	flag.IntVar(&drainGracePeriod, "drain-grace-period", -1,
 		"time in seconds given to each pod to terminate gracefully, if negative, the default value specified in the pod will be used")
 	flag.StringVar(&drainPodSelector, "drain-pod-selector", "",
@@ -278,6 +281,9 @@ func main() {
 	go rebootAsRequired(nodeID, rebooter, rebootChecker, window, lock, client)
 	go maintainRebootRequiredMetric(nodeID, rebootChecker)
 
+	if pprofEnabled {
+		enablePPROF()
+	}
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", metricsHost, metricsPort), nil))
 }
