@@ -6,6 +6,7 @@ import (
 	"github.com/google/shlex"
 	log "github.com/sirupsen/logrus"
 	"os/exec"
+	"strings"
 )
 
 // CommandRebooter holds context-information for a reboot with command
@@ -24,9 +25,9 @@ func (c CommandRebooter) Reboot() error {
 	cmd.Stderr = bufStderr
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("error invoking reboot command %s: %v", c.RebootCommand, err)
+		return fmt.Errorf("error invoking reboot command %s: %v (stdout: %v, stderr: %v)", c.RebootCommand, err, bufStdout.String(), bufStderr.String())
 	}
-	log.Info("Invoked reboot command", "cmd", cmd.Args, "stdout", bufStdout, "stderr", bufStderr)
+	log.Info("Invoked reboot command", "cmd", strings.Join(cmd.Args, " "), "stdout", bufStdout.String(), "stderr", bufStderr.String())
 	return nil
 }
 

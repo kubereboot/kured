@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 // Checker is the standard interface to use to check
@@ -71,15 +72,15 @@ func (rc CommandChecker) RebootRequired() bool {
 			// is the right thing to do, and we are logging stdout/stderr of the command
 			// so it should be obvious what is wrong.
 			if cmd.ProcessState.ExitCode() != 1 {
-				log.Warnf("sentinel command ended with unexpected exit code: %v", cmd.ProcessState.ExitCode())
+				log.Warn(fmt.Sprintf("sentinel command ended with unexpected exit code: %v", cmd.ProcessState.ExitCode()), "cmd", strings.Join(cmd.Args, " "), "stdout", bufStdout.String(), "stderr", bufStderr.String())
 			}
 			return false
 		default:
 			// Something was grossly misconfigured, such as the command path being wrong.
-			log.Fatalf("Error invoking sentinel command: %v", err)
+			log.Fatal(fmt.Sprintf("Error invoking sentinel command: %v", err), "cmd", strings.Join(cmd.Args, " "), "stdout", bufStdout.String(), "stderr", bufStderr.String())
 		}
 	}
-	log.Info("checking if reboot is required", "cmd", cmd.Args, "stdout", bufStdout, "stderr", bufStderr)
+	log.Info("checking if reboot is required", "cmd", strings.Join(cmd.Args, " "), "stdout", bufStdout.String(), "stderr", bufStderr.String())
 	return true
 }
 
