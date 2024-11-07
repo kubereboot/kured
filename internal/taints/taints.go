@@ -138,7 +138,7 @@ func preferNoSchedule(client *kubernetes.Clientset, nodeID, taintName string, ef
 			},
 		}
 	} else {
-		// add missing taint to exsting list
+		// add missing taint to existing list
 		patches = []patchTaints{
 			{
 				Op:    "add",
