@@ -7,6 +7,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/kubereboot/kured/internal/daemonsetlock"
+	"github.com/kubereboot/kured/internal/delaytick"
+	"github.com/kubereboot/kured/internal/taints"
+	"github.com/kubereboot/kured/internal/timewindow"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -18,14 +22,9 @@ import (
 	"time"
 
 	"github.com/containrrr/shoutrrr"
-	"github.com/kubereboot/kured/internal"
 	"github.com/kubereboot/kured/pkg/blockers"
 	"github.com/kubereboot/kured/pkg/checkers"
-	"github.com/kubereboot/kured/pkg/daemonsetlock"
-	"github.com/kubereboot/kured/pkg/delaytick"
 	"github.com/kubereboot/kured/pkg/reboot"
-	"github.com/kubereboot/kured/pkg/taints"
-	"github.com/kubereboot/kured/pkg/timewindow"
 	papi "github.com/prometheus/client_golang/api"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -245,12 +244,12 @@ func main() {
 	log.Infof("Reboot schedule: %v", window)
 
 	log.Infof("Reboot method: %s", rebootMethod)
-	rebooter, err := internal.NewRebooter(rebootMethod, rebootCommand, rebootSignal)
+	rebooter, err := reboot.NewRebooter(rebootMethod, rebootCommand, rebootSignal)
 	if err != nil {
 		log.Fatalf("Failed to build rebooter: %v", err)
 	}
 
-	rebootChecker, err := internal.NewRebootChecker(rebootSentinelCommand, rebootSentinelFile)
+	rebootChecker, err := checkers.NewRebootChecker(rebootSentinelCommand, rebootSentinelFile)
 	if err != nil {
 		log.Fatalf("Failed to build reboot checker: %v", err)
 	}
@@ -672,7 +671,7 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 			}
 			if !acquired {
 				log.Warnf("Lock already held: %v", holder)
-				// Prefer to not schedule pods onto this node to avoid draing the same pod multiple times.
+				// Prefer to not schedule pods onto this node to avoid draining the same pod multiple times.
 				preferNoScheduleTaint.Enable()
 				continue
 			}
