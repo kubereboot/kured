@@ -262,6 +262,13 @@ func main() {
 		log.Fatal(err)
 	}
 
+	var blockCheckers []blockers.RebootBlocker
+	if prometheusURL != "" {
+		blockCheckers = append(blockCheckers, blockers.NewPrometheusBlockingChecker(papi.Config{Address: prometheusURL}, alertFilter.Regexp, alertFiringOnly, alertFilterMatchOnly))
+	}
+	if podSelectors != nil {
+		blockCheckers = append(blockCheckers, blockers.NewKubernetesBlockingChecker(client, nodeID, podSelectors))
+	}
 	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
 	if lockTTL > 0 {
 		log.Infof("Lock TTL set, lock will expire after: %v", lockTTL)
@@ -275,7 +282,7 @@ func main() {
 	}
 	lock := daemonsetlock.New(client, nodeID, dsNamespace, dsName, lockAnnotation, lockTTL, concurrency, lockReleaseDelay)
 
-	go rebootAsRequired(nodeID, rebooter, rebootChecker, window, lock, client)
+	go rebootAsRequired(nodeID, rebooter, rebootChecker, blockCheckers, window, lock, client)
 	go maintainRebootRequiredMetric(nodeID, rebootChecker)
 
 	http.Handle("/metrics", promhttp.Handler())
@@ -546,7 +553,7 @@ func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []stri
 	}
 }
 
-func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.Checker, window *timewindow.TimeWindow, lock daemonsetlock.Lock, client *kubernetes.Clientset) {
+func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.Checker, blockCheckers []blockers.RebootBlocker, window *timewindow.TimeWindow, lock daemonsetlock.Lock, client *kubernetes.Clientset) {
 
 	source := rand.NewSource(time.Now().UnixNano())
 	tick := delaytick.New(source, 1*time.Minute)
@@ -643,14 +650,6 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 					continue
 				}
 			}
-		}
-
-		var blockCheckers []blockers.RebootBlocker
-		if prometheusURL != "" {
-			blockCheckers = append(blockCheckers, blockers.NewPrometheusBlockingChecker(papi.Config{Address: prometheusURL}, alertFilter.Regexp, alertFiringOnly, alertFilterMatchOnly))
-		}
-		if podSelectors != nil {
-			blockCheckers = append(blockCheckers, blockers.NewKubernetesBlockingChecker(client, nodeID, podSelectors))
 		}
 
 		var rebootRequiredBlockCondition string
