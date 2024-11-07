@@ -152,7 +152,7 @@ func TestE2EWithCommand(t *testing.T) {
 		t.Run(version, func(t *testing.T) {
 			t.Parallel() // Allow tests to run in parallel
 
-			randomInt := fmt.Sprintf(strconv.Itoa(rand.Intn(100)))
+			randomInt := strconv.Itoa(rand.Intn(100))
 			kindClusterName := fmt.Sprintf("kured-e2e-command-%v-%v", version, randomInt)
 			kindClusterConfigFile := fmt.Sprintf("../../.github/kind-cluster-%v.yaml", version)
 			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
@@ -202,7 +202,7 @@ func TestE2EWithSignal(t *testing.T) {
 		t.Run(version, func(t *testing.T) {
 			t.Parallel() // Allow tests to run in parallel
 
-			randomInt := fmt.Sprintf(strconv.Itoa(rand.Intn(100)))
+			randomInt := strconv.Itoa(rand.Intn(100))
 			kindClusterName := fmt.Sprintf("kured-e2e-signal-%v-%v", version, randomInt)
 			kindClusterConfigFile := fmt.Sprintf("../../.github/kind-cluster-%v.yaml", version)
 			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
@@ -252,7 +252,7 @@ func TestE2EConcurrentWithCommand(t *testing.T) {
 		t.Run(version, func(t *testing.T) {
 			t.Parallel() // Allow tests to run in parallel
 
-			randomInt := fmt.Sprintf(strconv.Itoa(rand.Intn(100)))
+			randomInt := strconv.Itoa(rand.Intn(100))
 			kindClusterName := fmt.Sprintf("kured-e2e-concurrentcommand-%v-%v", version, randomInt)
 			kindClusterConfigFile := fmt.Sprintf("../../.github/kind-cluster-%v.yaml", version)
 			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
@@ -302,7 +302,7 @@ func TestE2EConcurrentWithSignal(t *testing.T) {
 		t.Run(version, func(t *testing.T) {
 			t.Parallel() // Allow tests to run in parallel
 
-			randomInt := fmt.Sprintf(strconv.Itoa(rand.Intn(100)))
+			randomInt := strconv.Itoa(rand.Intn(100))
 			kindClusterName := fmt.Sprintf("kured-e2e-concurrentsignal-%v-%v", version, randomInt)
 			kindClusterConfigFile := fmt.Sprintf("../../.github/kind-cluster-%v.yaml", version)
 			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
@@ -351,16 +351,16 @@ func TestCordonningIsKept(t *testing.T) {
 		t.Run(variant, func(t *testing.T) {
 			t.Parallel() // Allow tests to run in parallel
 
-			randomInt := fmt.Sprintf(strconv.Itoa(rand.Intn(100)))
+			randomInt := strconv.Itoa(rand.Intn(100))
 			kindClusterName := fmt.Sprintf("kured-e2e-cordon-%v-%v", variant, randomInt)
-			kindClusterConfigFile := fmt.Sprintf("../../.github/kind-cluster-next.yaml")
+			kindClusterConfigFile := "../../.github/kind-cluster-next.yaml"
 			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
 
 			var manifest string
 			if variant == "concurrency1" {
-				manifest = fmt.Sprintf("testfiles/kured-ds-signal.yaml")
+				manifest = "testfiles/kured-ds-signal.yaml"
 			} else {
-				manifest = fmt.Sprintf("testfiles/kured-ds-concurrent-signal.yaml")
+				manifest = "testfiles/kured-ds-concurrent-signal.yaml"
 			}
 			k := NewKindTester(kindClusterName, kindClusterConfigFile, t, LocalImage(kuredDevImage), Deploy("../../kured-rbac.yaml"), Deploy(manifest))
 			defer k.FlushLog()
@@ -400,9 +400,9 @@ func TestE2EBlocker(t *testing.T) {
 		t.Run(variant, func(t *testing.T) {
 			t.Parallel() // Allow tests to run in parallel
 
-			randomInt := fmt.Sprintf(strconv.Itoa(rand.Intn(100)))
+			randomInt := strconv.Itoa(rand.Intn(100))
 			kindClusterName := fmt.Sprintf("kured-e2e-cordon-%v-%v", variant, randomInt)
-			kindClusterConfigFile := fmt.Sprintf("../../.github/kind-cluster-next.yaml")
+			kindClusterConfigFile := "../../.github/kind-cluster-next.yaml"
 			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
 
 			k := NewKindTester(kindClusterName, kindClusterConfigFile, t, LocalImage(kuredDevImage), Deploy("../../kured-rbac.yaml"), Deploy(fmt.Sprintf("testfiles/kured-ds-%v.yaml", variant)))
@@ -421,7 +421,7 @@ func TestE2EBlocker(t *testing.T) {
 
 			k.Write([]byte("Now running e2e tests"))
 
-			if err := k.RunCmd("bash", fmt.Sprintf("testfiles/%v.sh",variant), kindContext); err != nil {
+			if err := k.RunCmd("bash", fmt.Sprintf("testfiles/%v.sh", variant), kindContext); err != nil {
 				t.Fatalf("node blocker test did not succeed: %v", err)
 			}
 		})
