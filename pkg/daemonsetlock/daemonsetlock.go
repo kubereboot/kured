@@ -214,10 +214,10 @@ func (dsl *DaemonSetSingleLock) Release() error {
 			}
 
 			if value.NodeID != dsl.nodeID {
-				return fmt.Errorf("Not lock holder: %v", value.NodeID)
+				return fmt.Errorf("not lock holder: %v", value.NodeID)
 			}
 		} else {
-			return fmt.Errorf("Lock not held")
+			return fmt.Errorf("lock not held")
 		}
 
 		delete(ds.ObjectMeta.Annotations, dsl.annotation)

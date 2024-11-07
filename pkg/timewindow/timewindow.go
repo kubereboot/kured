@@ -77,5 +77,5 @@ func parseTime(s string, loc *time.Location) (time.Time, error) {
 		}
 	}
 
-	return time.Now(), fmt.Errorf("Invalid time format: %s", s)
+	return time.Now(), fmt.Errorf("invalid time format: %s", s)
 }

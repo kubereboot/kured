@@ -81,11 +81,11 @@ func parseWeekday(day string) (time.Weekday, error) {
 		if n >= 0 && n < 7 {
 			return time.Weekday(n), nil
 		}
-		return time.Sunday, fmt.Errorf("Invalid weekday, number out of range: %s", day)
+		return time.Sunday, fmt.Errorf("invalid weekday, number out of range: %s", day)
 	}
 
 	if weekday, ok := dayStrings[strings.ToLower(day)]; ok {
 		return weekday, nil
 	}
-	return time.Sunday, fmt.Errorf("Invalid weekday: %s", day)
+	return time.Sunday, fmt.Errorf("invalid weekday: %s", day)
 }
