@@ -3,15 +3,15 @@
 // You can use that package if you fork Kured's main loop.
 package blockers
 
-import "fmt"
-
-// RebootBlocked checks that a single block Checker
-// will block the reboot or not.
-func RebootBlocked(blockers ...RebootBlocker) (blocked bool, blockernames []string) {
+// RebootBlocked returns whether at least one blocker
+// amongst all the blockers IS CURRENTLY blocking the reboot
+// and also returns the subset of those blockers CURRENTLY BLOCKING
+// the reboot.
+func RebootBlocked(blockers ...RebootBlocker) (blocked bool, blocking []RebootBlocker) {
 	for _, blocker := range blockers {
 		if blocker.IsBlocked() {
 			blocked = true
-			blockernames = append(blockernames, fmt.Sprintf("%T", blocker))
+			blocking = append(blocking, blocker)
 		}
 	}
 	return
@@ -21,4 +21,5 @@ func RebootBlocked(blockers ...RebootBlocker) (blocked bool, blockernames []stri
 // to know if their instantiations should block a reboot
 type RebootBlocker interface {
 	IsBlocked() bool
+	MetricLabel() string
 }
