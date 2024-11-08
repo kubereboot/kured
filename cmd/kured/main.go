@@ -247,7 +247,7 @@ func main() {
 
 	log.Infof("Reboot method: %s", rebootMethod)
 
-	rebooter, err := reboot.NewRebooter(rebootMethod, rebootCommand, rebootSignal, rebootDelay)
+	rebooter, err := reboot.NewRebooter(rebootMethod, rebootCommand, rebootSignal, rebootDelay, true, 1)
 	if err != nil {
 		log.Fatalf("Failed to build rebooter: %v", err)
 	}
