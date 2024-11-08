@@ -13,6 +13,10 @@ func (fbc BlockingChecker) IsBlocked() bool {
 	return fbc.blocking
 }
 
+func (fbc BlockingChecker) MetricLabel() string {
+	return "fake_blocker"
+}
+
 func Test_rebootBlocked(t *testing.T) {
 	noCheckers := []RebootBlocker{}
 	nonblockingChecker := BlockingChecker{blocking: false}
