@@ -30,7 +30,7 @@ func TestNewCommandRebooter(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewCommandRebooter(tt.args.rebootCommand)
+			got, err := NewCommandRebooter(tt.args.rebootCommand, 0, true, 1)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewCommandRebooter() error = %v, wantErr %v", err, tt.wantErr)
 				return
