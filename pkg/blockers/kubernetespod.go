@@ -62,3 +62,7 @@ func (kb KubernetesBlockingChecker) IsBlocked() bool {
 	}
 	return false
 }
+
+func (kb KubernetesBlockingChecker) MetricLabel() string {
+	return "blocker_pod"
+}

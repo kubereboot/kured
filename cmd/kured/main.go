@@ -90,6 +90,11 @@ var (
 		Name:      "reboot_required",
 		Help:      "OS requires reboot due to software updates.",
 	}, []string{"node"})
+	rebootBlockedCounter = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Subsystem: "kured",
+		Name:      "reboot_blocked_reason",
+		Help:      "Reboot required was blocked by event.",
+	}, []string{"node", "reason"})
 )
 
 const (
@@ -106,7 +111,7 @@ const (
 )
 
 func init() {
-	prometheus.MustRegister(rebootRequiredGauge)
+	prometheus.MustRegister(rebootRequiredGauge, rebootBlockedCounter)
 }
 
 func main() {
@@ -558,7 +563,6 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 	// Starting on go1.23, with Tick, we would have that goroutine garbage collected.
 	c := time.Tick(period)
 	for range c {
-
 		rebootRequired := checker.RebootRequired()
 		if !rebootRequired {
 			rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
@@ -640,8 +644,12 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 			}
 			// moved up, because we should not put an annotation "Going to be rebooting", if
 			// we know well that this won't reboot. TBD as some ppl might have another opinion.
-			if blocked, names := blockers.RebootBlocked(blockCheckers...); blocked {
-				log.Infof("Reboot blocked by %v", strings.Join(names, ", "))
+
+			if blocked, currentlyBlocking := blockers.RebootBlocked(blockCheckers...); blocked {
+				for _, blocker := range currentlyBlocking {
+					rebootBlockedCounter.WithLabelValues(nodeID, blocker.MetricLabel()).Inc()
+					log.Infof("Reboot blocked by %v", blocker.MetricLabel())
+				}
 				continue
 			}
 

@@ -71,7 +71,7 @@ func (pb PrometheusBlockingChecker) IsBlocked() bool {
 // MetricLabel is used to give a fancier name
 // than the type to the label for rebootBlockedCounter
 func (pb PrometheusBlockingChecker) MetricLabel() string {
-	return "prometheus"
+	return "prometheus_alert"
 }
 
 // ActiveAlerts is a method of type promClient, it returns a list of names of active alerts
