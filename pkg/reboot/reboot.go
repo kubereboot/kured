@@ -16,11 +16,11 @@ type Rebooter interface {
 
 // NewRebooter validates the rebootMethod, rebootCommand, and rebootSignal input,
 // then chains to the right constructor.
-func NewRebooter(rebootMethod string, rebootCommand string, rebootSignal int, rebootDelay time.Duration) (Rebooter, error) {
+func NewRebooter(rebootMethod string, rebootCommand string, rebootSignal int, rebootDelay time.Duration, privileged bool, pid int) (Rebooter, error) {
 	switch {
 	case rebootMethod == "command":
 		logrus.Infof("Reboot command: %s", rebootCommand)
-		return NewCommandRebooter(rebootCommand, rebootDelay)
+		return NewCommandRebooter(rebootCommand, rebootDelay, true, 1)
 	case rebootMethod == "signal":
 		logrus.Infof("Reboot signal: %d", rebootSignal)
 		return NewSignalRebooter(rebootSignal, rebootDelay)
