@@ -2,7 +2,7 @@ package reboot
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
+	"log/slog"
 	"os"
 	"syscall"
 	"time"
@@ -17,7 +17,7 @@ type SignalRebooter struct {
 // Reboot triggers the reboot signal
 func (c SignalRebooter) Reboot() error {
 	c.DelayReboot()
-	log.Infof("Invoking signal: %v", c.Signal)
+	slog.Info("Invoking reboot signal", "signal", c.Signal)
 
 	process, err := os.FindProcess(1)
 	if err != nil {
