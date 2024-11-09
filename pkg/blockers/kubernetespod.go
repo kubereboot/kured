@@ -3,10 +3,9 @@ package blockers
 import (
 	"context"
 	"fmt"
-
-	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"log/slog"
 )
 
 // Compile-time checks to ensure the type implements the interface
@@ -44,7 +43,7 @@ func (kb KubernetesBlockingChecker) IsBlocked() bool {
 			FieldSelector: fieldSelector,
 			Limit:         10})
 		if err != nil {
-			log.Warnf("Reboot blocked: pod query error: %v", err)
+			slog.Info("Reboot blocked: pod query error", "error", err)
 			return true
 		}
 
@@ -56,7 +55,7 @@ func (kb KubernetesBlockingChecker) IsBlocked() bool {
 			if len(podList.Continue) > 0 {
 				podNames = append(podNames, "...")
 			}
-			log.Warnf("Reboot blocked: matching pods: %v", podNames)
+			slog.Info(fmt.Sprintf("Reboot blocked due pods matching the patterns: %v", podNames))
 			return true
 		}
 	}

@@ -7,12 +7,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
-	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"log/slog"
+	"os"
 )
 
 // Taint allows to set soft and hard limitations for scheduling and executing pods on nodes.
@@ -70,7 +70,9 @@ func (t *Taint) Disable() {
 func taintExists(client *kubernetes.Clientset, nodeID, taintName string) (bool, int, *v1.Node) {
 	updatedNode, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 	if err != nil || updatedNode == nil {
-		log.Fatalf("Error reading node %s: %v", nodeID, err)
+		slog.Debug("Error reading node from API server", "node", nodeID, "error", err)
+		// TODO: Clarify with community if we need to exit
+		os.Exit(10)
 	}
 
 	for i, taint := range updatedNode.Spec.Taints {
@@ -86,12 +88,12 @@ func preferNoSchedule(client *kubernetes.Clientset, nodeID, taintName string, ef
 	taintExists, offset, updatedNode := taintExists(client, nodeID, taintName)
 
 	if taintExists && shouldExists {
-		log.Debugf("Taint %v exists already for node %v.", taintName, nodeID)
+		slog.Debug(fmt.Sprintf("Taint %v exists already for node %v.", taintName, nodeID), "node", nodeID)
 		return
 	}
 
 	if !taintExists && !shouldExists {
-		log.Debugf("Taint %v already missing for node %v.", taintName, nodeID)
+		slog.Debug(fmt.Sprintf("Taint %v already missing for node %v.", taintName, nodeID), "node", nodeID)
 		return
 	}
 
@@ -153,17 +155,21 @@ func preferNoSchedule(client *kubernetes.Clientset, nodeID, taintName string, ef
 
 	patchBytes, err := json.Marshal(patches)
 	if err != nil {
-		log.Fatalf("Error encoding taint patch for node %s: %v", nodeID, err)
+		slog.Debug(fmt.Sprintf("Error encoding taint patch for node %s: %v", nodeID, err), "node", nodeID, "error", err)
+		// TODO: Clarify if we really need to exit with the community
+		os.Exit(10)
 	}
 
 	_, err = client.CoreV1().Nodes().Patch(context.TODO(), nodeID, types.JSONPatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
-		log.Fatalf("Error patching taint for node %s: %v", nodeID, err)
+		// TODO: Clarify if we really need to exit with the community
+		slog.Debug(fmt.Sprintf("Error patching taint for node %s: %v", nodeID, err), "node", nodeID, "error", err)
+		os.Exit(10)
 	}
 
 	if shouldExists {
-		log.Info("Node taint added")
+		slog.Info("Node taint added", "node", nodeID)
 	} else {
-		log.Info("Node taint removed")
+		slog.Info("Node taint removed", "node", nodeID)
 	}
 }
