@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	log "github.com/sirupsen/logrus"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -197,7 +197,7 @@ func (dsl *DaemonSetSingleLock) Holding() (bool, LockAnnotationValue, error) {
 // Release attempts to remove the lock data from the kured ds annotations using client-go
 func (dsl *DaemonSetSingleLock) Release() error {
 	if dsl.releaseDelay > 0 {
-		log.Infof("Waiting %v before releasing lock", dsl.releaseDelay)
+		slog.Info(fmt.Sprintf("Waiting %v before releasing lock", dsl.releaseDelay))
 		time.Sleep(dsl.releaseDelay)
 	}
 	for {
@@ -357,7 +357,7 @@ func (dsl *DaemonSetMultiLock) Holding() (bool, LockAnnotationValue, error) {
 // Release attempts to remove the lock data for a single node from the multi node annotation
 func (dsl *DaemonSetMultiLock) Release() error {
 	if dsl.releaseDelay > 0 {
-		log.Infof("Waiting %v before releasing lock", dsl.releaseDelay)
+		slog.Info(fmt.Sprintf("Waiting %v before releasing lock", dsl.releaseDelay))
 		time.Sleep(dsl.releaseDelay)
 	}
 	for {

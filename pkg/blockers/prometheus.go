@@ -6,7 +6,7 @@ import (
 	papi "github.com/prometheus/client_golang/api"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
-	log "github.com/sirupsen/logrus"
+	"log/slog"
 	"regexp"
 	"sort"
 	"time"
@@ -51,7 +51,7 @@ func NewPrometheusBlockingChecker(config papi.Config, alertFilter *regexp.Regexp
 func (pb PrometheusBlockingChecker) IsBlocked() bool {
 	alertNames, err := pb.ActiveAlerts()
 	if err != nil {
-		log.Warnf("Reboot blocked: prometheus query error: %v", err)
+		slog.Info("Reboot blocked: prometheus query error", "error", err)
 		return true
 	}
 	count := len(alertNames)
@@ -59,7 +59,7 @@ func (pb PrometheusBlockingChecker) IsBlocked() bool {
 		alertNames = append(alertNames[:10], "...")
 	}
 	if count > 0 {
-		log.Warnf("Reboot blocked: %d active alerts: %v", count, alertNames)
+		slog.Info(fmt.Sprintf("Reboot blocked: %d active alerts: %v", count, alertNames))
 		return true
 	}
 	return false
