@@ -1,7 +1,6 @@
 package checkers
 
 import (
-	log "github.com/sirupsen/logrus"
 	"reflect"
 	"testing"
 )
@@ -70,9 +69,14 @@ func Test_rebootRequired(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer func() { log.StandardLogger().ExitFunc = nil }()
 			fatal := false
-			log.StandardLogger().ExitFunc = func(int) { fatal = true }
+
+			exitFunc = func(code int) {
+				fatal = true
+			}
+
+			//// Reset exitFunc after the test
+			//defer func() { exitFunc = os.Exit }
 
 			a := CommandChecker{CheckCommand: tt.args.sentinelCommand, NamespacePid: 1, Privileged: false}
 

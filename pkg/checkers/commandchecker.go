@@ -3,11 +3,11 @@ package checkers
 import (
 	"bytes"
 	"fmt"
+	"github.com/google/shlex"
+	"log/slog"
+	"os"
 	"os/exec"
 	"strings"
-
-	"github.com/google/shlex"
-	log "github.com/sirupsen/logrus"
 )
 
 // CommandChecker is using a custom command to check
@@ -19,6 +19,8 @@ type CommandChecker struct {
 	NamespacePid int
 	Privileged   bool
 }
+
+var exitFunc = os.Exit
 
 // RebootRequired for CommandChecker runs a command without returning
 // any eventual error. This should be later refactored to return the errors,
@@ -40,15 +42,17 @@ func (rc CommandChecker) RebootRequired() bool {
 			// is the right thing to do, and we are logging stdout/stderr of the command
 			// so it should be obvious what is wrong.
 			if cmd.ProcessState.ExitCode() != 1 {
-				log.Warn(fmt.Sprintf("sentinel command ended with unexpected exit code: %v", cmd.ProcessState.ExitCode()), "cmd", strings.Join(cmd.Args, " "), "stdout", bufStdout.String(), "stderr", bufStderr.String())
+				slog.Info(fmt.Sprintf("sentinel command ended with unexpected exit code: %v, preventing reboot", cmd.ProcessState.ExitCode()), "cmd", strings.Join(cmd.Args, " "), "stdout", bufStdout.String(), "stderr", bufStderr.String())
 			}
 			return false
 		default:
 			// Something was grossly misconfigured, such as the command path being wrong.
-			log.Fatal(fmt.Sprintf("Error invoking sentinel command: %v", err), "cmd", strings.Join(cmd.Args, " "), "stdout", bufStdout.String(), "stderr", bufStderr.String())
+			slog.Error(fmt.Sprintf("Error invoking sentinel command: %v", err), "cmd", strings.Join(cmd.Args, " "), "stdout", bufStdout.String(), "stderr", bufStderr.String())
+			// exitFunc is in indirection to help testing
+			exitFunc(11)
 		}
 	}
-	log.Info("checking if reboot is required", "cmd", strings.Join(cmd.Args, " "), "stdout", bufStdout.String(), "stderr", bufStderr.String())
+	slog.Debug("reboot is required", "cmd", strings.Join(cmd.Args, " "), "stdout", bufStdout.String(), "stderr", bufStderr.String())
 	return true
 }
 

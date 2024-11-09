@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/google/shlex"
-	log "github.com/sirupsen/logrus"
+	"log/slog"
 	"os/exec"
 	"strings"
 	"time"
@@ -19,7 +19,7 @@ type CommandRebooter struct {
 // Reboot triggers the reboot command
 func (c CommandRebooter) Reboot() error {
 	c.DelayReboot()
-	log.Infof("Invoking command: %s", c.RebootCommand)
+	slog.Info("Invoking reboot command", "cmd", c.RebootCommand)
 
 	bufStdout := new(bytes.Buffer)
 	bufStderr := new(bytes.Buffer)
@@ -30,7 +30,7 @@ func (c CommandRebooter) Reboot() error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("error invoking reboot command %s: %v (stdout: %v, stderr: %v)", c.RebootCommand, err, bufStdout.String(), bufStderr.String())
 	}
-	log.Info("Invoked reboot command", "cmd", strings.Join(cmd.Args, " "), "stdout", bufStdout.String(), "stderr", bufStderr.String())
+	slog.Info("Invoked reboot command", "cmd", strings.Join(cmd.Args, " "), "stdout", bufStdout.String(), "stderr", bufStderr.String())
 	return nil
 }
 

@@ -6,8 +6,7 @@ package reboot
 
 import (
 	"fmt"
-
-	"github.com/sirupsen/logrus"
+	"log/slog"
 	"time"
 )
 
@@ -24,10 +23,10 @@ type Rebooter interface {
 func NewRebooter(rebootMethod string, rebootCommand string, rebootSignal int, rebootDelay time.Duration, privileged bool, pid int) (Rebooter, error) {
 	switch rebootMethod {
 	case "command":
-		logrus.Infof("Reboot command: %s", rebootCommand)
+		slog.Info("Will reboot using command", "cmd", rebootCommand)
 		return NewCommandRebooter(rebootCommand, rebootDelay, true, 1)
 	case "signal":
-		logrus.Infof("Reboot signal: %d", rebootSignal)
+		slog.Info("Will reboot using signal", "signal", rebootSignal)
 		return NewSignalRebooter(rebootSignal, rebootDelay)
 	default:
 		return nil, fmt.Errorf("invalid reboot-method configured %s, expected signal or command", rebootMethod)
@@ -40,7 +39,7 @@ type GenericRebooter struct {
 
 func (g GenericRebooter) DelayReboot() {
 	if g.RebootDelay > 0 {
-		logrus.Infof("Delayed reboot for %s", g.RebootDelay)
+		slog.Debug(fmt.Sprintf("Delayed reboot for %s", g.RebootDelay))
 		time.Sleep(g.RebootDelay)
 	}
 }

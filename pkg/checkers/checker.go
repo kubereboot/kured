@@ -7,7 +7,8 @@
 package checkers
 
 import (
-	"github.com/sirupsen/logrus"
+	"fmt"
+	"log/slog"
 )
 
 // Checker is the standard interface to use to check
@@ -23,9 +24,9 @@ type Checker interface {
 func NewRebootChecker(rebootSentinelCommand string, rebootSentinelFile string) (Checker, error) {
 	// An override of rebootSentinelCommand means a privileged command
 	if rebootSentinelCommand != "" {
-		logrus.Infof("Sentinel checker is (privileged) user provided command: %s", rebootSentinelCommand)
+		slog.Info(fmt.Sprintf("Sentinel checker is (privileged) user provided command: %s", rebootSentinelCommand))
 		return NewCommandChecker(rebootSentinelCommand, 1, true)
 	}
-	logrus.Infof("Sentinel checker is (unprivileged) testing for the presence of: %s", rebootSentinelFile)
+	slog.Info("Sentinel checker is (unprivileged) testing for the presence of the file: " + rebootSentinelFile)
 	return NewFileRebootChecker(rebootSentinelFile)
 }
