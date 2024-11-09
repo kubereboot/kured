@@ -14,7 +14,6 @@ import (
 	papi "github.com/prometheus/client_golang/api"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	log "github.com/sirupsen/logrus"
 	flag "github.com/spf13/pflag"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,6 +21,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	kubectldrain "k8s.io/kubectl/pkg/drain"
+	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -205,83 +206,100 @@ func main() {
 	// Load flags from environment variables
 	LoadFromEnv()
 
-	log.Infof("Kubernetes Reboot Daemon: %s", version)
-
-	if logFormat == "json" {
-		log.SetFormatter(&log.JSONFormatter{})
+	var logger *slog.Logger
+	switch logFormat {
+	case "json":
+		logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	case "text":
+		logger = slog.New(slog.NewTextHandler(os.Stdout, nil))
+	default:
+		logger = slog.New(slog.NewTextHandler(os.Stdout, nil))
+		logger.Info("incorrect configuration for logFormat, using text handler")
 	}
+	// For all the old calls using logger
+	slog.SetDefault(logger)
 
 	if nodeID == "" {
-		log.Fatal("KURED_NODE_ID environment variable required")
+		slog.Error("KURED_NODE_ID environment variable required")
+		os.Exit(1)
 	}
-	log.Infof("Node ID: %s", nodeID)
+
+	window, err := timewindow.New(rebootDays, rebootStart, rebootEnd, timezone)
+	if err != nil {
+		// TODO: Improve stacktrace with slog
+		slog.Error(fmt.Sprintf("Failed to build time window: %v", err))
+		os.Exit(2)
+	}
 
 	notifyURL = validateNotificationURL(notifyURL, slackHookURL)
 
-	err := validateNodeLabels(preRebootNodeLabels, postRebootNodeLabels)
+	err = validateNodeLabels(preRebootNodeLabels, postRebootNodeLabels)
 	if err != nil {
-		log.Warnf(err.Error())
+		slog.Info(err.Error(), "node", nodeID)
 	}
 
-	log.Infof("PreferNoSchedule taint: %s", preferNoScheduleTaintName)
+	slog.Info("Starting Kubernetes Reboot Daemon",
+		"version", version,
+		"node", nodeID,
+		"rebootPeriod", period,
+		"concurrency", concurrency,
+		"schedule", window,
+		"method", rebootMethod,
+	)
 
-	// This should be printed from blocker list instead of only blocking pod selectors
-	log.Infof("Blocking Pod Selectors: %v", podSelectors)
-
-	log.Infof("Reboot period %v", period)
-	log.Infof("Concurrency: %v", concurrency)
+	slog.Info(fmt.Sprintf("preferNoSchedule taint: (%s)", preferNoScheduleTaintName), "node", nodeID)
 
 	if annotateNodes {
-		log.Infof("Will annotate nodes during kured reboot operations")
+		slog.Info("Will annotate nodes during kured reboot operations", "node", nodeID)
 	}
-
-	// Now call the rest of the main loop.
-	window, err := timewindow.New(rebootDays, rebootStart, rebootEnd, timezone)
-	if err != nil {
-		log.Fatalf("Failed to build time window: %v", err)
-	}
-	log.Infof("Reboot schedule: %v", window)
-
-	log.Infof("Reboot method: %s", rebootMethod)
 
 	rebooter, err := reboot.NewRebooter(rebootMethod, rebootCommand, rebootSignal, rebootDelay, true, 1)
 	if err != nil {
-		log.Fatalf("Failed to build rebooter: %v", err)
+		slog.Error(fmt.Sprintf("unrecoverable error - failed to construct system rebooter: %v", err))
+		os.Exit(3)
 	}
 
 	rebootChecker, err := checkers.NewRebootChecker(rebootSentinelCommand, rebootSentinelFile)
 	if err != nil {
-		log.Fatalf("Failed to build reboot checker: %v", err)
+		slog.Error(fmt.Sprintf("unrecoverable error - failed to build reboot checker: %v", err))
+		os.Exit(4)
 	}
 
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		log.Fatal(err)
+		slog.Error(fmt.Sprintf("unrecoverable error - failed to load in cluster kubernetes config: %v", err))
+		os.Exit(5)
 	}
 
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error(fmt.Sprintf("unrecoverable error - failed to load in cluster kubernetes config: %v", err))
+		os.Exit(5)
 	}
 
 	var blockCheckers []blockers.RebootBlocker
 	if prometheusURL != "" {
+		slog.Info(fmt.Sprintf("Blocking reboot with prometheus alerts on %v", prometheusURL), "node", nodeID)
 		blockCheckers = append(blockCheckers, blockers.NewPrometheusBlockingChecker(papi.Config{Address: prometheusURL}, alertFilter.Regexp, alertFiringOnly, alertFilterMatchOnly))
 	}
 	if podSelectors != nil {
+		slog.Info(fmt.Sprintf("Blocking Pod Selectors: %v", podSelectors), "node", nodeID)
 		blockCheckers = append(blockCheckers, blockers.NewKubernetesBlockingChecker(client, nodeID, podSelectors))
 	}
-	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
+
+	slog.Info(fmt.Sprintf("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation), "node", nodeID)
 	if lockTTL > 0 {
-		log.Infof("Lock TTL set, lock will expire after: %v", lockTTL)
+		slog.Info(fmt.Sprintf("Lock TTL set, lock will expire after: %v", lockTTL), "node", nodeID)
 	} else {
-		log.Info("Lock TTL not set, lock will remain until being released")
+		slog.Info("Lock TTL not set, lock will remain until being released", "node", nodeID)
 	}
+
 	if lockReleaseDelay > 0 {
-		log.Infof("Lock release delay set, lock release will be delayed by: %v", lockReleaseDelay)
+		slog.Info(fmt.Sprintf("Lock release delay set, lock release will be delayed by: %v", lockReleaseDelay), "node", nodeID)
 	} else {
-		log.Info("Lock release delay not set, lock will be released immediately after rebooting")
+		slog.Info("Lock release delay not set, lock will be released immediately after rebooting", "node", nodeID)
 	}
+
 	lock := daemonsetlock.New(client, nodeID, dsNamespace, dsName, lockAnnotation, lockTTL, concurrency, lockReleaseDelay)
 
 	go rebootAsRequired(nodeID, rebooter, rebootChecker, blockCheckers, window, lock, client, period)
@@ -307,22 +325,23 @@ func validateNodeLabels(preRebootNodeLabels []string, postRebootNodeLabels []str
 	return nil
 }
 
+// Remove old flags
 func validateNotificationURL(notifyURL string, slackHookURL string) string {
 	switch {
 	case slackHookURL != "" && notifyURL != "":
-		log.Warnf("Cannot use both --notify-url (given: %v) and --slack-hook-url (given: %v) flags. Kured will only use --notify-url flag", slackHookURL, notifyURL)
+		slog.Error(fmt.Sprintf("Cannot use both --notify-url (given: %v) and --slack-hook-url (given: %v) flags. Kured will only use --notify-url flag", slackHookURL, notifyURL))
 		return validateNotificationURL(notifyURL, "")
 	case notifyURL != "":
 		return stripQuotes(notifyURL)
 	case slackHookURL != "":
-		log.Warnf("Deprecated flag(s). Please use --notify-url flag instead.")
+		slog.Info("Deprecated flag(s). Please use --notify-url flag instead.")
 		parsedURL, err := url.Parse(stripQuotes(slackHookURL))
 		if err != nil {
-			log.Errorf("slack-hook-url is not properly formatted... no notification will be sent: %v\n", err)
+			slog.Info(fmt.Sprintf("slack-hook-url is not properly formatted... no notification will be sent: %v\n", err))
 			return ""
 		}
 		if len(strings.Split(strings.Replace(parsedURL.Path, "/services/", "", -1), "/")) != 3 {
-			log.Errorf("slack-hook-url is not properly formatted... no notification will be sent: unexpected number of / in URL\n")
+			slog.Error(fmt.Sprintf("slack-hook-url is not properly formatted... no notification will be sent: unexpected number of / in URL\n"))
 			return ""
 		}
 		return fmt.Sprintf("slack://%s", strings.Replace(parsedURL.Path, "/services/", "", -1))
@@ -405,25 +424,47 @@ func stripQuotes(str string) string {
 	return str
 }
 
+type slogWriter struct {
+	stream  string
+	message string
+}
+
+func (sw slogWriter) Write(p []byte) (n int, err error) {
+	output := string(p)
+	switch sw.stream {
+	case "stdout":
+		slog.Info(sw.message, "node", nodeID, "stdout", output)
+	case "stderr":
+		slog.Info(sw.message, "node", nodeID, "stderr", output)
+	}
+	return len(p), nil
+}
+
 func drain(client *kubernetes.Clientset, node *v1.Node) error {
 	nodename := node.GetName()
 
 	if preRebootNodeLabels != nil {
-		updateNodeLabels(client, node, preRebootNodeLabels)
+		err := updateNodeLabels(client, node, preRebootNodeLabels)
+		if err != nil {
+			return fmt.Errorf("stopping drain due to problem with node labels %v", err)
+		}
 	}
 
 	if drainDelay > 0 {
-		log.Infof("Delaying drain for %v", drainDelay)
+		slog.Debug("Delaying drain", "delay", drainDelay, "node", nodename)
 		time.Sleep(drainDelay)
 	}
 
-	log.Infof("Draining node %s", nodename)
+	slog.Info("Starting drain", "node", nodename)
 
 	if notifyURL != "" {
 		if err := shoutrrr.Send(notifyURL, fmt.Sprintf(messageTemplateDrain, nodename)); err != nil {
-			log.Warnf("Error notifying: %v", err)
+			slog.Info(fmt.Sprintf("Error notifying but continuing drain: %v", err), "node", nodename)
 		}
 	}
+
+	kubectlStdOutLogger := &slogWriter{message: "draining: results", stream: "stdout"}
+	kubectlStdErrLogger := &slogWriter{message: "draining: results", stream: "stderr"}
 
 	drainer := &kubectldrain.Helper{
 		Client:                          client,
@@ -434,37 +475,37 @@ func drain(client *kubernetes.Clientset, node *v1.Node) error {
 		Force:                           true,
 		DeleteEmptyDirData:              true,
 		IgnoreAllDaemonSets:             true,
-		ErrOut:                          os.Stderr,
-		Out:                             os.Stdout,
+		ErrOut:                          kubectlStdErrLogger,
+		Out:                             kubectlStdOutLogger,
 		Timeout:                         drainTimeout,
 	}
 
 	if err := kubectldrain.RunCordonOrUncordon(drainer, node, true); err != nil {
-		log.Errorf("Error cordonning %s: %v", nodename, err)
-		return err
+		return fmt.Errorf("error cordonning node %s, %v", nodename, err)
 	}
 
 	if err := kubectldrain.RunNodeDrain(drainer, nodename); err != nil {
-		log.Errorf("Error draining %s: %v", nodename, err)
-		return err
+		return fmt.Errorf("error draining node %s: %v", nodename, err)
 	}
 	return nil
 }
 
 func uncordon(client *kubernetes.Clientset, node *v1.Node) error {
 	nodename := node.GetName()
-	log.Infof("Uncordoning node %s", nodename)
+	kubectlStdOutLogger := &slogWriter{message: "uncordon: results", stream: "stdout"}
+	kubectlStdErrLogger := &slogWriter{message: "uncordon: results", stream: "stderr"}
+
 	drainer := &kubectldrain.Helper{
 		Client: client,
-		ErrOut: os.Stderr,
-		Out:    os.Stdout,
+		ErrOut: kubectlStdErrLogger,
+		Out:    kubectlStdOutLogger,
 		Ctx:    context.Background(),
 	}
 	if err := kubectldrain.RunCordonOrUncordon(drainer, node, false); err != nil {
-		log.Fatalf("Error uncordonning %s: %v", nodename, err)
-		return err
+		return fmt.Errorf("error uncordonning node %s: %v", nodename, err)
 	} else if postRebootNodeLabels != nil {
-		updateNodeLabels(client, node, postRebootNodeLabels)
+		err := updateNodeLabels(client, node, postRebootNodeLabels)
+		return fmt.Errorf("error updating node (%s) labels, needs manual intervention %v", nodename, err)
 	}
 	return nil
 }
@@ -472,18 +513,16 @@ func uncordon(client *kubernetes.Clientset, node *v1.Node) error {
 func addNodeAnnotations(client *kubernetes.Clientset, nodeID string, annotations map[string]string) error {
 	node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 	if err != nil {
-		log.Errorf("Error retrieving node object via k8s API: %s", err)
-		return err
+		return fmt.Errorf("error retrieving node object via k8s API: %v", err)
 	}
 	for k, v := range annotations {
 		node.Annotations[k] = v
-		log.Infof("Adding node %s annotation: %s=%s", node.GetName(), k, v)
+		slog.Debug(fmt.Sprintf("adding node annotation: %s=%s", k, v), "node", node.GetName())
 	}
 
 	bytes, err := json.Marshal(node)
 	if err != nil {
-		log.Errorf("Error marshalling node object into JSON: %v", err)
-		return err
+		return fmt.Errorf("error marshalling node object into JSON: %v", err)
 	}
 
 	_, err = client.CoreV1().Nodes().Patch(context.TODO(), node.GetName(), types.StrategicMergePatchType, bytes, metav1.PatchOptions{})
@@ -492,34 +531,30 @@ func addNodeAnnotations(client *kubernetes.Clientset, nodeID string, annotations
 		for k, v := range annotations {
 			annotationsErr += fmt.Sprintf("%s=%s ", k, v)
 		}
-		log.Errorf("Error adding node annotations %s via k8s API: %v", annotationsErr, err)
-		return err
+		return fmt.Errorf("error adding node annotations %s via k8s API: %v", annotationsErr, err)
 	}
 	return nil
 }
 
 func deleteNodeAnnotation(client *kubernetes.Clientset, nodeID, key string) error {
-	log.Infof("Deleting node %s annotation %s", nodeID, key)
-
 	// JSON Patch takes as path input a JSON Pointer, defined in RFC6901
 	// So we replace all instances of "/" with "~1" as per:
 	// https://tools.ietf.org/html/rfc6901#section-3
 	patch := []byte(fmt.Sprintf("[{\"op\":\"remove\",\"path\":\"/metadata/annotations/%s\"}]", strings.ReplaceAll(key, "/", "~1")))
 	_, err := client.CoreV1().Nodes().Patch(context.TODO(), nodeID, types.JSONPatchType, patch, metav1.PatchOptions{})
 	if err != nil {
-		log.Errorf("Error deleting node annotation %s via k8s API: %v", key, err)
-		return err
+		return fmt.Errorf("error deleting node annotation %s via k8s API: %v", key, err)
 	}
 	return nil
 }
 
-func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []string) {
+func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []string) error {
 	labelsMap := make(map[string]string)
 	for _, label := range labels {
 		k := strings.Split(label, "=")[0]
 		v := strings.Split(label, "=")[1]
 		labelsMap[k] = v
-		log.Infof("Updating node %s label: %s=%s", node.GetName(), k, v)
+		slog.Debug(fmt.Sprintf("Updating node %s label: %s=%s", node.GetName(), k, v), "node", node.GetName())
 	}
 
 	bytes, err := json.Marshal(map[string]interface{}{
@@ -528,7 +563,7 @@ func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []stri
 		},
 	})
 	if err != nil {
-		log.Fatalf("Error marshalling node object into JSON: %v", err)
+		return fmt.Errorf("error marshalling node object into JSON: %v", err)
 	}
 
 	_, err = client.CoreV1().Nodes().Patch(context.TODO(), node.GetName(), types.StrategicMergePatchType, bytes, metav1.PatchOptions{})
@@ -539,8 +574,9 @@ func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []stri
 			v := strings.Split(label, "=")[1]
 			labelsErr += fmt.Sprintf("%s=%s ", k, v)
 		}
-		log.Errorf("Error updating node labels %s via k8s API: %v", labelsErr, err)
+		return fmt.Errorf("error updating node labels %s via k8s API: %v", labelsErr, err)
 	}
+	return nil
 }
 
 func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.Checker, blockCheckers []blockers.RebootBlocker, window *timewindow.TimeWindow, lock daemonsetlock.Lock, client *kubernetes.Clientset, period time.Duration) {
@@ -564,7 +600,9 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 			// Test API server first. If cannot get node, we should not do anything.
 			node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 			if err != nil {
-				log.Infof("Error retrieving node object via k8s API: %v", err)
+				// Only debug level even though the API is dead: Kured should not worry about transient
+				// issues, the k8s cluster admin should be aware already
+				slog.Debug(fmt.Sprintf("error retrieving node object via k8s API: %v.\nPlease check API", err), "node", nodeID, "error", err)
 				continue
 			}
 
@@ -573,7 +611,8 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 			// TODO: Need to move to another method to check the current data of the lock relevant for this node
 			holding, lockData, err := lock.Holding()
 			if err != nil {
-				log.Infof("Error checking lock - Not applying any action: %v", err)
+				// Internal wiring, admin does not need to be aware unless debugging session
+				slog.Debug(fmt.Sprintf("Error checking lock - Not applying any action: %v.\nPlease check API", err), "node", nodeID, "error", err)
 				continue
 			}
 
@@ -590,16 +629,20 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 				// Split into two lines to remember I need to remove the first
 				// condition ;)
 				if node.Spec.Unschedulable != lockData.Metadata.Unschedulable && lockData.Metadata.Unschedulable == false {
+					// Important lifecycle event - admin should be aware
+					slog.Info("uncordoning node", "node", nodeID)
 					err = uncordon(client, node)
 					if err != nil {
-						log.Infof("Unable to uncordon %s: %v, will continue to hold lock and retry uncordon", node.GetName(), err)
+						// Transient API issue - no problem, will retry. No need to worry the admin for this
+						slog.Debug(fmt.Sprintf("Unable to uncordon %s: %v, will continue to hold lock and retry uncordon", node.GetName(), err), "node", nodeID, "error", err)
 						continue
 					}
 					// TODO, modify the actions to directly log and notify, instead of individual methods giving
 					// an incomplete view of the lifecycle
 					if notifyURL != "" {
 						if err := shoutrrr.Send(notifyURL, fmt.Sprintf(messageTemplateUncordon, nodeID)); err != nil {
-							log.Warnf("Error notifying: %v", err)
+							// admin might want to act upon this -- raising to info level
+							slog.Info(fmt.Sprintf("Error notifying: %v", err), "node", nodeID, "error", err)
 						}
 					}
 				}
@@ -609,13 +652,16 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 			// Releasing lock earlier is nice for other nodes
 			err = lock.Release()
 			if err != nil {
-				log.Infof("Error releasing lock, will retry: %v", err)
+				// Lock release is an internal thing, do not worry the admin too much
+				slog.Debug("Error releasing lock, will retry", "node", nodeID, "error", err)
 				continue
 			}
 			// Regardless or not we are holding the lock
 			// The node should not say it's still in progress if the reboot is done
 			if annotateNodes {
 				if _, ok := node.Annotations[KuredRebootInProgressAnnotation]; ok {
+					// Who reads this? I hope nobody bothers outside real debug cases
+					slog.Debug(fmt.Sprintf("Deleting node %s annotation %s", nodeID, KuredRebootInProgressAnnotation), "node", nodeID)
 					err := deleteNodeAnnotation(client, nodeID, KuredRebootInProgressAnnotation)
 					if err != nil {
 						continue
@@ -628,7 +674,8 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 
 			// Act on reboot required.
 			if !window.Contains(time.Now()) {
-				log.Debugf("Reboot required for node %v, but outside maintenance window", nodeID)
+				// Probably spamming outside the maintenance window. This should not be logged as info
+				slog.Debug("reboot required but outside maintenance window", "node", nodeID)
 				continue
 			}
 			// moved up, because we should not put an annotation "Going to be rebooting", if
@@ -637,7 +684,8 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 			if blocked, currentlyBlocking := blockers.RebootBlocked(blockCheckers...); blocked {
 				for _, blocker := range currentlyBlocking {
 					rebootBlockedCounter.WithLabelValues(nodeID, blocker.MetricLabel()).Inc()
-					log.Infof("Reboot blocked by %v", blocker.MetricLabel())
+					// Important lifecycle event -- tried to reboot, but was blocked!
+					slog.Info(fmt.Sprintf("reboot blocked by %v", blocker.MetricLabel()), "node", nodeID)
 				}
 				continue
 			}
@@ -645,7 +693,8 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 			// Test API server first. If cannot get node, we should not do anything.
 			node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 			if err != nil {
-				log.Debugf("Error retrieving node object via k8s API: %v", err)
+				// Not important to worry the admin
+				slog.Debug("error retrieving node object via k8s API, retrying at next tick", "node", nodeID, "error", err)
 				continue
 			}
 			// nodeMeta contains the node Metadata that should be included in the lock
@@ -673,18 +722,21 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 			// This could be merged into a single idempotent "Acquire" lock
 			holding, _, err := lock.Holding()
 			if err != nil {
-				log.Debugf("Error testing lock: %v", err)
+				// Not important to worry the admin
+				slog.Debug("error testing lock", "node", nodeID, "error", err)
 				continue
 			}
 
 			if !holding {
 				acquired, holder, err := lock.Acquire(nodeMeta)
 				if err != nil {
-					log.Debugf("Error acquiring lock: %v", err)
+					// Not important to worry the admin
+					slog.Debug("error acquiring lock, will retry at next tick", "node", nodeID, "error", err)
 					continue
 				}
 				if !acquired {
-					log.Infof("Lock already held by %v, will retry", holder)
+					// Not very important - lock prevents action
+					slog.Debug(fmt.Sprintf("Lock already held by %v, will retry at next tick", holder), "node", nodeID)
 					continue
 				}
 			}
@@ -692,27 +744,32 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 			err = drain(client, node)
 			if err != nil {
 				if !forceReboot {
-					log.Infof("Unable to cordon or drain %s: %v, will force-reboot by releasing lock and uncordon until next success", node.GetName(), err)
+					slog.Debug(fmt.Sprintf("Unable to cordon or drain %s: %v, will force-reboot by releasing lock and uncordon until next success", node.GetName(), err), "node", nodeID, "error", err)
 					err = lock.Release()
 					if err != nil {
-						log.Infof("Error in best-effort releasing lock: %v", err)
+						slog.Debug(fmt.Sprintf("error in best-effort releasing lock: %v", err), "node", nodeID, "error", err)
 					}
-					log.Infof("Performing a best-effort uncordon after failed cordon and drain")
+					// this is important -- if it's not shown, it means that (on normal / non-force reboot case) the drain was
+					// in error, the lock was NOT released.
+					// If shown, it is helping understand the uncordonning. If the admin seems the node as cordonned
+					// with this, it needs to take action (for example if the node was previously cordonned!)
+					slog.Info("Performing a best-effort uncordon after failed cordon and drain", "node", nodeID)
 					uncordon(client, node)
 					continue
 				}
 			}
 			if notifyURL != "" {
 				if err := shoutrrr.Send(notifyURL, fmt.Sprintf(messageTemplateReboot, nodeID)); err != nil {
-					log.Infof("Error notifying: %v", err)
+					// most likely important to see: if not notified, at least it would be logged!
+					slog.Info("Error sending notification for reboot", "node", nodeID, "error", err)
 				}
 			}
-
-			log.Infof("Triggering reboot for node %v", nodeID)
+			// important lifecycle event
+			slog.Info(fmt.Sprintf("Triggering reboot for node %v", nodeID), "node", nodeID)
 
 			rebooter.Reboot()
 			for {
-				log.Infof("Waiting for reboot")
+				slog.Info("Waiting for reboot", "node", nodeID)
 				time.Sleep(time.Minute)
 			}
 		}
