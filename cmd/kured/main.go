@@ -108,8 +108,8 @@ const (
 	KuredMostRecentRebootNeededAnnotation string = "weave.works/kured-most-recent-reboot-needed"
 	// EnvPrefix The environment variable prefix of all environment variables bound to our command line flags.
 	EnvPrefix = "KURED"
-
-	sigTrminPlus5 = 34 + 5
+	// TODO: Replace this with runtime evaluation
+	sigRTMinPlus5 = 34 + 5
 )
 
 func init() {
@@ -170,7 +170,7 @@ func main() {
 		"command to run when a reboot is required")
 	flag.IntVar(&concurrency, "concurrency", 1,
 		"amount of nodes to concurrently reboot. Defaults to 1")
-	flag.IntVar(&rebootSignal, "reboot-signal", sigTrminPlus5,
+	flag.IntVar(&rebootSignal, "reboot-signal", sigRTMinPlus5,
 		"signal to use for reboot, SIGRTMIN+5 by default.")
 	flag.StringVar(&slackHookURL, "slack-hook-url", "",
 		"slack hook URL for reboot notifications [deprecated in favor of --notify-url]")
