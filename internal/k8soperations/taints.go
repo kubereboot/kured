@@ -1,4 +1,4 @@
-package taints
+package k8soperations
 
 import (
 	"context"
@@ -21,8 +21,8 @@ type Taint struct {
 	exists    bool
 }
 
-// New provides a new taint.
-func New(client *kubernetes.Clientset, nodeID, taintName string, effect v1.TaintEffect) *Taint {
+// NewTaint provides a new taint.
+func NewTaint(client *kubernetes.Clientset, nodeID, taintName string, effect v1.TaintEffect) *Taint {
 	exists, _, _ := taintExists(client, nodeID, taintName)
 
 	return &Taint{
