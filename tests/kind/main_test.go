@@ -84,14 +84,27 @@ func LocalImage(nameTag string) Option {
 	}
 }
 
+// Deploy can be passed to NewKind to deploy extra components, in addition to the base deployment.
+func WithClusterName(name string) Option {
+	return func(k *KindTest) {
+		k.clusterName = name
+	}
+}
+
+func ForTestInstance(t *testing.T) Option {
+	return func(k *KindTest) {
+		k.testInstance = t
+	}
+}
+
 // NewKind creates a kind cluster given a name and set of Option instances.
-func NewKindTester(kindClusterName string, filePath string, t *testing.T, options ...Option) *KindTest {
+func NewKindTester(config string, options ...Option) *KindTest {
 
 	k := &KindTest{
-		clusterName:    kindClusterName,
+		clusterName:    "kured",
 		timeout:        10 * time.Minute,
-		kindConfigPath: filePath,
-		testInstance:   t,
+		kindConfigPath: config,
+		testInstance:   nil,
 	}
 	for _, option := range options {
 		option(k)
@@ -156,7 +169,14 @@ func TestE2EWithCommand(t *testing.T) {
 			kindClusterConfigFile := fmt.Sprintf("../../.github/kind-cluster-%v.yaml", version)
 			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
 
-			k := NewKindTester(kindClusterName, kindClusterConfigFile, t, LocalImage(kuredDevImage), Deploy("../../kured-rbac.yaml"), Deploy("testfiles/kured-ds.yaml"))
+			k := NewKindTester(
+				kindClusterConfigFile,
+				ForTestInstance(t),
+				WithClusterName(kindClusterName),
+				LocalImage(kuredDevImage),
+				Deploy("../../kured-rbac.yaml"),
+				Deploy("testfiles/kured-ds.yaml"),
+			)
 			defer k.FlushLog()
 
 			err := k.Create()
@@ -205,7 +225,14 @@ func TestE2EWithSignal(t *testing.T) {
 			kindClusterConfigFile := fmt.Sprintf("../../.github/kind-cluster-%v.yaml", version)
 			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
 
-			k := NewKindTester(kindClusterName, kindClusterConfigFile, t, LocalImage(kuredDevImage), Deploy("../../kured-rbac.yaml"), Deploy("testfiles/kured-ds-signal.yaml"))
+			k := NewKindTester(
+				kindClusterConfigFile,
+				ForTestInstance(t),
+				WithClusterName(kindClusterName),
+				LocalImage(kuredDevImage),
+				Deploy("../../kured-rbac.yaml"),
+				Deploy("testfiles/kured-ds-signal.yaml"),
+			)
 			defer k.FlushLog()
 
 			err := k.Create()
@@ -254,7 +281,14 @@ func TestE2EConcurrentWithCommand(t *testing.T) {
 			kindClusterConfigFile := fmt.Sprintf("../../.github/kind-cluster-%v.yaml", version)
 			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
 
-			k := NewKindTester(kindClusterName, kindClusterConfigFile, t, LocalImage(kuredDevImage), Deploy("../../kured-rbac.yaml"), Deploy("testfiles/kured-ds-concurrent-command.yaml"))
+			k := NewKindTester(
+				kindClusterConfigFile,
+				ForTestInstance(t),
+				WithClusterName(kindClusterName),
+				LocalImage(kuredDevImage),
+				Deploy("../../kured-rbac.yaml"),
+				Deploy("testfiles/kured-ds-concurrent-command.yaml"),
+			)
 			defer k.FlushLog()
 
 			err := k.Create()
@@ -303,7 +337,14 @@ func TestE2EConcurrentWithSignal(t *testing.T) {
 			kindClusterConfigFile := fmt.Sprintf("../../.github/kind-cluster-%v.yaml", version)
 			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
 
-			k := NewKindTester(kindClusterName, kindClusterConfigFile, t, LocalImage(kuredDevImage), Deploy("../../kured-rbac.yaml"), Deploy("testfiles/kured-ds-concurrent-signal.yaml"))
+			k := NewKindTester(
+				kindClusterConfigFile,
+				ForTestInstance(t),
+				WithClusterName(kindClusterName),
+				LocalImage(kuredDevImage),
+				Deploy("../../kured-rbac.yaml"),
+				Deploy("testfiles/kured-ds-concurrent-signal.yaml"),
+			)
 			defer k.FlushLog()
 
 			err := k.Create()
@@ -358,7 +399,16 @@ func TestCordonningIsKept(t *testing.T) {
 			} else {
 				manifest = "testfiles/kured-ds-concurrent-signal.yaml"
 			}
-			k := NewKindTester(kindClusterName, kindClusterConfigFile, t, LocalImage(kuredDevImage), Deploy("../../kured-rbac.yaml"), Deploy(manifest))
+
+			k := NewKindTester(
+				kindClusterConfigFile,
+				ForTestInstance(t),
+				WithClusterName(kindClusterName),
+				LocalImage(kuredDevImage),
+				Deploy("../../kured-rbac.yaml"),
+				Deploy(manifest),
+			)
+
 			defer k.FlushLog()
 
 			err := k.Create()
@@ -401,7 +451,14 @@ func TestE2EBlocker(t *testing.T) {
 			kindClusterConfigFile := "../../.github/kind-cluster-current.yaml"
 			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
 
-			k := NewKindTester(kindClusterName, kindClusterConfigFile, t, LocalImage(kuredDevImage), Deploy("../../kured-rbac.yaml"), Deploy(fmt.Sprintf("testfiles/kured-ds-%v.yaml", variant)))
+			k := NewKindTester(
+				kindClusterConfigFile,
+				ForTestInstance(t),
+				WithClusterName(kindClusterName),
+				LocalImage(kuredDevImage),
+				Deploy("../../kured-rbac.yaml"),
+				Deploy(fmt.Sprintf("testfiles/kured-ds-%v.yaml", variant)),
+			)
 			defer k.FlushLog()
 
 			err := k.Create()

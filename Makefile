@@ -30,8 +30,9 @@ kured-release-snapshot:
 image: kured
 	$(SUDO) docker buildx build --no-cache --load -t ghcr.io/$(DH_ORG)/kured:$(VERSION) .
 
-dev-image: image
-	$(SUDO) docker tag ghcr.io/$(DH_ORG)/kured:$(VERSION) kured:dev
+dev-image: kured
+	$(SUDO) docker buildx build --no-cache --load -t ghcr.io/$(DH_ORG)/kured:dev .
+	$(SUDO) docker tag ghcr.io/$(DH_ORG)/kured:dev kured:dev
 
 dev-manifest:
 	# basic e2e scenario
