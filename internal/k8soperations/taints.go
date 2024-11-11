@@ -1,18 +1,19 @@
 // Package taints provides utilities to manage Kubernetes node taints for controlling
 // pod scheduling and execution. It allows setting, removing, and checking taints on nodes,
 // using Kubernetes client-go and JSON patching for atomic updates.
-package taints
+package k8soperations
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"os"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	"log/slog"
-	"os"
 )
 
 // Taint allows to set soft and hard limitations for scheduling and executing pods on nodes.
@@ -24,8 +25,8 @@ type Taint struct {
 	exists    bool
 }
 
-// New provides a new taint.
-func New(client *kubernetes.Clientset, nodeID, taintName string, effect v1.TaintEffect) *Taint {
+// NewTaint provides a new taint.
+func NewTaint(client *kubernetes.Clientset, nodeID, taintName string, effect v1.TaintEffect) *Taint {
 	exists, _, _ := taintExists(client, nodeID, taintName)
 
 	return &Taint{
