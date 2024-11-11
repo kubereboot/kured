@@ -43,7 +43,7 @@ var (
 	alertFilter                     regexpValue
 	alertFilterMatchOnly            bool
 	alertFiringOnly                 bool
-	annotateNodes                   bool
+	annotateNodeProgress            bool
 	concurrency                     int
 	drainDelay                      time.Duration
 	drainGracePeriod                int
@@ -96,7 +96,8 @@ var (
 
 const (
 	// KuredNodeLockAnnotation is the canonical string value for the kured node-lock annotation
-	KuredNodeLockAnnotation string = "kured.dev/kured-node-lock"
+	KuredNodeLockAnnotation                        string = "kured.dev/kured-node-lock"
+	KuredNodeWasUnschedulableBeforeDrainAnnotation string = "kured.dev/node-unschedulable-before-drain"
 	// KuredRebootInProgressAnnotation is the canonical string value for the kured reboot-in-progress annotation
 	KuredRebootInProgressAnnotation string = "kured.dev/kured-reboot-in-progress"
 	// KuredMostRecentRebootNeededAnnotation is the canonical string value for the kured most-recent-reboot-needed annotation
@@ -116,7 +117,7 @@ func main() {
 	// flags are sorted alphabetically by type
 	flag.BoolVar(&alertFilterMatchOnly, "alert-filter-match-only", false, "Only block if the alert-filter-regexp matches active alerts")
 	flag.BoolVar(&alertFiringOnly, "alert-firing-only", false, "only consider firing alerts when checking for active alerts")
-	flag.BoolVar(&annotateNodes, "annotate-nodes", false, "if set, the annotations 'kured.dev/kured-reboot-in-progress' and 'kured.dev/kured-most-recent-reboot-needed' will be given to nodes undergoing kured reboots")
+	flag.BoolVar(&annotateNodeProgress, "annotate-nodes", false, "if set, the annotations 'kured.dev/kured-reboot-in-progress' and 'kured.dev/kured-most-recent-reboot-needed' will be given to nodes undergoing kured reboots")
 	flag.BoolVar(&forceReboot, "force-reboot", false, "force a reboot even if the drain fails or times out")
 	flag.DurationVar(&drainDelay, "drain-delay", 0, "delay drain for this duration (default: 0, disabled)")
 	flag.DurationVar(&drainTimeout, "drain-timeout", 0, "timeout after which the drain is aborted (default: 0, infinite time)")
@@ -199,12 +200,12 @@ func main() {
 		"concurrency", concurrency,
 		"schedule", window,
 		"method", rebootMethod,
+		"taint", fmt.Sprintf("preferNoSchedule taint: (%s)", preferNoScheduleTaintName),
+		"annotation", fmt.Sprintf("Lock Annotation: %s", lockAnnotation),
 	)
 
-	slog.Info(fmt.Sprintf("preferNoSchedule taint: (%s)", preferNoScheduleTaintName), "node", nodeID)
-
-	if annotateNodes {
-		slog.Info("Will annotate nodes during kured reboot operations", "node", nodeID)
+	if annotateNodeProgress {
+		slog.Info("Will annotate nodes progress during kured reboot operations", "node", nodeID)
 	}
 
 	rebooter, err := reboot.NewRebooter(rebootMethod, rebootCommand, rebootSignal, rebootDelay, true, 1)
@@ -241,7 +242,6 @@ func main() {
 		blockCheckers = append(blockCheckers, blockers.NewKubernetesBlockingChecker(client, nodeID, podSelectors))
 	}
 
-	slog.Info(fmt.Sprintf("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation), "node", nodeID)
 	if lockTTL > 0 {
 		slog.Info(fmt.Sprintf("Lock TTL set, lock will expire after: %v", lockTTL), "node", nodeID)
 	} else {
@@ -402,6 +402,20 @@ func drain(client *kubernetes.Clientset, node *v1.Node, notifier notifications.N
 		Timeout:                         drainTimeout,
 	}
 
+	// Add previous state of the node Spec.Unschedulable into an annotation
+	// If an annotation was present, it means that either the cordon or drain failed,
+	// hence it does not need to reapply: It might override what the user has set
+	// (for example if the cordon succeeded but the drain failed)
+	if _, ok := node.Annotations[KuredNodeWasUnschedulableBeforeDrainAnnotation]; !ok {
+		// Store State of the node before cordon changes it
+		annotations := map[string]string{KuredNodeWasUnschedulableBeforeDrainAnnotation: strconv.FormatBool(node.Spec.Unschedulable)}
+		// & annotate this node with a timestamp so that other node maintenance tools know how long it's been since this node has been marked for reboot
+		err := addNodeAnnotations(client, nodeID, annotations)
+		if err != nil {
+			return fmt.Errorf("error saving state of the node %s, %v", nodename, err)
+		}
+	}
+
 	if err := kubectldrain.RunCordonOrUncordon(drainer, node, true); err != nil {
 		return fmt.Errorf("error cordonning node %s, %v", nodename, err)
 	}
@@ -412,8 +426,30 @@ func drain(client *kubernetes.Clientset, node *v1.Node, notifier notifications.N
 	return nil
 }
 
-func uncordon(client *kubernetes.Clientset, node *v1.Node) error {
-	nodename := node.GetName()
+func uncordon(client *kubernetes.Clientset, node *v1.Node, notifier notifications.Notifier) error {
+	// Revert cordon spec change with the help of node annotation
+	annotationContent, ok := node.Annotations[KuredNodeWasUnschedulableBeforeDrainAnnotation]
+	if !ok {
+		// If no node annotations, uncordon will not act.
+		// Do not uncordon if you do not know previous state, it could bring nodes under maintenance online!
+		return nil
+	}
+
+	wasUnschedulable, err := strconv.ParseBool(annotationContent)
+	if err != nil {
+		return fmt.Errorf("annotation was edited and cannot be converted back to bool %v, cannot uncordon (unrecoverable)", err)
+	}
+
+	if wasUnschedulable {
+		// Just delete the annotation, keep Cordonned
+		err := deleteNodeAnnotation(client, nodeID, KuredNodeWasUnschedulableBeforeDrainAnnotation)
+		if err != nil {
+			return fmt.Errorf("error removing the WasUnschedulable annotation, keeping the node stuck in cordonned state forever %v", err)
+		}
+		return nil
+	}
+
+	nodeName := node.GetName()
 	kubectlStdOutLogger := &slogWriter{message: "uncordon: results", stream: "stdout"}
 	kubectlStdErrLogger := &slogWriter{message: "uncordon: results", stream: "stderr"}
 
@@ -424,11 +460,17 @@ func uncordon(client *kubernetes.Clientset, node *v1.Node) error {
 		Ctx:    context.Background(),
 	}
 	if err := kubectldrain.RunCordonOrUncordon(drainer, node, false); err != nil {
-		return fmt.Errorf("error uncordonning node %s: %v", nodename, err)
+		return fmt.Errorf("error uncordonning node %s: %v", nodeName, err)
 	} else if postRebootNodeLabels != nil {
 		err := updateNodeLabels(client, node, postRebootNodeLabels)
-		return fmt.Errorf("error updating node (%s) labels, needs manual intervention %v", nodename, err)
+		return fmt.Errorf("error updating node (%s) labels, needs manual intervention %v", nodeName, err)
 	}
+
+	err = deleteNodeAnnotation(client, nodeID, KuredNodeWasUnschedulableBeforeDrainAnnotation)
+	if err != nil {
+		return fmt.Errorf("error removing the WasUnschedulable annotation, keeping the node stuck in current state forever %v", err)
+	}
+	notifier.Send(fmt.Sprintf(messageTemplateUncordon, nodeID), "Node uncordonned successfully")
 	return nil
 }
 
@@ -528,42 +570,11 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 				continue
 			}
 
-			// Get lock data to know if need to uncordon the node
-			// to get the node back to its previous state
-			// TODO: Need to move to another method to check the current data of the lock relevant for this node
-			holding, lockData, err := lock.Holding()
+			err = uncordon(client, node, notifier)
 			if err != nil {
-				// Internal wiring, admin does not need to be aware unless debugging session
-				slog.Debug(fmt.Sprintf("Error checking lock - Not applying any action: %v.\nPlease check API", err), "node", nodeID, "error", err)
+				// Might be a transient API issue or a real problem. Inform the admin
+				slog.Info("unable to uncordon needs investigation", "node", nodeID, "error", err)
 				continue
-			}
-
-			// we check if holding ONLY to know if lockData is valid.
-			// When moving to fetch lockData as a separate method, remove
-			// this whole condition.
-			// However, it means that Release()
-			// need to behave idempotently regardless or not the lock is
-			// held, but that's an ideal state.
-			// what we should simply do is reconcile the lock data
-			// with the node spec. But behind the scenes its a bug
-			// if it's not holding due to an error
-			if holding && !lockData.Metadata.Unschedulable {
-				// Split into two lines to remember I need to remove the first
-				// condition ;)
-				if node.Spec.Unschedulable != lockData.Metadata.Unschedulable && lockData.Metadata.Unschedulable == false {
-					// Important lifecycle event - admin should be aware
-					slog.Info("uncordoning node", "node", nodeID)
-					err = uncordon(client, node)
-					if err != nil {
-						// Transient API issue - no problem, will retry. No need to worry the admin for this
-						slog.Debug(fmt.Sprintf("Unable to uncordon %s: %v, will continue to hold lock and retry uncordon", node.GetName(), err), "node", nodeID, "error", err)
-						continue
-					}
-					// TODO, modify the actions to directly log and notify, instead of individual methods giving
-					// an incomplete view of the lifecycle
-					notifier.Send(fmt.Sprintf(messageTemplateUncordon, nodeID), "Node uncordonned")
-				}
-
 			}
 
 			// Releasing lock earlier is nice for other nodes
@@ -575,7 +586,7 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 			}
 			// Regardless or not we are holding the lock
 			// The node should not say it's still in progress if the reboot is done
-			if annotateNodes {
+			if annotateNodeProgress {
 				if _, ok := node.Annotations[KuredRebootInProgressAnnotation]; ok {
 					// Who reads this? I hope nobody bothers outside real debug cases
 					slog.Debug(fmt.Sprintf("Deleting node %s annotation %s", nodeID, KuredRebootInProgressAnnotation), "node", nodeID)
@@ -590,6 +601,7 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 			rebootRequiredGauge.WithLabelValues(nodeID).Set(1)
 
 			// Act on reboot required.
+
 			if !window.Contains(time.Now()) {
 				// Probably spamming outside the maintenance window. This should not be logged as info
 				slog.Debug("reboot required but outside maintenance window", "node", nodeID)
@@ -614,11 +626,11 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 				slog.Debug("error retrieving node object via k8s API, retrying at next tick", "node", nodeID, "error", err)
 				continue
 			}
-			// nodeMeta contains the node Metadata that should be included in the lock
-			nodeMeta := daemonsetlock.NodeMeta{Unschedulable: node.Spec.Unschedulable}
+			//// nodeMeta contains the node Metadata that should be included in the lock
+			//nodeMeta := daemonsetlock.NodeMeta{Unschedulable: node.Spec.Unschedulable}
 
 			var timeNowString string
-			if annotateNodes {
+			if annotateNodeProgress {
 				if _, ok := node.Annotations[KuredRebootInProgressAnnotation]; !ok {
 					timeNowString = time.Now().Format(time.RFC3339)
 					// Annotate this node to indicate that "I am going to be rebooted!"
@@ -636,27 +648,32 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 			// Prefer to not schedule pods onto this node to avoid draing the same pod multiple times.
 			preferNoScheduleTaint.Enable()
 
-			// This could be merged into a single idempotent "Acquire" lock
-			holding, _, err := lock.Holding()
-			if err != nil {
-				// Not important to worry the admin
-				slog.Debug("error testing lock", "node", nodeID, "error", err)
+			holding, err := lock.Acquire()
+			if err != nil || !holding {
+				slog.Debug("error acquiring lock, will retry at next tick", "node", nodeID, "error", err)
 				continue
 			}
-
-			if !holding {
-				acquired, holder, err := lock.Acquire(nodeMeta)
-				if err != nil {
-					// Not important to worry the admin
-					slog.Debug("error acquiring lock, will retry at next tick", "node", nodeID, "error", err)
-					continue
-				}
-				if !acquired {
-					// Not very important - lock prevents action
-					slog.Debug(fmt.Sprintf("Lock already held by %v, will retry at next tick", holder), "node", nodeID)
-					continue
-				}
-			}
+			//// This could be merged into a single idempotent "Acquire" lock
+			//holding, _, err := lock.Holding()
+			//if err != nil {
+			//	// Not important to worry the admin
+			//	slog.Debug("error testing lock", "node", nodeID, "error", err)
+			//	continue
+			//}
+			//
+			//if !holding {
+			//	acquired, holder, err := lock.Acquire(nodeMeta)
+			//	if err != nil {
+			//		// Not important to worry the admin
+			//		slog.Debug("error acquiring lock, will retry at next tick", "node", nodeID, "error", err)
+			//		continue
+			//	}
+			//	if !acquired {
+			//		// Not very important - lock prevents action
+			//		slog.Debug(fmt.Sprintf("Lock already held by %v, will retry at next tick", holder), "node", nodeID)
+			//		continue
+			//	}
+			//}
 
 			err = drain(client, node, notifier)
 			if err != nil {
@@ -671,7 +688,7 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 					// If shown, it is helping understand the uncordonning. If the admin seems the node as cordonned
 					// with this, it needs to take action (for example if the node was previously cordonned!)
 					slog.Info("Performing a best-effort uncordon after failed cordon and drain", "node", nodeID)
-					err := uncordon(client, node)
+					err := uncordon(client, node, notifier)
 					if err != nil {
 						slog.Info("Failed to do best-effort uncordon", "node", nodeID, "error", err)
 					}
