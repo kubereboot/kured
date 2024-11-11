@@ -39,48 +39,47 @@ import (
 var (
 	version = "unreleased"
 
-	// Command line flags
-	forceReboot                     bool
-	drainDelay                      time.Duration
-	drainTimeout                    time.Duration
-	rebootDelay                     time.Duration
-	rebootMethod                    string
-	period                          time.Duration
-	metricsHost                     string
-	metricsPort                     int
-	drainGracePeriod                int
-	drainPodSelector                string
-	skipWaitForDeleteTimeoutSeconds int
-	dsNamespace                     string
-	dsName                          string
-	lockAnnotation                  string
-	lockTTL                         time.Duration
-	lockReleaseDelay                time.Duration
-	prometheusURL                   string
-	preferNoScheduleTaintName       string
+	// Command line flags (sorted alphabetically)
 	alertFilter                     regexpValue
 	alertFilterMatchOnly            bool
 	alertFiringOnly                 bool
-	rebootSentinelFile              string
-	rebootSentinelCommand           string
-	notifyURLs                      []string
+	annotateNodes                   bool
+	concurrency                     int
+	drainDelay                      time.Duration
+	drainGracePeriod                int
+	drainPodSelector                string
+	drainTimeout                    time.Duration
+	dsName                          string
+	dsNamespace                     string
+	lockAnnotation                  string
+	lockReleaseDelay                time.Duration
+	lockTTL                         time.Duration
+	logFormat                       string
 	messageTemplateDrain            string
 	messageTemplateReboot           string
 	messageTemplateUncordon         string
-	podSelectors                    []string
-	rebootCommand                   string
-	rebootSignal                    int
-	logFormat                       string
-	preRebootNodeLabels             []string
-	postRebootNodeLabels            []string
+	metricsHost                     string
+	metricsPort                     int
 	nodeID                          string
-	concurrency                     int
-
-	rebootDays    []string
-	rebootStart   string
-	rebootEnd     string
-	timezone      string
-	annotateNodes bool
+	notifyURLs                      []string
+	period                          time.Duration
+	podSelectors                    []string
+	postRebootNodeLabels            []string
+	preRebootNodeLabels             []string
+	preferNoScheduleTaintName       string
+	prometheusURL                   string
+	rebootCommand                   string
+	rebootDays                      []string
+	rebootDelay                     time.Duration
+	rebootEnd                       string
+	rebootMethod                    string
+	rebootSentinelCommand           string
+	rebootSentinelFile              string
+	rebootSignal                    int
+	rebootStart                     string
+	skipWaitForDeleteTimeoutSeconds int
+	timezone                        string
+	forceReboot                     bool
 
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -114,85 +113,47 @@ func init() {
 
 func main() {
 
-	flag.StringVar(&nodeID, "node-id", "",
-		"node name kured runs on, should be passed down from spec.nodeName via KURED_NODE_ID environment variable")
-	flag.BoolVar(&forceReboot, "force-reboot", false,
-		"force a reboot even if the drain fails or times out")
-	flag.StringVar(&metricsHost, "metrics-host", "",
-		"host where metrics will listen")
-	flag.IntVar(&metricsPort, "metrics-port", 8080,
-		"port number where metrics will listen")
-	flag.IntVar(&drainGracePeriod, "drain-grace-period", -1,
-		"time in seconds given to each pod to terminate gracefully, if negative, the default value specified in the pod will be used")
-	flag.StringVar(&drainPodSelector, "drain-pod-selector", "",
-		"only drain pods with labels matching the selector (default: '', all pods)")
-	flag.IntVar(&skipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", 0,
-		"when seconds is greater than zero, skip waiting for the pods whose deletion timestamp is older than N seconds while draining a node")
-	flag.DurationVar(&drainDelay, "drain-delay", 0,
-		"delay drain for this duration (default: 0, disabled)")
-	flag.DurationVar(&drainTimeout, "drain-timeout", 0,
-		"timeout after which the drain is aborted (default: 0, infinite time)")
-	flag.DurationVar(&rebootDelay, "reboot-delay", 0,
-		"delay reboot for this duration (default: 0, disabled)")
-	flag.StringVar(&rebootMethod, "reboot-method", "command",
-		"method to use for reboots. Available: command")
-	flag.DurationVar(&period, "period", time.Minute,
-		"period at which the main operations are done")
-	flag.StringVar(&dsNamespace, "ds-namespace", "kube-system",
-		"namespace containing daemonset on which to place lock")
-	flag.StringVar(&dsName, "ds-name", "kured",
-		"name of daemonset on which to place lock")
-	flag.StringVar(&lockAnnotation, "lock-annotation", KuredNodeLockAnnotation,
-		"annotation in which to record locking node")
-	flag.DurationVar(&lockTTL, "lock-ttl", 0,
-		"expire lock annotation after this duration (default: 0, disabled)")
-	flag.DurationVar(&lockReleaseDelay, "lock-release-delay", 0,
-		"delay lock release for this duration (default: 0, disabled)")
-	flag.StringVar(&prometheusURL, "prometheus-url", "",
-		"Prometheus instance to probe for active alerts")
-	flag.Var(&alertFilter, "alert-filter-regexp",
-		"alert names to ignore when checking for active alerts")
-	flag.BoolVar(&alertFilterMatchOnly, "alert-filter-match-only", false,
-		"Only block if the alert-filter-regexp matches active alerts")
-	flag.BoolVar(&alertFiringOnly, "alert-firing-only", false,
-		"only consider firing alerts when checking for active alerts")
-	flag.StringVar(&rebootSentinelFile, "reboot-sentinel", "/var/run/reboot-required",
-		"path to file whose existence triggers the reboot command")
-	flag.StringVar(&preferNoScheduleTaintName, "prefer-no-schedule-taint", "",
-		"Taint name applied during pending node reboot (to prevent receiving additional pods from other rebooting nodes). Disabled by default. Set e.g. to \"kured.dev/kured-node-reboot\" to enable tainting.")
-	flag.StringVar(&rebootSentinelCommand, "reboot-sentinel-command", "",
-		"command for which a zero return code will trigger a reboot command")
-	flag.StringVar(&rebootCommand, "reboot-command", "/bin/systemctl reboot",
-		"command to run when a reboot is required")
-	flag.IntVar(&concurrency, "concurrency", 1,
-		"amount of nodes to concurrently reboot. Defaults to 1")
-	flag.IntVar(&rebootSignal, "reboot-signal", sigRTMinPlus5,
-		"signal to use for reboot, SIGRTMIN+5 by default.")
+	// flags are sorted alphabetically by type
+	flag.BoolVar(&alertFilterMatchOnly, "alert-filter-match-only", false, "Only block if the alert-filter-regexp matches active alerts")
+	flag.BoolVar(&alertFiringOnly, "alert-firing-only", false, "only consider firing alerts when checking for active alerts")
+	flag.BoolVar(&annotateNodes, "annotate-nodes", false, "if set, the annotations 'kured.dev/kured-reboot-in-progress' and 'kured.dev/kured-most-recent-reboot-needed' will be given to nodes undergoing kured reboots")
+	flag.BoolVar(&forceReboot, "force-reboot", false, "force a reboot even if the drain fails or times out")
+	flag.DurationVar(&drainDelay, "drain-delay", 0, "delay drain for this duration (default: 0, disabled)")
+	flag.DurationVar(&drainTimeout, "drain-timeout", 0, "timeout after which the drain is aborted (default: 0, infinite time)")
+	flag.DurationVar(&lockReleaseDelay, "lock-release-delay", 0, "delay lock release for this duration (default: 0, disabled)")
+	flag.DurationVar(&lockTTL, "lock-ttl", 0, "expire lock annotation after this duration (default: 0, disabled)")
+	flag.DurationVar(&period, "period", time.Minute, "period at which the main operations are done")
+	flag.DurationVar(&rebootDelay, "reboot-delay", 0, "delay reboot for this duration (default: 0, disabled)")
+	flag.IntVar(&concurrency, "concurrency", 1, "amount of nodes to concurrently reboot. Defaults to 1")
+	flag.IntVar(&drainGracePeriod, "drain-grace-period", -1, "time in seconds given to each pod to terminate gracefully, if negative, the default value specified in the pod will be used")
+	flag.IntVar(&metricsPort, "metrics-port", 8080, "port number where metrics will listen")
+	flag.IntVar(&rebootSignal, "reboot-signal", sigRTMinPlus5, "signal to use for reboot, SIGRTMIN+5 by default.")
+	flag.IntVar(&skipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", 0, "when seconds is greater than zero, skip waiting for the pods whose deletion timestamp is older than N seconds while draining a node")
 	flag.StringArrayVar(&notifyURLs, "notify-url", nil, "notify URL for reboot notifications (can be repeated for multiple notifications)")
-	flag.StringVar(&messageTemplateUncordon, "message-template-uncordon", "Node %s rebooted & uncordoned successfully!",
-		"message template used to notify about a node being successfully uncordoned")
-	flag.StringVar(&messageTemplateDrain, "message-template-drain", "Draining node %s",
-		"message template used to notify about a node being drained")
-	flag.StringVar(&messageTemplateReboot, "message-template-reboot", "Rebooting node %s",
-		"message template used to notify about a node being rebooted")
-	flag.StringArrayVar(&podSelectors, "blocking-pod-selector", nil,
-		"label selector identifying pods whose presence should prevent reboots")
-	flag.StringSliceVar(&rebootDays, "reboot-days", timewindow.EveryDay,
-		"schedule reboot on these days")
-	flag.StringVar(&rebootStart, "start-time", "0:00",
-		"schedule reboot only after this time of day")
-	flag.StringVar(&rebootEnd, "end-time", "23:59:59",
-		"schedule reboot only before this time of day")
-	flag.StringVar(&timezone, "time-zone", "UTC",
-		"use this timezone for schedule inputs")
-	flag.BoolVar(&annotateNodes, "annotate-nodes", false,
-		"if set, the annotations 'kured.dev/kured-reboot-in-progress' and 'kured.dev/kured-most-recent-reboot-needed' will be given to nodes undergoing kured reboots")
-	flag.StringVar(&logFormat, "log-format", "text",
-		"use text or json log format")
-	flag.StringSliceVar(&preRebootNodeLabels, "pre-reboot-node-labels", nil,
-		"labels to add to nodes before cordoning")
-	flag.StringSliceVar(&postRebootNodeLabels, "post-reboot-node-labels", nil,
-		"labels to add to nodes after uncordoning")
+	flag.StringArrayVar(&podSelectors, "blocking-pod-selector", nil, "label selector identifying pods whose presence should prevent reboots")
+	flag.StringSliceVar(&postRebootNodeLabels, "post-reboot-node-labels", nil, "labels to add to nodes after uncordoning")
+	flag.StringSliceVar(&preRebootNodeLabels, "pre-reboot-node-labels", nil, "labels to add to nodes before cordoning")
+	flag.StringSliceVar(&rebootDays, "reboot-days", timewindow.EveryDay, "schedule reboot on these days")
+	flag.StringVar(&drainPodSelector, "drain-pod-selector", "", "only drain pods with labels matching the selector (default: '', all pods)")
+	flag.StringVar(&dsName, "ds-name", "kured", "name of daemonset on which to place lock")
+	flag.StringVar(&dsNamespace, "ds-namespace", "kube-system", "namespace containing daemonset on which to place lock")
+	flag.StringVar(&lockAnnotation, "lock-annotation", KuredNodeLockAnnotation, "annotation in which to record locking node")
+	flag.StringVar(&logFormat, "log-format", "text", "use text or json log format")
+	flag.StringVar(&messageTemplateDrain, "message-template-drain", "Draining node %s", "message template used to notify about a node being drained")
+	flag.StringVar(&messageTemplateReboot, "message-template-reboot", "Rebooting node %s", "message template used to notify about a node being rebooted")
+	flag.StringVar(&messageTemplateUncordon, "message-template-uncordon", "Node %s rebooted & uncordoned successfully!", "message template used to notify about a node being successfully uncordoned")
+	flag.StringVar(&metricsHost, "metrics-host", "", "host where metrics will listen")
+	flag.StringVar(&nodeID, "node-id", "", "node name kured runs on, should be passed down from spec.nodeName via KURED_NODE_ID environment variable")
+	flag.StringVar(&preferNoScheduleTaintName, "prefer-no-schedule-taint", "", "Taint name applied during pending node reboot (to prevent receiving additional pods from other rebooting nodes). Disabled by default. Set e.g. to \"kured.dev/kured-node-reboot\" to enable tainting.")
+	flag.StringVar(&prometheusURL, "prometheus-url", "", "Prometheus instance to probe for active alerts")
+	flag.StringVar(&rebootCommand, "reboot-command", "/bin/systemctl reboot", "command to run when a reboot is required")
+	flag.StringVar(&rebootEnd, "end-time", "23:59:59", "schedule reboot only before this time of day")
+	flag.StringVar(&rebootMethod, "reboot-method", "command", "method to use for reboots. Available: command")
+	flag.StringVar(&rebootSentinelCommand, "reboot-sentinel-command", "", "command for which a zero return code will trigger a reboot command")
+	flag.StringVar(&rebootSentinelFile, "reboot-sentinel", "/var/run/reboot-required", "path to file whose existence triggers the reboot command")
+	flag.StringVar(&rebootStart, "start-time", "0:00", "schedule reboot only after this time of day")
+	flag.StringVar(&timezone, "time-zone", "UTC", "use this timezone for schedule inputs")
+	flag.Var(&alertFilter, "alert-filter-regexp", "alert names to ignore when checking for active alerts")
 
 	flag.Parse()
 
