@@ -63,10 +63,7 @@ var (
 	alertFiringOnly                 bool
 	rebootSentinelFile              string
 	rebootSentinelCommand           string
-	notifyURL                       string
-	slackHookURL                    string
-	slackUsername                   string
-	slackChannel                    string
+	notifyURLs                      []string
 	messageTemplateDrain            string
 	messageTemplateReboot           string
 	messageTemplateUncordon         string
@@ -171,14 +168,7 @@ func main() {
 		"amount of nodes to concurrently reboot. Defaults to 1")
 	flag.IntVar(&rebootSignal, "reboot-signal", sigRTMinPlus5,
 		"signal to use for reboot, SIGRTMIN+5 by default.")
-	flag.StringVar(&slackHookURL, "slack-hook-url", "",
-		"slack hook URL for reboot notifications [deprecated in favor of --notify-url]")
-	flag.StringVar(&slackUsername, "slack-username", "kured",
-		"slack username for reboot notifications")
-	flag.StringVar(&slackChannel, "slack-channel", "",
-		"slack channel for reboot notifications")
-	flag.StringVar(&notifyURL, "notify-url", "",
-		"notify URL for reboot notifications (cannot use with --slack-hook-url flags)")
+	flag.StringArrayVar(&notifyURLs, "notify-url", nil, "notify URL for reboot notifications (can be repeated for multiple notifications)")
 	flag.StringVar(&messageTemplateUncordon, "message-template-uncordon", "Node %s rebooted & uncordoned successfully!",
 		"message template used to notify about a node being successfully uncordoned")
 	flag.StringVar(&messageTemplateDrain, "message-template-drain", "Draining node %s",
@@ -234,7 +224,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	notifier := notifications.NewNotifier(notifyURL, slackHookURL)
+	notifier := notifications.NewNotifier(notifyURLs...)
 
 	err = validateNodeLabels(preRebootNodeLabels, postRebootNodeLabels)
 	if err != nil {
@@ -391,6 +381,7 @@ func LoadFromEnv() {
 					os.Exit(1)
 				}
 			default:
+				//String Arrays are not supported from CLI for example
 				fmt.Printf("Unsupported flag type for %s\n", f.Name)
 			}
 		}

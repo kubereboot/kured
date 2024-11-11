@@ -5,60 +5,6 @@ import (
 	"testing"
 )
 
-func TestValidateNotificationURL(t *testing.T) {
-
-	tests := []struct {
-		name         string
-		slackHookURL string
-		notifyURL    string
-		expected     string
-	}{
-		{
-			"slackHookURL only works fine",
-			"https://hooks.slack.com/services/BLABLABA12345/IAM931A0VERY/COMPLICATED711854TOKEN1SET",
-			"",
-			"slack://BLABLABA12345/IAM931A0VERY/COMPLICATED711854TOKEN1SET",
-		},
-		{
-			"slackHookURL and notify URL together only keeps notifyURL",
-			"\"https://hooks.slack.com/services/BLABLABA12345/IAM931A0VERY/COMPLICATED711854TOKEN1SET\"",
-			"teams://79b4XXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX@acd8XXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX/204cXXXXXXXXXXXXXXXXXXXXXXXXXXXX/a1f8XXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX?host=XXXX.webhook.office.com",
-			"teams://79b4XXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX@acd8XXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX/204cXXXXXXXXXXXXXXXXXXXXXXXXXXXX/a1f8XXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX?host=XXXX.webhook.office.com",
-		},
-		{
-			"slackHookURL removes extraneous double quotes",
-			"\"https://hooks.slack.com/services/BLABLABA12345/IAM931A0VERY/COMPLICATED711854TOKEN1SET\"",
-			"",
-			"slack://BLABLABA12345/IAM931A0VERY/COMPLICATED711854TOKEN1SET",
-		},
-		{
-			"slackHookURL removes extraneous single quotes",
-			"'https://hooks.slack.com/services/BLABLABA12345/IAM931A0VERY/COMPLICATED711854TOKEN1SET'",
-			"",
-			"slack://BLABLABA12345/IAM931A0VERY/COMPLICATED711854TOKEN1SET",
-		},
-		{
-			"notifyURL removes extraneous double quotes",
-			"",
-			"\"teams://79b4XXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX@acd8XXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX/204cXXXXXXXXXXXXXXXXXXXXXXXXXXXX/a1f8XXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX?host=XXXX.webhook.office.com\"",
-			"teams://79b4XXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX@acd8XXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX/204cXXXXXXXXXXXXXXXXXXXXXXXXXXXX/a1f8XXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX?host=XXXX.webhook.office.com",
-		},
-		{
-			"notifyURL removes extraneous single quotes",
-			"",
-			"'teams://79b4XXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX@acd8XXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX/204cXXXXXXXXXXXXXXXXXXXXXXXXXXXX/a1f8XXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX?host=XXXX.webhook.office.com'",
-			"teams://79b4XXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX@acd8XXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX/204cXXXXXXXXXXXXXXXXXXXXXXXXXXXX/a1f8XXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX?host=XXXX.webhook.office.com",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := validateNotificationURL(tt.notifyURL, tt.slackHookURL); !reflect.DeepEqual(got, tt.expected) {
-				t.Errorf("validateNotificationURL() = %v, expected %v", got, tt.expected)
-			}
-		})
-	}
-}
-
 func Test_stripQuotes(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -86,6 +32,16 @@ func Test_stripQuotes(t *testing.T) {
 			expected: "'Hello, world!\"",
 		},
 		{
+			name:     "string with length of two is stripped",
+			input:    "\"\"",
+			expected: "",
+		},
+		{
+			name:     "string with length of two is stripped",
+			input:    "''",
+			expected: "",
+		},
+		{
 			name:     "string with length of one is unchanged",
 			input:    "'",
 			expected: "'",
@@ -100,6 +56,71 @@ func Test_stripQuotes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := stripQuotes(tt.input); !reflect.DeepEqual(got, tt.expected) {
 				t.Errorf("stripQuotes() = %v, expected %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestNewNotifier(t *testing.T) {
+	type args struct {
+		URLs []string
+	}
+	tests := []struct {
+		name string
+		args args
+		want Notifier
+	}{
+		{
+			name: "No URLs means no notifier",
+			args: args{},
+			want: &NoopNotifier{},
+		},
+		{
+			name: "Empty slice means no notifier",
+			args: args{URLs: []string{}},
+			want: &NoopNotifier{},
+		},
+		{
+			name: "Empty string means no notifier",
+			args: args{URLs: []string{""}},
+			want: &NoopNotifier{},
+		},
+		{
+			name: "Pseudo-Empty string means no notifier",
+			args: args{URLs: []string{"''"}},
+			want: &NoopNotifier{},
+		},
+		{
+			name: "Pseudo-Empty string means no notifier",
+			args: args{URLs: []string{"\"\""}},
+			want: &NoopNotifier{},
+		},
+		{
+			name: "Invalid string means no notifier",
+			args: args{URLs: []string{"'"}},
+			want: &NoopNotifier{},
+		},
+		{
+			name: "Old shoutrrr slack urls are not valid anymore",
+			args: args{URLs: []string{"slack://xxxx/yyyy/zzzz"}},
+			want: &NoopNotifier{},
+		},
+		{
+			name: "Valid slack bot API notifier url",
+			args: args{URLs: []string{"slack://xoxb:123456789012-1234567890123-4mt0t4l1YL3g1T5L4cK70k3N@C001CH4NN3L?color=good&title=Great+News&icon=man-scientist&botname=Shoutrrrbot"}},
+			want: &ShoutrrrNotifier{},
+		},
+		{
+			name: "Valid slack webhook notifier url",
+			args: args{URLs: []string{"slack://hook:WNA3PBYV6-F20DUQND3RQ-Webc4MAvoacrpPakR8phF0zi@webhook?color=good&title=Great+News&icon=man-scientist&botname=Shoutrrrbot"}},
+			want: &ShoutrrrNotifier{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NewNotifier(tt.args.URLs...)
+			if reflect.TypeOf(got) != reflect.TypeOf(tt.want) {
+				t.Errorf("NewNotifier() = %v, want %v", reflect.TypeOf(got), reflect.TypeOf(tt.want))
 			}
 		})
 	}
