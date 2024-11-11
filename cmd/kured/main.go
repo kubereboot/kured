@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/containrrr/shoutrrr"
 	"github.com/kubereboot/kured/internal/daemonsetlock"
+	"github.com/kubereboot/kured/internal/notifications"
 	"github.com/kubereboot/kured/internal/taints"
 	"github.com/kubereboot/kured/internal/timewindow"
 	"github.com/kubereboot/kured/pkg/blockers"
@@ -24,7 +24,6 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
 	"reflect"
 	"sort"
@@ -231,7 +230,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	notifyURL = validateNotificationURL(notifyURL, slackHookURL)
+	notifier := notifications.NewNotifier(notifyURL, slackHookURL)
 
 	err = validateNodeLabels(preRebootNodeLabels, postRebootNodeLabels)
 	if err != nil {
@@ -302,7 +301,7 @@ func main() {
 
 	lock := daemonsetlock.New(client, nodeID, dsNamespace, dsName, lockAnnotation, lockTTL, concurrency, lockReleaseDelay)
 
-	go rebootAsRequired(nodeID, rebooter, rebootChecker, blockCheckers, window, lock, client, period)
+	go rebootAsRequired(nodeID, rebooter, rebootChecker, blockCheckers, window, lock, client, period, notifier)
 
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", metricsHost, metricsPort), nil))
@@ -323,30 +322,6 @@ func validateNodeLabels(preRebootNodeLabels []string, postRebootNodeLabels []str
 	}
 
 	return nil
-}
-
-// Remove old flags
-func validateNotificationURL(notifyURL string, slackHookURL string) string {
-	switch {
-	case slackHookURL != "" && notifyURL != "":
-		slog.Error(fmt.Sprintf("Cannot use both --notify-url (given: %v) and --slack-hook-url (given: %v) flags. Kured will only use --notify-url flag", slackHookURL, notifyURL))
-		return validateNotificationURL(notifyURL, "")
-	case notifyURL != "":
-		return stripQuotes(notifyURL)
-	case slackHookURL != "":
-		slog.Info("Deprecated flag(s). Please use --notify-url flag instead.")
-		parsedURL, err := url.Parse(stripQuotes(slackHookURL))
-		if err != nil {
-			slog.Info(fmt.Sprintf("slack-hook-url is not properly formatted... no notification will be sent: %v\n", err))
-			return ""
-		}
-		if len(strings.Split(strings.Replace(parsedURL.Path, "/services/", "", -1), "/")) != 3 {
-			slog.Error(fmt.Sprintf("slack-hook-url is not properly formatted... no notification will be sent: unexpected number of / in URL\n"))
-			return ""
-		}
-		return fmt.Sprintf("slack://%s", strings.Replace(parsedURL.Path, "/services/", "", -1))
-	}
-	return ""
 }
 
 // LoadFromEnv attempts to load environment variables corresponding to flags.
@@ -411,19 +386,6 @@ func LoadFromEnv() {
 
 }
 
-// stripQuotes removes any literal single or double quote chars that surround a string
-func stripQuotes(str string) string {
-	if len(str) > 2 {
-		firstChar := str[0]
-		lastChar := str[len(str)-1]
-		if firstChar == lastChar && (firstChar == '"' || firstChar == '\'') {
-			return str[1 : len(str)-1]
-		}
-	}
-	// return the original string if it has a length of zero or one
-	return str
-}
-
 type slogWriter struct {
 	stream  string
 	message string
@@ -440,7 +402,7 @@ func (sw slogWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func drain(client *kubernetes.Clientset, node *v1.Node) error {
+func drain(client *kubernetes.Clientset, node *v1.Node, notifier notifications.Notifier) error {
 	nodename := node.GetName()
 
 	if preRebootNodeLabels != nil {
@@ -457,11 +419,7 @@ func drain(client *kubernetes.Clientset, node *v1.Node) error {
 
 	slog.Info("Starting drain", "node", nodename)
 
-	if notifyURL != "" {
-		if err := shoutrrr.Send(notifyURL, fmt.Sprintf(messageTemplateDrain, nodename)); err != nil {
-			slog.Info(fmt.Sprintf("Error notifying but continuing drain: %v", err), "node", nodename)
-		}
-	}
+	notifier.Send(fmt.Sprintf(messageTemplateDrain, nodename), "Starting drain")
 
 	kubectlStdOutLogger := &slogWriter{message: "draining: results", stream: "stdout"}
 	kubectlStdErrLogger := &slogWriter{message: "draining: results", stream: "stderr"}
@@ -579,7 +537,7 @@ func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []stri
 	return nil
 }
 
-func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.Checker, blockCheckers []blockers.RebootBlocker, window *timewindow.TimeWindow, lock daemonsetlock.Lock, client *kubernetes.Clientset, period time.Duration) {
+func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.Checker, blockCheckers []blockers.RebootBlocker, window *timewindow.TimeWindow, lock daemonsetlock.Lock, client *kubernetes.Clientset, period time.Duration, notifier notifications.Notifier) {
 
 	preferNoScheduleTaint := taints.New(client, nodeID, preferNoScheduleTaintName, v1.TaintEffectPreferNoSchedule)
 
@@ -639,12 +597,7 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 					}
 					// TODO, modify the actions to directly log and notify, instead of individual methods giving
 					// an incomplete view of the lifecycle
-					if notifyURL != "" {
-						if err := shoutrrr.Send(notifyURL, fmt.Sprintf(messageTemplateUncordon, nodeID)); err != nil {
-							// admin might want to act upon this -- raising to info level
-							slog.Info(fmt.Sprintf("Error notifying: %v", err), "node", nodeID, "error", err)
-						}
-					}
+					notifier.Send(fmt.Sprintf(messageTemplateUncordon, nodeID), "Node uncordonned")
 				}
 
 			}
@@ -741,7 +694,7 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 				}
 			}
 
-			err = drain(client, node)
+			err = drain(client, node, notifier)
 			if err != nil {
 				if !forceReboot {
 					slog.Debug(fmt.Sprintf("Unable to cordon or drain %s: %v, will force-reboot by releasing lock and uncordon until next success", node.GetName(), err), "node", nodeID, "error", err)
@@ -758,12 +711,13 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 					continue
 				}
 			}
-			if notifyURL != "" {
-				if err := shoutrrr.Send(notifyURL, fmt.Sprintf(messageTemplateReboot, nodeID)); err != nil {
-					// most likely important to see: if not notified, at least it would be logged!
-					slog.Info("Error sending notification for reboot", "node", nodeID, "error", err)
-				}
+			notifier.Send(fmt.Sprintf(messageTemplateReboot, nodeID), "Node Reboot")
+			if err != nil {
+				// If notifications are not sent, lifecycle event of the reboot is still recorded, so it's no
+				// big deal, as long as it can be debugged.
+				slog.Debug("Error sending notification for reboot", "node", nodeID, "error", err)
 			}
+
 			// important lifecycle event
 			slog.Info(fmt.Sprintf("Triggering reboot for node %v", nodeID), "node", nodeID)
 
