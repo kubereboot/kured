@@ -97,11 +97,11 @@ var (
 
 const (
 	// KuredNodeLockAnnotation is the canonical string value for the kured node-lock annotation
-	KuredNodeLockAnnotation string = "weave.works/kured-node-lock"
+	KuredNodeLockAnnotation string = "kured.dev/kured-node-lock"
 	// KuredRebootInProgressAnnotation is the canonical string value for the kured reboot-in-progress annotation
-	KuredRebootInProgressAnnotation string = "weave.works/kured-reboot-in-progress"
+	KuredRebootInProgressAnnotation string = "kured.dev/kured-reboot-in-progress"
 	// KuredMostRecentRebootNeededAnnotation is the canonical string value for the kured most-recent-reboot-needed annotation
-	KuredMostRecentRebootNeededAnnotation string = "weave.works/kured-most-recent-reboot-needed"
+	KuredMostRecentRebootNeededAnnotation string = "kured.dev/kured-most-recent-reboot-needed"
 	// EnvPrefix The environment variable prefix of all environment variables bound to our command line flags.
 	EnvPrefix = "KURED"
 	// TODO: Replace this with runtime evaluation
@@ -159,7 +159,7 @@ func main() {
 	flag.StringVar(&rebootSentinelFile, "reboot-sentinel", "/var/run/reboot-required",
 		"path to file whose existence triggers the reboot command")
 	flag.StringVar(&preferNoScheduleTaintName, "prefer-no-schedule-taint", "",
-		"Taint name applied during pending node reboot (to prevent receiving additional pods from other rebooting nodes). Disabled by default. Set e.g. to \"weave.works/kured-node-reboot\" to enable tainting.")
+		"Taint name applied during pending node reboot (to prevent receiving additional pods from other rebooting nodes). Disabled by default. Set e.g. to \"kured.dev/kured-node-reboot\" to enable tainting.")
 	flag.StringVar(&rebootSentinelCommand, "reboot-sentinel-command", "",
 		"command for which a zero return code will trigger a reboot command")
 	flag.StringVar(&rebootCommand, "reboot-command", "/bin/systemctl reboot",
@@ -186,7 +186,7 @@ func main() {
 	flag.StringVar(&timezone, "time-zone", "UTC",
 		"use this timezone for schedule inputs")
 	flag.BoolVar(&annotateNodes, "annotate-nodes", false,
-		"if set, the annotations 'weave.works/kured-reboot-in-progress' and 'weave.works/kured-most-recent-reboot-needed' will be given to nodes undergoing kured reboots")
+		"if set, the annotations 'kured.dev/kured-reboot-in-progress' and 'kured.dev/kured-most-recent-reboot-needed' will be given to nodes undergoing kured reboots")
 	flag.StringVar(&logFormat, "log-format", "text",
 		"use text or json log format")
 	flag.StringSliceVar(&preRebootNodeLabels, "pre-reboot-node-labels", nil,
