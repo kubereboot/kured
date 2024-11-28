@@ -4,6 +4,7 @@
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fkubereboot%2Fkured.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fkubereboot%2Fkured?ref=badge_shield)
 [![CLOMonitor](https://img.shields.io/endpoint?url=https://clomonitor.io/api/projects/cncf/kured/badge)](https://clomonitor.io/projects/cncf/kured)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/8867/badge)](https://www.bestpractices.dev/projects/8867)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/kubereboot/kured/badge)](https://scorecard.dev/viewer/?uri=github.com/kubereboot/kured)
 
 <img src="https://github.com/kubereboot/website/raw/main/static/img/kured.png" alt="kured logo" width="200" align="right"/>
 
@@ -53,6 +54,16 @@ If you have any questions about, feedback for or problems with `kured`:
 We follow the [CNCF Code of Conduct](CODE_OF_CONDUCT.md).
 
 Your feedback is always welcome!
+
+## Adopters
+
+- ...
+
+## Roadmap
+
+- Make the code simpler to maintain
+- Support new kubernetes versions at each new kubernetes minor version (not every patch version)
+- Reduce privileges required to run the service by using different mechanisms to store data and locks
 
 ## Trademarks
 
