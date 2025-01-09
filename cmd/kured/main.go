@@ -320,11 +320,11 @@ func validateNotificationURL(notifyURL string, slackHookURL string) string {
 			log.Errorf("slack-hook-url is not properly formatted... no notification will be sent: %v\n", err)
 			return ""
 		}
-		if len(strings.Split(strings.Trim(parsedURL.Path, "/services/"), "/")) != 3 {
+		if len(strings.Split(strings.Replace(parsedURL.Path, "/services/", "", -1), "/")) != 3 {
 			log.Errorf("slack-hook-url is not properly formatted... no notification will be sent: unexpected number of / in URL\n")
 			return ""
 		}
-		return fmt.Sprintf("slack://%s", strings.Trim(parsedURL.Path, "/services/"))
+		return fmt.Sprintf("slack://%s", strings.Replace(parsedURL.Path, "/services/", "", -1))
 	}
 	return ""
 }
