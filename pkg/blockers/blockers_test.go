@@ -13,6 +13,10 @@ func (fbc BlockingChecker) IsBlocked() bool {
 	return fbc.blocking
 }
 
+func (fbc BlockingChecker) MetricLabel() string {
+	return "fake_blocker"
+}
+
 func Test_rebootBlocked(t *testing.T) {
 	noCheckers := []RebootBlocker{}
 	nonblockingChecker := BlockingChecker{blocking: false}
@@ -57,7 +61,7 @@ func Test_rebootBlocked(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := RebootBlocked(tt.args.blockers...); got != tt.want {
+			if got, _ := RebootBlocked(tt.args.blockers...); got != tt.want {
 				t.Errorf("rebootBlocked() = %v, want %v", got, tt.want)
 			}
 		})
