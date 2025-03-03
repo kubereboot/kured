@@ -6,6 +6,7 @@ metadata:
 rules:
 # Allow kured to read spec.unschedulable
 # Allow kubectl to drain/uncordon
+# Allow kubectl to migrate KubeVirt instances
 #
 # NB: These permissions are tightly coupled to the bundled version of kubectl; the ones below
 # match https://github.com/kubernetes/kubernetes/blob/v1.19.4/staging/src/k8s.io/kubectl/pkg/cmd/drain/drain.go
@@ -22,6 +23,9 @@ rules:
 - apiGroups: [""]
   resources: ["pods/eviction"]
   verbs:     ["create"]
+- apiGroups: [ "subresources.kubevirt.io" ]
+  resources: [ "virtualmachines/migrate" ]
+  verbs:     ["update" ]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
