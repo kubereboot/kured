@@ -5,7 +5,7 @@ go 1.22.12
 require (
 	github.com/containrrr/shoutrrr v0.8.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
-	github.com/prometheus/client_golang v1.21.0
+	github.com/prometheus/client_golang v1.21.1
 	github.com/prometheus/common v0.62.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/pflag v1.0.6
