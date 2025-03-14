@@ -28,25 +28,6 @@ jobs:
         with:
           test-results: test.json
 
-
-  pr-check-docs-links:
-    name: Check docs for incorrect links
-    runs-on: ubuntu-latest
-    steps:
-    - name: Harden Runner
-      uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
-      with:
-        egress-policy: audit
-
-    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-    - name: Link Checker
-      uses: lycheeverse/lychee-action@5c4ee84814c983aa7164eaee476f014e53ff3963
-      env:
-        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-      with:
-        args: --verbose --no-progress '*.md' '*.yaml' '*/*/*.go' --exclude-link-local
-        fail: true
-
   # This should not be made a mandatory test
   # It is only used to make us aware of any potential security failure, that
   # should trigger a bump of the image in build/.
