@@ -20,6 +20,7 @@ import (
 	"github.com/kubereboot/kured/pkg/checkers"
 	"github.com/kubereboot/kured/pkg/daemonsetlock"
 	"github.com/kubereboot/kured/pkg/delaytick"
+	"github.com/kubereboot/kured/pkg/evacuators"
 	"github.com/kubereboot/kured/pkg/reboot"
 	"github.com/kubereboot/kured/pkg/taints"
 	"github.com/kubereboot/kured/pkg/timewindow"
@@ -404,6 +405,38 @@ func stripQuotes(str string) string {
 	return str
 }
 
+func evacuate(client *kubernetes.Clientset, node *v1.Node) error {
+	var err error
+
+	nodename := node.GetName()
+
+	drainer := &kubectldrain.Helper{
+		Client:                          client,
+		Ctx:                             context.Background(),
+		GracePeriodSeconds:              drainGracePeriod,
+		PodSelector:                     drainPodSelector,
+		SkipWaitForDeleteTimeoutSeconds: skipWaitForDeleteTimeoutSeconds,
+		Force:                           true,
+		DeleteEmptyDirData:              true,
+		IgnoreAllDaemonSets:             true,
+		ErrOut:                          os.Stderr,
+		Out:                             os.Stdout,
+		Timeout:                         drainTimeout,
+	}
+
+	if err = kubectldrain.RunCordonOrUncordon(drainer, node, true); err != nil {
+		log.Errorf("Error cordonning %s: %v", nodename, err)
+		return err
+	}
+
+	kubeVirtEvacuator, err := evacuators.NewKubeVirtEvacuator(nodename, client)
+	if err != nil {
+		return err
+	}
+
+	return kubeVirtEvacuator.Evacuate()
+}
+
 func drain(client *kubernetes.Clientset, node *v1.Node) error {
 	nodename := node.GetName()
 
@@ -675,6 +708,11 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 				preferNoScheduleTaint.Enable()
 				continue
 			}
+		}
+		// Evacuate VM
+		err = evacuate(client, node)
+		if err != nil {
+			log.Errorf("Error trying to live migrate VMs: %v", err)
 		}
 
 		err = drain(client, node)
