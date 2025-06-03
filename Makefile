@@ -1,5 +1,5 @@
 .DEFAULT: all
-.PHONY: all clean image minikube-publish manifest test kured-all
+.PHONY: all clean image minikube-publish manifest test kured-all lint 
 
 HACKDIR=./hack/bin
 GORELEASER_CMD=$(HACKDIR)/goreleaser
@@ -72,3 +72,10 @@ test: bootstrap-tools
 	echo "Running shellcheck"
 	find . -name '*.sh' | xargs -n1 $(HACKDIR)/shellcheck
 	staticcheck ./...
+lint:
+	@echo "Ensuring golangci-lint is installed..."
+	@if ! command -v $(HACKDIR)/golangci-lint > /dev/null; then \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(HACKDIR) v2.1.6; \
+	fi
+	@echo "Running golangci-lint..."
+	$(HACKDIR)/golangci-lint run ./...
