@@ -144,7 +144,7 @@ You can see their contents in `.github/workflows`.
 
 We currently run:
 
-- go tests and lint
+- go tests and golangci-lint
 - `shellcheck`
 - a check for dead links in our docs
 - a security check against our base image (alpine)
@@ -159,6 +159,15 @@ To test your code manually, follow the section Manual testing.
 Please run `make test` to run only the basic tests. It gives a good
 idea of the code behaviour.
 
+### Linting
+
+We use [`golangci-lint`](https://golangci-lint.run/) for Go code linting.
+
+To run lint checks locally:
+
+```bash
+make lint
+```
 ### Manual functional testing
 
 Before `kured` is released, we want to make sure it still works fine on the

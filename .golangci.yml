@@ -1,0 +1,34 @@
+version: "2"
+#timeout : 5m we can add this if needed 
+modules-download-mode: readonly
+run:
+  tests: false
+linters:
+  enable:
+    - govet
+    - staticcheck
+    - unused
+    - contextcheck
+    - goconst
+    - gosec
+    - testifylint
+    - errcheck
+    - revive
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  revive:
+    severity: warning
+    confidence: 0.8
+    rules:
+      - name: indent-error-flow
+      - name: var-naming
+      - name: import-shadowing
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+  uniq-by-line: false
+  sort-results: true
