@@ -33,7 +33,7 @@ func NewNodeBlockingChecker(client *kubernetes.Clientset, nodename string, nodeA
 
 // IsBlocked for the NodeBlockingChecker will check if a pod, for the node, is preventing
 // the reboot. It will warn in the logs about blocking, but does not return an error.
-func (kb NodeBlockingChecker) IsBlocked() bool {
+func (kb *NodeBlockingChecker) IsBlocked() bool {
 	node, err := kb.client.CoreV1().Nodes().Get(context.TODO(), kb.nodeName, metav1.GetOptions{})
 	if err != nil {
 		log.Warnf("Reboot blocked: node query error: %v", err)
