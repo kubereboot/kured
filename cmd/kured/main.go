@@ -70,7 +70,9 @@ var (
 	messageTemplateDrain            string
 	messageTemplateReboot           string
 	messageTemplateUncordon         string
-	podSelectors                    []string
+	blockingPodSelectors            []string
+	inhibitingPodSelectors          []string
+	inhibitingNodeAnnotations       []string
 	blockingNodeAnnotations         []string
 	rebootCommand                   string
 	rebootSignal                    int
@@ -181,10 +183,14 @@ func main() {
 		"message template used to notify about a node being drained")
 	flag.StringVar(&messageTemplateReboot, "message-template-reboot", "Rebooting node %s",
 		"message template used to notify about a node being rebooted")
-	flag.StringArrayVar(&podSelectors, "blocking-pod-selector", nil,
+	flag.StringArrayVar(&blockingPodSelectors, "blocking-pod-selector", nil,
 		"label selector identifying pods whose presence should prevent reboots")
+	flag.StringArrayVar(&inhibitingPodSelectors, "inhibiting-pod-selector", nil,
+		"label selector identifying pods whose presence should prevent final reboots not draining of nodes")
 	flag.StringArrayVar(&blockingNodeAnnotations, "blocking-node-annotation", nil,
-		"node annotation whose presence should prevent final reboots not draining")
+		"node annotation whose presence should prevent node reboots")
+	flag.StringArrayVar(&inhibitingNodeAnnotations, "inhibiting-node-annotation", nil,
+		"node annotation whose presence should prevent final reboots not draining of nodes")
 	flag.StringSliceVar(&rebootDays, "reboot-days", timewindow.EveryDay,
 		"schedule reboot on these days")
 	flag.StringVar(&rebootStart, "start-time", "0:00",
@@ -228,7 +234,7 @@ func main() {
 	log.Infof("PreferNoSchedule taint: %s", preferNoScheduleTaintName)
 
 	// This should be printed from blocker list instead of only blocking pod selectors
-	log.Infof("Blocking Pod Selectors: %v", podSelectors)
+	log.Infof("Blocking Pod Selectors: %v", blockingPodSelectors)
 
 	log.Infof("Reboot period %v", period)
 	log.Infof("Concurrency: %v", concurrency)
@@ -269,17 +275,19 @@ func main() {
 	if prometheusURL != "" {
 		blockCheckers = append(blockCheckers, blockers.NewPrometheusBlockingChecker(papi.Config{Address: prometheusURL}, alertFilter.Regexp, alertFiringOnly, alertFilterMatchOnly))
 	}
-	if podSelectors != nil {
-		blockCheckers = append(blockCheckers, blockers.NewKubernetesBlockingChecker(client, nodeID, podSelectors))
+	if blockingPodSelectors != nil {
+		blockCheckers = append(blockCheckers, blockers.NewKubernetesBlockingChecker(client, nodeID, blockingPodSelectors))
 	}
 
 	// These prevent the rebooter to reboot the node, it will still drain the node.
 	// This is useful for cases in which you want to wait for a condition that is only met after draining the node.
-	log.Info("Setting up rebooter blockers")
-	var rebooterBlockCheckers []blockers.RebootBlocker
+	var inhibitingBlockCheckers []blockers.RebootBlocker
 	if blockingNodeAnnotations != nil {
 		log.Info("Setup rebooter blocker for node annotations")
-		rebooterBlockCheckers = append(rebooterBlockCheckers, blockers.NewNodeBlockingChecker(client, nodeID, blockingNodeAnnotations))
+		inhibitingBlockCheckers = append(inhibitingBlockCheckers, blockers.NewNodeBlockingChecker(client, nodeID, blockingNodeAnnotations))
+	}
+	if inhibitingPodSelectors != nil {
+		inhibitingBlockCheckers = append(inhibitingBlockCheckers, blockers.NewKubernetesBlockingChecker(client, nodeID, inhibitingPodSelectors))
 	}
 
 	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
@@ -295,7 +303,7 @@ func main() {
 	}
 	lock := daemonsetlock.New(client, nodeID, dsNamespace, dsName, lockAnnotation, lockTTL, concurrency, lockReleaseDelay)
 
-	go rebootAsRequired(nodeID, rebooter, rebootChecker, blockCheckers, rebooterBlockCheckers, window, lock, client)
+	go rebootAsRequired(nodeID, rebooter, rebootChecker, blockCheckers, inhibitingBlockCheckers, window, lock, client)
 	go maintainRebootRequiredMetric(nodeID, rebootChecker)
 
 	http.Handle("/metrics", promhttp.Handler())
@@ -566,7 +574,7 @@ func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []stri
 	}
 }
 
-func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.Checker, blockCheckers []blockers.RebootBlocker, rebooterBlockCheckers []blockers.RebootBlocker, window *timewindow.TimeWindow, lock daemonsetlock.Lock, client *kubernetes.Clientset) {
+func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.Checker, blockCheckers []blockers.RebootBlocker, inhibitingBlockCheckers []blockers.RebootBlocker, window *timewindow.TimeWindow, lock daemonsetlock.Lock, client *kubernetes.Clientset) {
 
 	source := rand.NewSource(time.Now().UnixNano())
 	tick := delaytick.New(source, 1*time.Minute)
@@ -703,6 +711,11 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 			}
 		}
 
+		if blockers.RebootBlocked(inhibitingBlockCheckers...) {
+			log.Info("Reboot required, but blocked by inhibiting blockers")
+			continue
+		}
+
 		if rebootDelay > 0 {
 			log.Infof("Delaying reboot for %v", rebootDelay)
 			time.Sleep(rebootDelay)
@@ -714,10 +727,6 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 			}
 		}
 
-		if blockers.RebootBlocked(rebooterBlockCheckers...) {
-			log.Info("Reboot required, but blocked by rebooter blockers")
-			continue
-		}
 		log.Infof("Triggering reboot for node %v", nodeID)
 
 		err = rebooter.Reboot()
