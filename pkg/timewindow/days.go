@@ -50,7 +50,7 @@ func parseWeekdays(days []string) (weekdays, error) {
 		if err != nil {
 			return weekdays(0), err
 		}
-
+		// #nosec G115 -- weekday is guaranteed to be between 0–6 by parseWeekday()
 		result |= 1 << uint32(weekday)
 	}
 
@@ -59,6 +59,7 @@ func parseWeekdays(days []string) (weekdays, error) {
 
 // Contains returns true if the specified weekday is a member of this set.
 func (w weekdays) Contains(day time.Weekday) bool {
+	// #nosec G115 -- day is time.Weekday [0-6], shift safe within uint32
 	return uint32(w)&(1<<uint32(day)) != 0
 }
 

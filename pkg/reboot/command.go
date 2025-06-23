@@ -3,10 +3,11 @@ package reboot
 import (
 	"bytes"
 	"fmt"
-	"github.com/google/shlex"
-	log "github.com/sirupsen/logrus"
 	"os/exec"
 	"strings"
+
+	"github.com/google/shlex"
+	log "github.com/sirupsen/logrus"
 )
 
 // CommandRebooter holds context-information for a reboot with command
@@ -20,7 +21,7 @@ func (c CommandRebooter) Reboot() error {
 
 	bufStdout := new(bytes.Buffer)
 	bufStderr := new(bytes.Buffer)
-	cmd := exec.Command(c.RebootCommand[0], c.RebootCommand[1:]...)
+	cmd := exec.Command(c.RebootCommand[0], c.RebootCommand[1:]...) // #nosec G204
 	cmd.Stdout = bufStdout
 	cmd.Stderr = bufStderr
 

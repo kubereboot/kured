@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"strings"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	v1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -20,17 +21,21 @@ const (
 	k8sAPICallRetryTimeout = 5 * time.Minute // How long to wait until we determine that the k8s API is definitively unavailable
 )
 
+// Lock defines the interface for acquiring, releasing, and checking
+// the status of a reboot coordination lock.
 type Lock interface {
 	Acquire(NodeMeta) (bool, string, error)
 	Release() error
 	Holding() (bool, LockAnnotationValue, error)
 }
 
+// GenericLock holds the configuration for lock TTL and the delay before releasing it.
 type GenericLock struct {
 	TTL          time.Duration
 	releaseDelay time.Duration
 }
 
+// NodeMeta contains metadata about a node relevant to scheduling decisions.
 type NodeMeta struct {
 	Unschedulable bool `json:"unschedulable"`
 }
@@ -94,20 +99,19 @@ func New(client *kubernetes.Clientset, nodeID, namespace, name, annotation strin
 			},
 			maxOwners: concurrency,
 		}
-	} else {
-		return &DaemonSetSingleLock{
-			GenericLock: GenericLock{
-				TTL:          TTL,
-				releaseDelay: lockReleaseDelay,
-			},
-			DaemonSetLock: DaemonSetLock{
-				client:     client,
-				nodeID:     nodeID,
-				namespace:  namespace,
-				name:       name,
-				annotation: annotation,
-			},
-		}
+	}
+	return &DaemonSetSingleLock{
+		GenericLock: GenericLock{
+			TTL:          TTL,
+			releaseDelay: lockReleaseDelay,
+		},
+		DaemonSetLock: DaemonSetLock{
+			client:     client,
+			nodeID:     nodeID,
+			namespace:  namespace,
+			name:       name,
+			annotation: annotation,
+		},
 	}
 }
 
@@ -135,7 +139,7 @@ func (dsl *DaemonSetSingleLock) Acquire(nodeMetadata NodeMeta) (bool, string, er
 			return false, "", fmt.Errorf("timed out trying to get daemonset %s in namespace %s: %w", dsl.name, dsl.namespace, err)
 		}
 
-		valueString, exists := ds.ObjectMeta.Annotations[dsl.annotation]
+		valueString, exists := ds.Annotations[dsl.annotation]
 		if exists {
 			value := LockAnnotationValue{}
 			if err := json.Unmarshal([]byte(valueString), &value); err != nil {
@@ -147,15 +151,22 @@ func (dsl *DaemonSetSingleLock) Acquire(nodeMetadata NodeMeta) (bool, string, er
 			}
 		}
 
-		if ds.ObjectMeta.Annotations == nil {
-			ds.ObjectMeta.Annotations = make(map[string]string)
+		if ds.Annotations == nil {
+			ds.Annotations = make(map[string]string)
 		}
-		value := LockAnnotationValue{NodeID: dsl.nodeID, Metadata: nodeMetadata, Created: time.Now().UTC(), TTL: dsl.TTL}
+
+		value := LockAnnotationValue{
+			NodeID:   dsl.nodeID,
+			Metadata: nodeMetadata,
+			Created:  time.Now().UTC(),
+			TTL:      dsl.TTL,
+		}
+
 		valueBytes, err := json.Marshal(&value)
 		if err != nil {
 			return false, "", err
 		}
-		ds.ObjectMeta.Annotations[dsl.annotation] = string(valueBytes)
+		ds.Annotations[dsl.annotation] = string(valueBytes)
 
 		_, err = dsl.client.AppsV1().DaemonSets(dsl.namespace).Update(context.TODO(), ds, metav1.UpdateOptions{})
 		if err != nil {
@@ -163,15 +174,15 @@ func (dsl *DaemonSetSingleLock) Acquire(nodeMetadata NodeMeta) (bool, string, er
 				// Something else updated the resource between us reading and writing - try again soon
 				time.Sleep(time.Second)
 				continue
-			} else {
-				return false, "", err
 			}
+			return false, "", err
 		}
+
 		return true, dsl.nodeID, nil
 	}
 }
 
-// Test attempts to check the kured daemonset lock status (existence, expiry) from instantiated DaemonSetLock using client-go
+// Holding checks if the current node still holds the lock based on the DaemonSet annotation.
 func (dsl *DaemonSetSingleLock) Holding() (bool, LockAnnotationValue, error) {
 	var lockData LockAnnotationValue
 	ds, err := dsl.GetDaemonSet(k8sAPICallRetrySleep, k8sAPICallRetryTimeout)
@@ -179,7 +190,7 @@ func (dsl *DaemonSetSingleLock) Holding() (bool, LockAnnotationValue, error) {
 		return false, lockData, fmt.Errorf("timed out trying to get daemonset %s in namespace %s: %w", dsl.name, dsl.namespace, err)
 	}
 
-	valueString, exists := ds.ObjectMeta.Annotations[dsl.annotation]
+	valueString, exists := ds.Annotations[dsl.annotation]
 	if exists {
 		value := LockAnnotationValue{}
 		if err := json.Unmarshal([]byte(valueString), &value); err != nil {
@@ -206,7 +217,7 @@ func (dsl *DaemonSetSingleLock) Release() error {
 			return fmt.Errorf("timed out trying to get daemonset %s in namespace %s: %w", dsl.name, dsl.namespace, err)
 		}
 
-		valueString, exists := ds.ObjectMeta.Annotations[dsl.annotation]
+		valueString, exists := ds.Annotations[dsl.annotation]
 		if exists {
 			value := LockAnnotationValue{}
 			if err := json.Unmarshal([]byte(valueString), &value); err != nil {
@@ -220,7 +231,7 @@ func (dsl *DaemonSetSingleLock) Release() error {
 			return fmt.Errorf("lock not held")
 		}
 
-		delete(ds.ObjectMeta.Annotations, dsl.annotation)
+		delete(ds.Annotations, dsl.annotation)
 
 		_, err = dsl.client.AppsV1().DaemonSets(dsl.namespace).Update(context.TODO(), ds, metav1.UpdateOptions{})
 		if err != nil {
@@ -228,9 +239,8 @@ func (dsl *DaemonSetSingleLock) Release() error {
 				// Something else updated the resource between us reading and writing - try again soon
 				time.Sleep(time.Second)
 				continue
-			} else {
-				return err
 			}
+			return err
 		}
 		return nil
 	}
@@ -295,7 +305,7 @@ func (dsl *DaemonSetMultiLock) Acquire(nodeMetaData NodeMeta) (bool, string, err
 		}
 
 		annotation := multiLockAnnotationValue{}
-		valueString, exists := ds.ObjectMeta.Annotations[dsl.annotation]
+		valueString, exists := ds.Annotations[dsl.annotation]
 		if exists {
 			if err := json.Unmarshal([]byte(valueString), &annotation); err != nil {
 				return false, "", fmt.Errorf("error getting multi lock: %w", err)
@@ -307,29 +317,29 @@ func (dsl *DaemonSetMultiLock) Acquire(nodeMetaData NodeMeta) (bool, string, err
 			return false, strings.Join(nodeIDsFromMultiLock(newAnnotation), ","), nil
 		}
 
-		if ds.ObjectMeta.Annotations == nil {
-			ds.ObjectMeta.Annotations = make(map[string]string)
+		if ds.Annotations == nil {
+			ds.Annotations = make(map[string]string)
 		}
 		newAnnotationBytes, err := json.Marshal(&newAnnotation)
 		if err != nil {
 			return false, "", fmt.Errorf("error marshalling new annotation lock: %w", err)
 		}
-		ds.ObjectMeta.Annotations[dsl.annotation] = string(newAnnotationBytes)
+		ds.Annotations[dsl.annotation] = string(newAnnotationBytes)
 
 		_, err = dsl.client.AppsV1().DaemonSets(dsl.namespace).Update(context.Background(), ds, metav1.UpdateOptions{})
 		if err != nil {
 			if se, ok := err.(*errors.StatusError); ok && se.ErrStatus.Reason == metav1.StatusReasonConflict {
 				time.Sleep(time.Second)
 				continue
-			} else {
-				return false, "", fmt.Errorf("error updating daemonset with multi lock: %w", err)
 			}
+			return false, "", fmt.Errorf("error updating daemonset with multi lock: %w", err)
+
 		}
 		return true, strings.Join(nodeIDsFromMultiLock(newAnnotation), ","), nil
 	}
 }
 
-// TestMultiple attempts to check the kured daemonset lock status for multi locks
+// Holding checks whether the current node is holding a valid lock for the DaemonSetMultiLock.
 func (dsl *DaemonSetMultiLock) Holding() (bool, LockAnnotationValue, error) {
 	var lockdata LockAnnotationValue
 	ds, err := dsl.GetDaemonSet(k8sAPICallRetrySleep, k8sAPICallRetryTimeout)
@@ -337,7 +347,7 @@ func (dsl *DaemonSetMultiLock) Holding() (bool, LockAnnotationValue, error) {
 		return false, lockdata, fmt.Errorf("timed out trying to get daemonset %s in namespace %s: %w", dsl.name, dsl.namespace, err)
 	}
 
-	valueString, exists := ds.ObjectMeta.Annotations[dsl.annotation]
+	valueString, exists := ds.Annotations[dsl.annotation]
 	if exists {
 		value := multiLockAnnotationValue{}
 		if err := json.Unmarshal([]byte(valueString), &value); err != nil {
@@ -366,7 +376,7 @@ func (dsl *DaemonSetMultiLock) Release() error {
 			return fmt.Errorf("timed out trying to get daemonset %s in namespace %s: %w", dsl.name, dsl.namespace, err)
 		}
 
-		valueString, exists := ds.ObjectMeta.Annotations[dsl.annotation]
+		valueString, exists := ds.Annotations[dsl.annotation]
 		modified := false
 		value := multiLockAnnotationValue{}
 		if exists {
@@ -391,7 +401,7 @@ func (dsl *DaemonSetMultiLock) Release() error {
 		if err != nil {
 			return fmt.Errorf("error marshalling new annotation on release: %v", err)
 		}
-		ds.ObjectMeta.Annotations[dsl.annotation] = string(newAnnotationBytes)
+		ds.Annotations[dsl.annotation] = string(newAnnotationBytes)
 
 		_, err = dsl.client.AppsV1().DaemonSets(dsl.namespace).Update(context.TODO(), ds, metav1.UpdateOptions{})
 		if err != nil {
@@ -399,9 +409,8 @@ func (dsl *DaemonSetMultiLock) Release() error {
 				// Something else updated the resource between us reading and writing - try again soon
 				time.Sleep(time.Second)
 				continue
-			} else {
-				return err
 			}
+			return err
 		}
 		return nil
 	}

@@ -10,6 +10,7 @@ func New(s rand.Source, d time.Duration) <-chan time.Time {
 	c := make(chan time.Time)
 
 	go func() {
+		// #nosec G404 -- math/rand is used here for non-security timing jitter
 		random := rand.New(s)
 		time.Sleep(time.Duration(float64(d)/2 + float64(d)*random.Float64()))
 		c <- time.Now()
