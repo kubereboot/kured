@@ -3,13 +3,14 @@ package blockers
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"sort"
+	"time"
+
 	papi "github.com/prometheus/client_golang/api"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 	log "github.com/sirupsen/logrus"
-	"regexp"
-	"sort"
-	"time"
 )
 
 // Compile-time checks to ensure the type implements the interface
@@ -31,6 +32,8 @@ type PrometheusBlockingChecker struct {
 	promClient papi.Client
 }
 
+// NewPrometheusBlockingChecker creates a new PrometheusBlockingChecker using the given
+// Prometheus API config, alert filter, and filtering options.
 func NewPrometheusBlockingChecker(config papi.Config, alertFilter *regexp.Regexp, firingOnly bool, filterMatchOnly bool) PrometheusBlockingChecker {
 	promClient, _ := papi.NewClient(config)
 

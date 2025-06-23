@@ -3,11 +3,12 @@ package checkers
 import (
 	"bytes"
 	"fmt"
-	"github.com/google/shlex"
-	log "github.com/sirupsen/logrus"
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/google/shlex"
+	log "github.com/sirupsen/logrus"
 )
 
 // Checker is the standard interface to use to check
@@ -59,6 +60,7 @@ type CommandChecker struct {
 func (rc CommandChecker) RebootRequired() bool {
 	bufStdout := new(bytes.Buffer)
 	bufStderr := new(bytes.Buffer)
+	// #nosec G204 -- CheckCommand is controlled and validated internally
 	cmd := exec.Command(rc.CheckCommand[0], rc.CheckCommand[1:]...)
 	cmd.Stdout = bufStdout
 	cmd.Stderr = bufStderr
