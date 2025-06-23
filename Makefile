@@ -19,7 +19,7 @@ bootstrap-tools: $(HACKDIR)
 	command -v  $(HACKDIR)/cosign || curl -sSfL https://github.com/sigstore/cosign/releases/download/v2.2.3/cosign-linux-amd64 -o $(HACKDIR)/cosign
 	command -v  $(HACKDIR)/shellcheck || (curl -sSfL https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.x86_64.tar.xz | tar -J -v -x shellcheck-stable/shellcheck && mv shellcheck-stable/shellcheck $(HACKDIR)/shellcheck && rmdir shellcheck-stable)
 	chmod +x $(HACKDIR)/goreleaser $(HACKDIR)/cosign $(HACKDIR)/syft $(HACKDIR)/shellcheck
-	command -v staticcheck || go install honnef.co/go/tools/cmd/staticcheck@latest
+	command -v  $(HACKDIR)/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(HACKDIR) v2.1.6
 
 clean:
 	rm -rf ./dist
@@ -66,16 +66,12 @@ manifest:
 	sed -i "s#image: ghcr.io/.*kured.*#image: ghcr.io/$(DH_ORG)/kured:$(VERSION)#g" kured-ds-signal.yaml
 	echo "Please generate combined manifest if necessary"
 
-test: bootstrap-tools
+test: lint
 	echo "Running short go tests"
 	go test -test.short -json ./... > test.json
+
+lint: bootstrap-tools
 	echo "Running shellcheck"
 	find . -name '*.sh' | xargs -n1 $(HACKDIR)/shellcheck
-	staticcheck ./...
-lint:
-	@echo "Ensuring golangci-lint is installed..."
-	@if ! command -v $(HACKDIR)/golangci-lint > /dev/null; then \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(HACKDIR) v2.1.6; \
-	fi
 	@echo "Running golangci-lint..."
 	$(HACKDIR)/golangci-lint run ./...

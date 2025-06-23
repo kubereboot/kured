@@ -3,6 +3,7 @@ package blockers
 import (
 	"context"
 	"fmt"
+
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -23,6 +24,8 @@ type KubernetesBlockingChecker struct {
 	filter []string
 }
 
+// NewKubernetesBlockingChecker creates a new KubernetesBlockingChecker using the provided Kubernetes client,
+// node name, and pod selectors.
 func NewKubernetesBlockingChecker(client *kubernetes.Clientset, nodename string, podSelectors []string) *KubernetesBlockingChecker {
 	return &KubernetesBlockingChecker{
 		client:   client,

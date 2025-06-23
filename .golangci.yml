@@ -26,6 +26,9 @@ linters-settings:
       - name: indent-error-flow
       - name: var-naming
       - name: import-shadowing
+      # https://github.com/mgechev/revive/blob/HEAD/RULES_DESCRIPTIONS.md#package-comments
+      - name: package-comments # This is not working!
+        disabled: true
 output:
   format: colored-line-number
   print-issued-lines: true
