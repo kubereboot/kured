@@ -286,7 +286,7 @@ func main() {
 	go maintainRebootRequiredMetric(nodeID, rebootChecker)
 
 	http.Handle("/metrics", promhttp.Handler())
-	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", metricsHost, metricsPort), nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", metricsHost, metricsPort), nil)) // #nosec G114
 }
 
 func validateNodeLabels(preRebootNodeLabels []string, postRebootNodeLabels []string) error {
@@ -320,11 +320,11 @@ func validateNotificationURL(notifyURL string, slackHookURL string) string {
 			log.Errorf("slack-hook-url is not properly formatted... no notification will be sent: %v\n", err)
 			return ""
 		}
-		if len(strings.Split(strings.Replace(parsedURL.Path, "/services/", "", -1), "/")) != 3 {
+		if len(strings.Split(strings.ReplaceAll(parsedURL.Path, "/services/", ""), "/")) != 3 {
 			log.Errorf("slack-hook-url is not properly formatted... no notification will be sent: unexpected number of / in URL\n")
 			return ""
 		}
-		return fmt.Sprintf("slack://%s", strings.Replace(parsedURL.Path, "/services/", "", -1))
+		return fmt.Sprintf("slack://%s", strings.ReplaceAll(parsedURL.Path, "/services/", ""))
 	}
 	return ""
 }
@@ -368,14 +368,22 @@ func LoadFromEnv() {
 			case "duration":
 				// Set duration from the environment variable (e.g., "1h30m")
 				if _, err := time.ParseDuration(envValue); err == nil {
-					flag.Set(f.Name, envValue)
+					err = flag.Set(f.Name, envValue)
+					if err != nil {
+						fmt.Printf("cannot set flag %s from env{%s}: %s\n", f.Name, envVarName, envValue)
+						os.Exit(1)
+					}
 				} else {
 					fmt.Printf("Invalid duration for %s: %s\n", envVarName, envValue)
 					os.Exit(1)
 				}
 			case "regexp":
 				// For regexp, set it from the environment variable
-				flag.Set(f.Name, envValue)
+				err := flag.Set(f.Name, envValue)
+				if err != nil {
+					fmt.Printf("cannot set flag %s from env{%s}: %s\n", f.Name, envVarName, envValue)
+					os.Exit(1)
+				}
 			case "stringSlice":
 				// For stringSlice, split the environment variable by commas and set it
 				err := flag.Set(f.Name, envValue)
@@ -574,11 +582,11 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 				if err != nil {
 					log.Errorf("Unable to uncordon %s: %v, will continue to hold lock and retry uncordon", node.GetName(), err)
 					continue
-				} else {
-					if notifyURL != "" {
-						if err := shoutrrr.Send(notifyURL, fmt.Sprintf(messageTemplateUncordon, nodeID)); err != nil {
-							log.Warnf("Error notifying: %v", err)
-						}
+				}
+
+				if notifyURL != "" {
+					if err := shoutrrr.Send(notifyURL, fmt.Sprintf(messageTemplateUncordon, nodeID)); err != nil {
+						log.Warnf("Error notifying: %v", err)
 					}
 				}
 			}
@@ -601,8 +609,6 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 				log.Errorf("Error releasing lock, will retry: %v", err)
 				continue
 			}
-			break
-		} else {
 			break
 		}
 	}
@@ -686,7 +692,10 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 					log.Errorf("Error releasing lock: %v", err)
 				}
 				log.Infof("Performing a best-effort uncordon after failed cordon and drain")
-				uncordon(client, node)
+				err := uncordon(client, node)
+				if err != nil {
+					log.Errorf("Failed to uncordon %s: %v", node.GetName(), err)
+				}
 				continue
 			}
 		}

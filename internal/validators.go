@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+
 	"github.com/kubereboot/kured/pkg/checkers"
 	"github.com/kubereboot/kured/pkg/reboot"
 	log "github.com/sirupsen/logrus"
@@ -10,11 +11,11 @@ import (
 // NewRebooter validates the rebootMethod, rebootCommand, and rebootSignal input,
 // then chains to the right constructor.
 func NewRebooter(rebootMethod string, rebootCommand string, rebootSignal int) (reboot.Rebooter, error) {
-	switch {
-	case rebootMethod == "command":
+	switch rebootMethod {
+	case "command":
 		log.Infof("Reboot command: %s", rebootCommand)
 		return reboot.NewCommandRebooter(rebootCommand)
-	case rebootMethod == "signal":
+	case "signal":
 		log.Infof("Reboot signal: %d", rebootSignal)
 		return reboot.NewSignalRebooter(rebootSignal)
 	default:
