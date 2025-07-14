@@ -133,7 +133,7 @@ jobs:
         uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
           install_only: true
-          version: v0.27.0
+          version: v0.29.0
       - name: Run specific e2e tests
         run: make e2e-test ARGS="-run ^${{ matrix.testname }}/${{ matrix.kubernetes_version }}"
 
@@ -173,7 +173,7 @@ jobs:
         uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
           install_only: true
-          version: v0.27.0
+          version: v0.29.0
           # Keep this until v1.31 (or superior) becomes the default kubectl version for the kind-action.
           # It is used in podblocker shell script test to use --all-pods.
           # If the podblocker e2e test relies on another way, this can also be removed.
