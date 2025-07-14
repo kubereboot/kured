@@ -1,6 +1,6 @@
 module github.com/kubereboot/kured
 
-go 1.23.0
+go 1.23.1
 
 require (
 	github.com/containrrr/shoutrrr v0.8.0
