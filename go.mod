@@ -1,6 +1,6 @@
 module github.com/kubereboot/kured
 
-go 1.22.12
+go 1.23.0
 
 require (
 	github.com/containrrr/shoutrrr v0.8.0
@@ -69,7 +69,7 @@ require (
 	github.com/xlab/treeprint v1.2.0 // indirect
 	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
 	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/oauth2 v0.24.0 // indirect
+	golang.org/x/oauth2 v0.27.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/term v0.27.0 // indirect
