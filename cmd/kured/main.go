@@ -43,6 +43,7 @@ var (
 	forceReboot                     bool
 	drainDelay                      time.Duration
 	drainTimeout                    time.Duration
+	globalDrainTimeout              time.Duration
 	rebootDelay                     time.Duration
 	rebootMethod                    string
 	period                          time.Duration
@@ -129,6 +130,8 @@ func main() {
 	flag.DurationVar(&drainDelay, "drain-delay", 0,
 		"delay drain for this duration (default: 0, disabled)")
 	flag.DurationVar(&drainTimeout, "drain-timeout", 0,
+		"timeout after which an individual drain is aborted if global-drain-timeout is not set this is the full timeout (default: 0, infinite time)")
+	flag.DurationVar(&globalDrainTimeout, "global-drain-timeout", 0,
 		"timeout after which the drain is aborted (default: 0, infinite time)")
 	flag.DurationVar(&rebootDelay, "reboot-delay", 0,
 		"delay reboot for this duration (default: 0, disabled)")
@@ -214,6 +217,9 @@ func main() {
 		log.Fatal("KURED_NODE_ID environment variable required")
 	}
 	log.Infof("Node ID: %s", nodeID)
+	if globalDrainTimeout > 0 && drainTimeout == 0 {
+		log.Fatal("global-drain-timeout is set, but drain-timeout is not set. Please set drain-timeout to a value greater than 0.")
+	}
 
 	notifyURL = validateNotificationURL(notifyURL, slackHookURL)
 
@@ -616,6 +622,7 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 
 	source = rand.NewSource(time.Now().UnixNano())
 	tick = delaytick.New(source, period)
+MAIN:
 	for range tick {
 		if !window.Contains(time.Now()) {
 			// Remove taint outside the reboot time window to allow for normal operation.
@@ -676,18 +683,42 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 				continue
 			}
 		}
-
-		err = drain(client, node)
-		if err != nil {
-			if !forceReboot {
-				log.Errorf("Unable to cordon or drain %s: %v, will release lock and retry cordon and drain before rebooting when lock is next acquired", node.GetName(), err)
-				err = lock.Release()
-				if err != nil {
-					log.Errorf("Error releasing lock: %v", err)
+		if globalDrainTimeout == 0 {
+			err = drain(client, node)
+			if err != nil {
+				if !forceReboot {
+					log.Errorf("Unable to cordon or drain %s: %v, will release lock and retry cordon and drain before rebooting when lock is next acquired", node.GetName(), err)
+					err = lock.Release()
+					if err != nil {
+						log.Errorf("Error releasing lock: %v", err)
+					}
+					log.Infof("Performing a best-effort uncordon after failed cordon and drain")
+					uncordon(client, node)
+					continue
 				}
-				log.Infof("Performing a best-effort uncordon after failed cordon and drain")
-				uncordon(client, node)
-				continue
+			}
+		} else {
+			deadline := time.Now().Add(globalDrainTimeout)
+			for {
+				if time.Now().After(deadline) {
+					log.Errorf("Drain timed out after global timeout (%v) for node %s", globalDrainTimeout, node.GetName())
+					if !forceReboot {
+						err = lock.Release()
+						if err != nil {
+							log.Errorf("Error releasing lock: %v", err)
+						}
+						log.Infof("Performing a best-effort uncordon after failed cordon and drain")
+						uncordon(client, node)
+						time.Sleep(period * 2) // Wait at least two periods before retrying, giving other nodes a chance to drain instead
+						continue MAIN
+					}
+					break
+				}
+				err = drain(client, node)
+				if err == nil {
+					// Drain was successful, break out of the loop
+					break
+				}
 			}
 		}
 
