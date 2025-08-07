@@ -278,13 +278,16 @@ func main() {
 	if blockingPodSelectors != nil {
 		blockCheckers = append(blockCheckers, blockers.NewKubernetesBlockingChecker(client, nodeID, blockingPodSelectors))
 	}
+	if blockingNodeAnnotations != nil {
+		blockCheckers = append(blockCheckers, blockers.NewNodeBlockingChecker(client, nodeID, blockingNodeAnnotations))
+	}
 
 	// These prevent the rebooter to reboot the node, it will still drain the node.
 	// This is useful for cases in which you want to wait for a condition that is only met after draining the node.
 	var inhibitingBlockCheckers []blockers.RebootBlocker
-	if blockingNodeAnnotations != nil {
-		log.Info("Setup rebooter blocker for node annotations")
-		inhibitingBlockCheckers = append(inhibitingBlockCheckers, blockers.NewNodeBlockingChecker(client, nodeID, blockingNodeAnnotations))
+	if inhibitingNodeAnnotations != nil {
+		log.Info("Setup inhibiting blocker for node annotations")
+		inhibitingBlockCheckers = append(inhibitingBlockCheckers, blockers.NewNodeBlockingChecker(client, nodeID, inhibitingNodeAnnotations))
 	}
 	if inhibitingPodSelectors != nil {
 		inhibitingBlockCheckers = append(inhibitingBlockCheckers, blockers.NewKubernetesBlockingChecker(client, nodeID, inhibitingPodSelectors))
