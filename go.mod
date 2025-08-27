@@ -9,7 +9,7 @@ require (
 	github.com/prometheus/common v0.65.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/pflag v1.0.7
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	k8s.io/api v0.32.7
 	k8s.io/apimachinery v0.32.7
 	k8s.io/client-go v0.32.6
