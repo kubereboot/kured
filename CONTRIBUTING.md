@@ -254,31 +254,35 @@ make e2e-test ARGS="-timeout 1200s'
 
 ## Publishing a new kured release
 
-### Prepare Documentation
+### Double check the latest kubernetes patch version
 
-Ensure the [compatibility matrix](https://kured.dev/docs/installation/) is
-updated to the new version you want to release.
+Ensure you have used the latest patch version in tree. 
+Check the documentation "Updating k8s support" if the minor version was not yet applied.
 
 ### Update the manifests with the new version
 
+```sh
+export VERSION=1.20.0
+make DH_ORG="kubereboot" VERSION="${VERSION}" manifest
+```
 Create a commit updating the manifest with future image [like this one](https://github.com/kubereboot/kured/commit/58091f6145771f426b4b9e012a43a9c847af2560).
 
-### Create the new version tag on the repo
+### Create the combined manifest for the new release
 
-Tag the previously created commit with the future release version.
-The Github Actions workflow will push the new image to the registry.
-
-### Create the combined manifest for the new version
-
-Now create the `kured-<new version>-dockerhub.yaml` for e.g. `1.3.0`:
+Now create the `kured-<new version>-combined.yaml` for e.g. `1.20.0`:
 
 ```sh
-VERSION=1.3.0
-MANIFEST="kured-$VERSION-dockerhub.yaml"
-make DH_ORG="kubereboot" VERSION="${VERSION}" manifest
+export VERSION=1.20.0
+export MANIFEST="kured-$VERSION-combined.yaml"
+make DH_ORG="kubereboot" VERSION="${VERSION}" manifest # just to be safe
 cat kured-rbac.yaml > "$MANIFEST"
 cat kured-ds.yaml >> "$MANIFEST"
 ```
+
+### Create the new version tag on the repo (optional, can also be done directly in GH web interface)
+
+Tag the previously created commit with the future release version.
+The Github Actions workflow will push the new image to the registry.
 
 ### Publish new version release artifacts
 
@@ -300,3 +304,12 @@ Before clicking on publishing release, upload the yaml manifest
 (`kured-<new version>-dockerhub.yaml`) file.
 
 Click on publish the release and set as the latest release.
+
+### Prepare Helm chart
+
+Create a commit to [bump the chart and kured version like this one](https://github.com/kubereboot/charts/commit/e0191d91c21db8338be8cbe56f8991a557048110).
+
+### Prepare Documentation
+
+Ensure the [compatibility matrix](https://kured.dev/docs/installation/) is updated to the new version you want to release.
+
