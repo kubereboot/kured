@@ -612,8 +612,8 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 				log.Errorf("Error releasing lock, will retry: %v", err)
 				continue
 			}
-			break
 		}
+		break
 	}
 
 	preferNoScheduleTaint := taints.New(client, nodeID, preferNoScheduleTaintName, v1.TaintEffectPreferNoSchedule)
