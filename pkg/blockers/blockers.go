@@ -1,3 +1,6 @@
+// Package blockers provides interfaces and implementations for determining
+// whether a system should be prevented to reboot.
+// You can use that package if you fork Kured's main loop.
 package blockers
 
 // RebootBlocked checks that a single block Checker

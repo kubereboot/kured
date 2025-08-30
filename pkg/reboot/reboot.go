@@ -1,3 +1,7 @@
+// Package reboot provides mechanisms to trigger node reboots using different
+// methods, like custom commands or signals.
+// Each of those includes constructors and interfaces for handling different reboot
+// strategies, supporting privileged command execution via nsenter for containerized environments.
 package reboot
 
 // Rebooter is the standard interface to use to execute

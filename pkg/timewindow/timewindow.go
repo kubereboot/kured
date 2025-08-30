@@ -1,3 +1,7 @@
+// Package timewindow provides utilities for handling days of the week,
+// including parsing, representing, and manipulating sets of weekdays.
+// It enables flexible specification of time windows for reboot operations
+// in kured, supporting various formats and convenience functions.
 package timewindow
 
 import (

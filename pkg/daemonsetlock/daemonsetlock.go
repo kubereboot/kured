@@ -1,3 +1,7 @@
+// Package daemonsetlock provides mechanisms for leader election and locking
+// using Kubernetes DaemonSets. It enables distributed coordination of operations
+// (such as reboots) by ensuring only one node acts as the leader at any time,
+// leveraging Kubernetes primitives for safe, atomic locking in clusters.
 package daemonsetlock
 
 import (
