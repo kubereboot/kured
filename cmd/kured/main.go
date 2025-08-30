@@ -1,3 +1,6 @@
+// The main controller for kured
+// This package is a reference implementation on how to reboot your nodes based on the different
+// tools present in this project's modules
 package main
 
 import (

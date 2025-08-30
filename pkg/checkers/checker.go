@@ -1,3 +1,9 @@
+// Package checkers provides interfaces and implementations for determining
+// whether a system reboot is required. It includes checkers based on file
+// presence or custom commands, and supports privileged command execution
+// in containerized environments. These checkers are used by kured to
+// detect conditions that should trigger node reboots.
+// You can use that package if you fork Kured's main loop.
 package checkers
 
 import (

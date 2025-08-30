@@ -1,3 +1,6 @@
+// Package taints provides utilities to manage Kubernetes node taints for controlling
+// pod scheduling and execution. It allows setting, removing, and checking taints on nodes,
+// using Kubernetes client-go and JSON patching for atomic updates.
 package taints
 
 import (
