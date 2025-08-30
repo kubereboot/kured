@@ -219,7 +219,7 @@ func main() {
 
 	err := validateNodeLabels(preRebootNodeLabels, postRebootNodeLabels)
 	if err != nil {
-		log.Warnf(err.Error())
+		log.Warn(err.Error())
 	}
 
 	log.Infof("PreferNoSchedule taint: %s", preferNoScheduleTaintName)
