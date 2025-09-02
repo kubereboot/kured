@@ -301,7 +301,7 @@ Please also note down on which releases the upcoming `kured` release was
 tested on or what it supports. (Check old release notes if you're unsure.)
 
 Before clicking on publishing release, upload the yaml manifest
-(`kured-<new version>-dockerhub.yaml`) file.
+(`kured-<new version>-combined.yaml`) file.
 
 Click on publish the release and set as the latest release.
 
