@@ -41,53 +41,72 @@ All Kured repositories are kept under <https://github.com/kubereboot>. To find t
 | <https://github.com/kubereboot/charts>  | Helm chart                |
 | <https://github.com/kubereboot/website> | website and documentation |
 
-### Kured code
+We use github actions in all our repositories.
 
-- Kured's main code can be found in the [`cmd`](cmd) and [`pkg`](pkg) directories
-- Its e2e tests are in the [`tests`](tests) directory
-- We use [GoReleaser to build](.goreleaser.yml).
-- Every PR and tagged release is tested by [Kind in GitHub workflows](.github/workflows).
+### Charts repo structure highlights
 
-As a project, we try to follow all the official and obvious standards.
+- we use github actions to do the chart testing. Only linting/installation happens, no e2e test is done.
+- charts/kured is the place to contribute changes to the chart. Please bump Chart.yaml at each change according to semver.
 
-## Regular development activities
+### Kured repo structure highlights
+
+Kured's main code can be found in the [`cmd`](cmd) and [`pkg`](pkg) directories
+
+Keep in mind we always want to guarantee that `kured` works for the previous, current, and next
+minor version of kubernetes according to `client-go` and `kubectl` dependencies in use.
+
+Our e2e tests are in the [`tests`](tests) directory. These are deep tests using our manifests with different params, on all supported k8s versions of a release.
+They are expensive but allow us to catch many issues quickly. If you want to ensure your scenario works, add an e2e test for it! Those e2e tests are encouraged by the maintainer team (See below).
+
+We also have other tests:
+
+- golangci-lint , shellcheck
+- a security check against our base image (alpine)
+
+All these test run on every PR/tagged release. See .github/workflows for more details.
+
+We use [GoReleaser to build](.goreleaser.yml).
+
+## Regular development activities / maintenance
 
 ### Prepare environment
 
-Please run `make bootstrap-tools` once on a fresh repository clone to download several needed tools, e.g. GoReleaser.
+Please run `make bootstrap-tools` on a fresh repository clone to download several needed tools, e.g. GoReleaser.
 
 ### Updating k8s support
 
-Whenever we want to update e.g. the `kubectl` or `client-go` dependencies,
-some RBAC changes might be necessary too.
+At each new major release of kubernetes, we update our dependencies.
 
-This is what it took to support Kubernetes 1.14:
-<https://github.com/kubereboot/kured/pull/75>
+Beware that whenever we want to update e.g. the `kubectl` or `client-go` dependencies, some other impactful changes might be necessary too.
+(RBAC, drain behaviour changes, ...)
 
-That the process can be more involved based on kubernetes changes.
-For example, k8s 1.10 changes to apps triggered the following commits:
+As examples, this is what it took to support:
 
-b3f9ddf: Bump client-go for optimum k8s 1.10 compatibility
-bc3f28d: Move deployment manifest to apps/v1
-908998a: Update RBAC permissions for kubectl v1.10.3
-efbb0c3: Document version compatibility in release notes
-5731b98: Add warning to Dockerfile re: upgrading kubectl
+- Kubernetes 1.10 <https://github.com/kubereboot/kured/commit/b3f9ddf> + <https://github.com/kubereboot/kured/commit/bc3f28d> + <https://github.com/kubereboot/kured/commit/908998a> + <https://github.com/kubereboot/kured/commit/efbb0c3> + <https://github.com/kubereboot/kured/commit/5731b98>
+- Kubernetes 1.14 <https://github.com/kubereboot/kured/pull/75>
+- Kubernetes 1.34 <https://github.com/kubereboot/kured/commit/6ab853dd711ee264663184976ae492a20b657b0a>
 
 Search the git log for inspiration for your cases.
 
-Please update our `.github/workflows` with the new k8s images.
+In general the following activities have to happen:
 
-For that, run the following:
+- Bump kind and its images (see below)
+- go get k8s.io/kubectl@v0.{version}
 
-`cp .github/kind-cluster-current.yaml .github/kind-cluster-previous.yaml`
-`cp .github/kind-cluster-next.yaml .github/kind-cluster-current.yaml`
+### bump kind images support
 
-Then edit `.github/kind-cluster-next.yaml` to point to the new version.
+Go to `.github/workflows` and update the new k8s images. For that:
+
+- `cp .github/kind-cluster-current.yaml .github/kind-cluster-previous.yaml`
+- `cp .github/kind-cluster-next.yaml .github/kind-cluster-current.yaml`
+- Then edit `.github/kind-cluster-next.yaml` to point to the new version.
 
 This will make the full test matrix updated (the CI and the test code).
 
 Once your code passes all tests, update the support matrix in
 the [installation docs](https://kured.dev/docs/installation/).
+
+Beware that sometimes you also need to update kind version. grep in the .github/workflows for the kind version.
 
 ### Updating other dependencies
 
@@ -106,58 +125,10 @@ If a failure happen in periodics, something terribly wrong must have happened
 (or GitHub is failing at the creation of a kind cluster). Please monitor those
 failures carefully.
 
-### Introducing new features
+## Testing kured
 
-When you introduce a new feature, the kured team expects you to have tested
-your change thoroughly. If possible, include all the necessary testing in your change.
-
-If your change involves a user facing change (change in flags of kured for example),
-please include expose your new feature in our default manifest (`kured-ds.yaml`),
-as a comment.
-
-Our release manifests and helm charts are our stable interfaces.
-Any user facing changes will therefore have to wait for a release before being
-exposed to our users.
-
-This also means that when you expose a new feature, you should create another PR
-for your changes in <https://github.com/kubereboot/charts> to make your feature
-available at the next kured version for helm users.
-
-In the charts PR, you can directly bump the `appVersion` to the next minor version
-(you are introducing a new feature, which requires a bump of the minor number.
-For example, if current `appVersion` is `1.6.x`, make sure you update your `appVersion`
-to `1.7.0`). It allows us to have an easy view of what we land each release.
-
-Do not hesitate to increase the test coverage for your feature, whether it's unit
-testing to full functional testing (even using helm charts).
-
-### Increasing test coverage
-
-We are welcoming any change to increase our test coverage.
-See also our GitHub issues for the label
-[`testing`](https://github.com/kubereboot/kured/labels/testing).
-
-## Automated testing
-
-Our CI is covered by GitHub actions.
-You can see their contents in `.github/workflows`.
-
-We currently run:
-
-- go tests and golangci-lint
-- `shellcheck`
-- a check for dead links in our docs
-- a security check against our base image (alpine)
-- a deep functional test using our manifests on all supported k8s versions
-
-To test your code manually, follow the section Manual testing.
-
-## Manual (release) testing
-
-### Quick Golang code testing
-
-Please run `make test` to run only the basic tests. It gives a good
-idea of the code behaviour.
+If you have developped anything (or just want to take kured for a spin!), run the following tests.
+As they will run in CI, we will quickly catch if you did not test before submitting your PR.
 
 ### Linting
 
@@ -168,24 +139,30 @@ To run lint checks locally:
 ```bash
 make lint
 ```
-### Manual functional testing
 
-Before `kured` is released, we want to make sure it still works fine on the
-previous, current and next minor version of Kubernetes (with respect to the
-`client-go` & `kubectl` dependencies in use). For local testing e.g.
-`minikube` or `kind` can be sufficient. This will allow you to catch issues
-that might not have been tested in our CI, like integration with other tools,
-or your specific use case.
+### Quick Golang code testing
 
-Deploy kured in your test scenario, make sure you pass the right `image`,
-update the e.g. `period` and `reboot-days` options, so you get immediate
-results, if you login to a node and run:
+Please run `make test` to run only the basic tests. It gives a good
+idea of the code behaviour.
+
+### Functional testing 
+
+For functional testing, the maintainer team is using `minikube` or `kind` (explained below), but also encourages you to test kured on your own cluster(s).
+
+#### Testing on your own cluster
+
+This will allow the community to catch issues that might not have been tested in our CI, like integration with other tools, or your specific use case.
+
+To test kured on your own cluster, make sure you pass the right `image`, update the `period` and `reboot-days` (so you get immediate results), and update any other flags for your cases.
+Then login to a node and run:
 
 ```console
 sudo touch /var/run/reboot-required
 ```
 
-### Example of functional testing with `minikube`
+Then tell us about everything that went well or went wrong in slack.
+
+#### Testing with `minikube`
 
 A test-run with `minikube` could look like this:
 
@@ -217,7 +194,7 @@ Unfortunately as of today, you are going to run into
 minikube won't come back easily. You will need to start minikube again.
 Then you can check for the lock release.
 
-### Example of testing with `kind`
+#### Testing with `kind` "The hard way"
 
 A test-run with `kind` could look like this:
 
@@ -233,9 +210,9 @@ kind create cluster --config .github/kind-cluster-<k8s-version>.yaml
 
 ```
 
-### Example of testing with `kind` and `make`
+### Testing with `kind` "The easy way"
 
-A test-run with `kind` and `make` can be done with the following command:
+You can automate the test with `kind` by using the same code as the CI.
 
 ```cli
 # Build kured:dev image, build manifests, and run the "long" go tests
@@ -251,6 +228,43 @@ make e2e-test ARGS="-run ^TestE2EWithSignal/current"
 # Run all tests but make sure to extend the timeout, for slower machines.
 make e2e-test ARGS="-timeout 1200s'
 ```
+
+## Introducing new features
+
+When you introduce a new feature, the kured team expects you to have tested (see above!)
+your change thoroughly. If possible, include all the necessary testing in your change.
+
+If your change involves a user facing change (change in flags of kured for example),
+please include expose your new feature in our default manifest (`kured-ds.yaml`),
+as a comment.
+
+Our release manifests and helm charts are our stable interfaces.
+Any user facing changes will therefore have to wait for a release before being
+exposed to our users.
+
+This also means that when you expose a new feature, you should create another PR
+for your changes in <https://github.com/kubereboot/charts> to make your feature
+available at the next kured version for helm users.
+
+In the charts PR, you can directly bump the `appVersion` to the next minor version
+(you are introducing a new feature, which requires a bump of the minor number.
+For example, if current `appVersion` is `1.6.x`, make sure you update your `appVersion`
+to `1.7.0`). It allows us to have an easy view of what we land each release.
+
+Do not hesitate to increase the test coverage for your feature, whether it's unit
+testing to full functional testing (even using helm charts).
+
+The team of kured is small, so we will most likely refuse any feature adding maintenance burden.
+
+## Introducing changes in the helm chart
+
+When you change the helm chart, do not forget to bump its version according to semver.
+Changes to defaults are frowned upon unless absolutely necessary.
+
+## Introducing new tests / increase test coverage
+
+At the opposite of features, we welcome ALL features increasing our stability and test coverage.
+See also our GitHub issues with the label [`testing`](https://github.com/kubereboot/kured/labels/testing).
 
 ## Publishing a new kured release
 
