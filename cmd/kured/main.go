@@ -82,11 +82,12 @@ var (
 	nodeID                          string
 	concurrency                     int
 
-	rebootDays    []string
-	rebootStart   string
-	rebootEnd     string
-	timezone      string
-	annotateNodes bool
+	rebootDays    		[]string
+	rebootDayOfMonth 	int
+	rebootStart   		string
+	rebootEnd     		string
+	timezone      		string
+	annotateNodes 		bool
 
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -187,6 +188,8 @@ func main() {
 		"label selector identifying pods whose presence should prevent reboots")
 	flag.StringSliceVar(&rebootDays, "reboot-days", timewindow.EveryDay,
 		"schedule reboot on these days")
+	flag.IntVar(&rebootDayOfMonth, "reboot-day-of-month", 0,
+		"Day of the month (1–31) to reboot. 0 disables this feature.")
 	flag.StringVar(&rebootStart, "start-time", "0:00",
 		"schedule reboot only after this time of day")
 	flag.StringVar(&rebootEnd, "end-time", "23:59:59",
@@ -626,11 +629,17 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 	source = rand.NewSource(time.Now().UnixNano())
 	tick = delaytick.New(source, period)
 	for range tick {
-		if !window.Contains(time.Now()) {
-			// Remove taint outside the reboot time window to allow for normal operation.
-			preferNoScheduleTaint.Disable()
-			continue
-		}
+			if !window.Contains(time.Now()) {
+				// Remove taint outside the reboot time window to allow for normal operation.
+				preferNoScheduleTaint.Disable()
+				continue
+			}
+
+			// Only allow reboot on the specified day of the month if set
+			if rebootDayOfMonth != 0 && time.Now().Day() != rebootDayOfMonth {
+				log.Infof("Today is not the specified reboot day (%d); skipping reboot", rebootDayOfMonth)
+				continue
+			}
 
 		if !checker.RebootRequired() {
 			log.Infof("Reboot not required")
