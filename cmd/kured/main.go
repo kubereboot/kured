@@ -629,17 +629,17 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 	source = rand.NewSource(time.Now().UnixNano())
 	tick = delaytick.New(source, period)
 	for range tick {
-			if !window.Contains(time.Now()) {
-				// Remove taint outside the reboot time window to allow for normal operation.
-				preferNoScheduleTaint.Disable()
-				continue
-			}
+		if !window.Contains(time.Now()) {
+			// Remove taint outside the reboot time window to allow for normal operation.
+			preferNoScheduleTaint.Disable()
+			continue
+		}
 
-			// Only allow reboot on the specified day of the month if set
-			if rebootDayOfMonth != 0 && time.Now().Day() != rebootDayOfMonth {
-				log.Infof("Today is not the specified reboot day (%d); skipping reboot", rebootDayOfMonth)
-				continue
-			}
+		// Only allow reboot on the specified day of the month if set
+		if rebootDayOfMonth != 0 && time.Now().Day() != rebootDayOfMonth {
+			log.Infof("Today is not the specified reboot day (%d); skipping reboot", rebootDayOfMonth)
+			continue
+		}
 
 		if !checker.RebootRequired() {
 			log.Infof("Reboot not required")
