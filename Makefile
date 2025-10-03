@@ -6,6 +6,8 @@ GORELEASER_CMD=$(HACKDIR)/goreleaser
 DH_ORG ?= kubereboot
 VERSION=$(shell git rev-parse --short HEAD)
 SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
+ARCH=$(shell uname -m)
+ARCH_COSIGN=$(shell uname -m | sed -e 's/aarch64/arm64/g' -e 's/x86_64/amd64/g')
 
 all: image
 
@@ -16,8 +18,8 @@ $(HACKDIR):
 bootstrap-tools: $(HACKDIR)
 	command -v $(HACKDIR)/goreleaser || VERSION=v1.24.0 TMPDIR=$(HACKDIR) bash hack/installers/goreleaser-install.sh
 	command -v  $(HACKDIR)/syft || curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b $(HACKDIR) v1.0.1
-	command -v  $(HACKDIR)/cosign || curl -sSfL https://github.com/sigstore/cosign/releases/download/v2.2.3/cosign-linux-amd64 -o $(HACKDIR)/cosign
-	command -v  $(HACKDIR)/shellcheck || (curl -sSfL https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.x86_64.tar.xz | tar -J -v -x shellcheck-stable/shellcheck && mv shellcheck-stable/shellcheck $(HACKDIR)/shellcheck && rmdir shellcheck-stable)
+	command -v  $(HACKDIR)/cosign || curl -sSfL https://github.com/sigstore/cosign/releases/download/v2.2.3/cosign-linux-$(ARCH_COSIGN) -o $(HACKDIR)/cosign
+	command -v  $(HACKDIR)/shellcheck || (curl -sSfL https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.$(ARCH).tar.xz | tar -J -v -x shellcheck-stable/shellcheck && mv shellcheck-stable/shellcheck $(HACKDIR)/shellcheck && rmdir shellcheck-stable)
 	chmod +x $(HACKDIR)/goreleaser $(HACKDIR)/cosign $(HACKDIR)/syft $(HACKDIR)/shellcheck
 	command -v  $(HACKDIR)/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(HACKDIR) v2.1.6
 
