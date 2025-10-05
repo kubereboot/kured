@@ -13,7 +13,35 @@ particular makes sense if you are planning to contribute code.
 [issues]: https://github.com/kubereboot/kured/issues
 [documentation]: https://kured.dev/docs
 
-## Certificate of Origin
+## Prepare your environment
+
+### Your IDE
+
+![JetBrains logo](https://resources.jetbrains.com/storage/products/company/brand/logos/jetbrains.png)
+
+The core team has access to Goland from [JetBrains][JetBrains], thanks to their sponsorship. Huge thanks to them.
+
+You can use the IDE you prefer. Don't include anything from your IDE in the .gitignore. Please do so in your global .gitignore.
+
+[JetBrains]: https://www.jetbrains.com/
+
+### Basic binaries required
+
+Your system needs at the least the following binaries installed:
+
+- make
+- sed
+- find
+- bash (command, echo)
+- docker (for docker buildx)
+- kind
+- go (see version in go.mod)
+
+### Fetch the additional binaries required
+
+Please run `make bootstrap-tools` once on a fresh repository clone to download several needed tools, e.g. GoReleaser.
+
+### Configure your git for the "Certificate of Origin"
 
 By contributing to this project you agree to the Developer Certificate of
 Origin (DCO). This document was created by the Linux Kernel community and is a
@@ -31,7 +59,7 @@ The signature must contain your real name
 If your `user.name` and `user.email` are configured in your Git config,
 you can sign your commit automatically with `git commit -s`.
 
-## Kured Repositories
+## Get to know Kured repositories
 
 All Kured repositories are kept under <https://github.com/kubereboot>. To find the code and work on the individual pieces that make Kured, here is our overview:
 
@@ -69,10 +97,6 @@ We use [GoReleaser to build](.goreleaser.yml).
 
 ## Regular development activities / maintenance
 
-### Prepare environment
-
-Please run `make bootstrap-tools` on a fresh repository clone to download several needed tools, e.g. GoReleaser.
-
 ### Updating k8s support
 
 At each new major release of kubernetes, we update our dependencies.
@@ -91,7 +115,7 @@ Search the git log for inspiration for your cases.
 In general the following activities have to happen:
 
 - Bump kind and its images (see below)
-- go get k8s.io/kubectl@v0.{version}
+- `go get k8s.io/kubectl@v0.{version}`
 
 ### bump kind images support
 
@@ -115,6 +139,9 @@ Some of those changes are covered by CI testing, some are not.
 
 Please make sure to test those not covered by CI (mostly the integration
 with other tools) manually before merging.
+
+In all cases, review dependabot changes: Imagine all changes as a possible supply chain
+attack vector. You then need to review the proposed changes by dependabot, and evaluate the trust/risks.
 
 ### Review periodic jobs
 
