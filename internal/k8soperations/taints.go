@@ -1,6 +1,5 @@
-// Package taints provides utilities to manage Kubernetes node taints for controlling
-// pod scheduling and execution. It allows setting, removing, and checking taints on nodes,
-// using Kubernetes client-go and JSON patching for atomic updates.
+// Package k8soperations provides utilities to manage Kubernetes node taints for controlling
+// pod scheduling and execution, drains, and other practical k8s calls.
 package k8soperations
 
 import (
@@ -16,7 +15,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// Taint allows to set soft and hard limitations for scheduling and executing pods on nodes.
+// Taint allows setting soft and hard limitations for scheduling and executing pods on nodes.
 type Taint struct {
 	client    *kubernetes.Clientset
 	nodeID    string

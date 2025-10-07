@@ -1,28 +1,37 @@
+// Package notifications provide generic notification tools
+// The intent was to separate the business logic in kured's main.go from the notification's internal implementation using shoutrrr
 package notifications
 
 import (
 	"errors"
+	"log/slog"
+	"strings"
+
 	"github.com/containrrr/shoutrrr"
 	"github.com/containrrr/shoutrrr/pkg/router"
 	"github.com/containrrr/shoutrrr/pkg/types"
-	"log/slog"
-	"strings"
 )
 
+// Notifier is the simplest interface possible for sending notifications
 type Notifier interface {
 	Send(string, string) error
 }
 
+// NoopNotifier is a default implementation of Notifier
 type NoopNotifier struct{}
 
+// Send does nothing. It does not even log.
+// This should probably be replaced by a logger as the default notifier implementation.
 func (nn *NoopNotifier) Send(_ string, _ string) error {
 	return nil
 }
 
+// ShoutrrrNotifier is a shoutrrr implementation of Notifier
 type ShoutrrrNotifier struct {
 	serviceRouter *router.ServiceRouter
 }
 
+// Send sends a notification using shoutrrr but returns errors in bulk
 func (sn *ShoutrrrNotifier) Send(message string, title string) error {
 	params := &types.Params{}
 	params.SetTitle(title)
@@ -37,6 +46,7 @@ func (sn *ShoutrrrNotifier) Send(message string, title string) error {
 	return nil
 }
 
+// NewNotifier creates a new Notifier instance based on kured shoutrrr URL format
 func NewNotifier(URLs ...string) Notifier {
 	if URLs == nil {
 		return &NoopNotifier{}

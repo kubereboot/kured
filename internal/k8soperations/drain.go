@@ -3,13 +3,14 @@ package k8soperations
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"strconv"
+	"time"
+
 	"github.com/kubereboot/kured/internal/notifications"
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	kubeDrain "k8s.io/kubectl/pkg/drain"
-	"log/slog"
-	"strconv"
-	"time"
 )
 
 // Drain drains the node in a kured fashion, respecting delays, notifications, and applying labels/annotations.
@@ -30,7 +31,9 @@ func Drain(client *kubernetes.Clientset, node *v1.Node, preRebootNodeLabels []st
 
 	slog.Info("Starting drain", "node", nodeName)
 
-	notifier.Send(fmt.Sprintf(messageTemplateDrain, nodeName), "Starting drain")
+	if err := notifier.Send(fmt.Sprintf(messageTemplateDrain, nodeName), "Starting drain"); err != nil {
+		slog.Debug("Error sending notification at the drain start", "error", err)
+	}
 
 	kubectlStdOutLogger := &slogWriter{message: "draining: results", stream: "stdout"}
 	kubectlStdErrLogger := &slogWriter{message: "draining: results", stream: "stderr"}
@@ -119,6 +122,8 @@ func Uncordon(client *kubernetes.Clientset, node *v1.Node, notifier notification
 	if err != nil {
 		return fmt.Errorf("error removing the WasUnschedulable annotation, keeping the node stuck in current state forever %v", err)
 	}
-	notifier.Send(fmt.Sprintf(messageTemplateUncordon, nodeName), "Node uncordonned successfully")
+	if err := notifier.Send(fmt.Sprintf(messageTemplateUncordon, nodeName), "Node uncordonned successfully"); err != nil {
+		slog.Debug("Error sending notification at the uncordon end", "error", err)
+	}
 	return nil
 }

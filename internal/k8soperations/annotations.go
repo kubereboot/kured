@@ -4,18 +4,28 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"strings"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	"log/slog"
-	"strings"
 )
 
 const (
+	// KuredNodeWasUnschedulableBeforeDrainAnnotation contains is the key where kured stores whether the node was unschedulable before the maintenance.
 	KuredNodeWasUnschedulableBeforeDrainAnnotation string = "kured.dev/node-unschedulable-before-drain"
 )
 
+// AddNodeAnnotations adds or updates annotations on a Kubernetes node.
+// Parameters:
+//   - client: Kubernetes client set for API operations
+//   - nodeID: identifier of the target node
+//   - annotations: map of key-value pairs to be added as annotations
+//
+// Returns an error if the operation fails, nil otherwise
+// The intent was a generic annotation system that can be used in multiple places.
 func AddNodeAnnotations(client *kubernetes.Clientset, nodeID string, annotations map[string]string) error {
 	node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 	if err != nil {
@@ -42,6 +52,13 @@ func AddNodeAnnotations(client *kubernetes.Clientset, nodeID string, annotations
 	return nil
 }
 
+// DeleteNodeAnnotation deletes an annotation from a Kubernetes node.
+// Parameters:
+//   - client: Kubernetes client set for API operations
+//   - nodeID: identifier of the target node
+//   - key: key of the annotation to be deleted
+//
+// Returns an error if the operation fails, nil otherwise
 func DeleteNodeAnnotation(client *kubernetes.Clientset, nodeID, key string) error {
 	// JSON Patch takes as path input a JSON Pointer, defined in RFC6901
 	// So we replace all instances of "/" with "~1" as per:

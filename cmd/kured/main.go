@@ -6,6 +6,16 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
+	"log/slog"
+	"net/http"
+	"os"
+	"reflect"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/kubereboot/kured/internal/daemonsetlock"
 	"github.com/kubereboot/kured/internal/k8soperations"
 	"github.com/kubereboot/kured/internal/notifications"
@@ -21,15 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"log"
-	"log/slog"
-	"net/http"
-	"os"
-	"reflect"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
 )
 
 var (
@@ -337,7 +338,7 @@ func LoadFromEnv() {
 					os.Exit(1)
 				}
 			default:
-				//String Arrays are not supported from CLI for example
+				// String arrays are not supported from CLI
 				fmt.Printf("Unsupported flag type for %s\n", f.Name)
 			}
 		}
@@ -357,13 +358,13 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 		rebootRequired := checker.RebootRequired()
 		if !rebootRequired {
 			rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
-			// Now cleaning up post reboot
+			// Now cleaning up after a reboot
 
 			// Quickly allow rescheduling.
 			// The node could be still cordonned anyway
 			preferNoScheduleTaint.Disable()
 
-			// Test API server first. If cannot get node, we should not do anything.
+			// Test the API server first. If we cannot get node, we should not do anything.
 			node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 			if err != nil {
 				// Only debug level even though the API is dead: Kured should not worry about transient
@@ -386,7 +387,7 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 				slog.Debug("Error releasing lock, will retry", "node", nodeID, "error", err)
 				continue
 			}
-			// Regardless or not we are holding the lock
+			// Do this regardless or not we are holding the lock
 			// The node should not say it's still in progress if the reboot is done
 			if annotateNodeProgress {
 				if _, ok := node.Annotations[KuredRebootInProgressAnnotation]; ok {
@@ -409,7 +410,7 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 				slog.Debug("reboot required but outside maintenance window", "node", nodeID)
 				continue
 			}
-			// moved up, because we should not put an annotation "Going to be rebooting", if
+			// moved up because we should not put an annotation "Going to be rebooting", if
 			// we know well that this won't reboot. TBD as some ppl might have another opinion.
 
 			if blocked, currentlyBlocking := blockers.RebootBlocked(blockCheckers...); blocked {
@@ -421,15 +422,13 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 				continue
 			}
 
-			// Test API server first. If cannot get node, we should not do anything.
+			// Test the API server first. If we cannot get node, we should not do anything.
 			node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
 			if err != nil {
-				// Not important to worry the admin
+				// Not important enough to worry the admin
 				slog.Debug("error retrieving node object via k8s API, retrying at next tick", "node", nodeID, "error", err)
 				continue
 			}
-			//// nodeMeta contains the node Metadata that should be included in the lock
-			//nodeMeta := daemonsetlock.NodeMeta{Unschedulable: node.Spec.Unschedulable}
 
 			var timeNowString string
 			if annotateNodeProgress {
@@ -447,7 +446,7 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 				}
 			}
 
-			// Prefer to not schedule pods onto this node to avoid draing the same pod multiple times.
+			// Prefer to not schedule pods onto this node to avoid draining the same pod multiple times.
 			preferNoScheduleTaint.Enable()
 
 			holding, err := lock.Acquire()
@@ -486,10 +485,11 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 					if err != nil {
 						slog.Debug(fmt.Sprintf("error in best-effort releasing lock: %v", err), "node", nodeID, "error", err)
 					}
-					// this is important -- if it's not shown, it means that (on normal / non-force reboot case) the drain was
-					// in error, the lock was NOT released.
-					// If shown, it is helping understand the uncordonning. If the admin seems the node as cordonned
-					// with this, it needs to take action (for example if the node was previously cordonned!)
+					// this is important -- if the next info not shown, it means that (in a normal or non-force reboot case)
+					// the drain was in error and the lock was NOT released.
+					// If shown, it is helping understand the "uncordoning".
+					// If the admin seems the node as cordoned even after trying a best-effort uncordon,
+					// the admin needs to take action (especially if the node was previously cordoned before the maintenance!)
 					slog.Info("Performing a best-effort uncordon after failed cordon and drain", "node", nodeID)
 					err := k8soperations.Uncordon(client, node, notifier, postRebootNodeLabels, messageTemplateUncordon)
 					if err != nil {
@@ -498,18 +498,16 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 					continue
 				}
 			}
-			notifier.Send(fmt.Sprintf(messageTemplateReboot, nodeID), "Node Reboot")
-			if err != nil {
-				// If notifications are not sent, lifecycle event of the reboot is still recorded, so it's no
-				// big deal, as long as it can be debugged.
+			if err := notifier.Send(fmt.Sprintf(messageTemplateReboot, nodeID), "Node Reboot"); err != nil {
+				// If the notifications are not sent, the lifecycle event of the reboot will be still recorded through
+				// logging. Logging should not exceed the "debug" level.
 				slog.Debug("Error sending notification for reboot", "node", nodeID, "error", err)
 			}
 
 			// important lifecycle event
 			slog.Info(fmt.Sprintf("Triggering reboot for node %v", nodeID), "node", nodeID)
 
-			rebootError := rebooter.Reboot()
-			if rebootError != nil {
+			if err := rebooter.Reboot(); err != nil {
 				slog.Info("Error rebooting node", "node", nodeID, "error", err)
 				continue
 			}

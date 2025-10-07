@@ -3,9 +3,10 @@ package blockers
 import (
 	"context"
 	"fmt"
+	"log/slog"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"log/slog"
 )
 
 // Compile-time checks to ensure the type implements the interface
@@ -62,6 +63,8 @@ func (kb KubernetesBlockingChecker) IsBlocked() bool {
 	return false
 }
 
+// MetricLabel is used to give a fancier name
+// than the type to the label for rebootBlockedCounter
 func (kb KubernetesBlockingChecker) MetricLabel() string {
 	return "blocker_pod"
 }
