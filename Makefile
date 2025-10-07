@@ -1,40 +1,31 @@
 .DEFAULT: all
 .PHONY: all clean image minikube-publish manifest test kured-all lint 
 
-HACKDIR=./hack/bin
-GORELEASER_CMD=$(HACKDIR)/goreleaser
 DH_ORG ?= kubereboot
 VERSION=$(shell git rev-parse --short HEAD)
 SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
 
 all: image
 
-$(HACKDIR):
-	mkdir -p $(HACKDIR)
-
-.PHONY: bootstrap-tools
-bootstrap-tools: $(HACKDIR)
-	command -v $(HACKDIR)/goreleaser || VERSION=v1.24.0 TMPDIR=$(HACKDIR) bash hack/installers/goreleaser-install.sh
-	command -v  $(HACKDIR)/syft || curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b $(HACKDIR) v1.0.1
-	command -v  $(HACKDIR)/cosign || curl -sSfL https://github.com/sigstore/cosign/releases/download/v2.2.3/cosign-linux-amd64 -o $(HACKDIR)/cosign
-	command -v  $(HACKDIR)/shellcheck || (curl -sSfL https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.x86_64.tar.xz | tar -J -v -x shellcheck-stable/shellcheck && mv shellcheck-stable/shellcheck $(HACKDIR)/shellcheck && rmdir shellcheck-stable)
-	chmod +x $(HACKDIR)/goreleaser $(HACKDIR)/cosign $(HACKDIR)/syft $(HACKDIR)/shellcheck
-	command -v  $(HACKDIR)/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(HACKDIR) v2.1.6
+.PHONY: install-tools
+install-tools:
+	command -v  mise 2>&1 || { echo "please install mise to continue" >&2; exit 127; }
+	mise install
 
 clean:
 	rm -rf ./dist
 
-kured: bootstrap-tools
-	$(GORELEASER_CMD) build --clean --single-target --snapshot
+kured:
+	goreleaser build --clean --single-target --snapshot
 
-kured-all: bootstrap-tools
-	$(GORELEASER_CMD) build --clean --snapshot
+kured-all:
+	goreleaser build --clean --snapshot
 
-kured-release-tag: bootstrap-tools
-	$(GORELEASER_CMD) release --clean
+kured-release-tag:
+	goreleaser release --clean
 
-kured-release-snapshot: bootstrap-tools
-	$(GORELEASER_CMD) release --clean --snapshot
+kured-release-snapshot:
+	goreleaser release --clean --snapshot
 
 image: kured
 	$(SUDO) docker buildx build --no-cache --load -t ghcr.io/$(DH_ORG)/kured:$(VERSION) .
@@ -67,11 +58,15 @@ manifest:
 	echo "Please generate combined manifest if necessary"
 
 test: lint
-	echo "Running short go tests"
+	@echo "Running short go tests"
 	go test -test.short -json ./... > test.json
 
-lint: bootstrap-tools
-	echo "Running shellcheck"
-	find . -name '*.sh' | xargs -n1 $(HACKDIR)/shellcheck
+lint:
+	@echo "Running shellcheck"
+	find . -name '*.sh' | xargs -n1 shellcheck
 	@echo "Running golangci-lint..."
-	$(HACKDIR)/golangci-lint run ./...
+	golangci-lint run ./...
+
+lint-docs:
+	@echo "Running lychee"
+	mise x lychee@latest -- lychee --verbose --no-progress '*.md' '*.yaml' '*/*/*.go' --exclude-link-local

@@ -19,7 +19,7 @@ particular makes sense if you are planning to contribute code.
 
 ![JetBrains logo](https://resources.jetbrains.com/storage/products/company/brand/logos/jetbrains.png)
 
-The core team has access to Goland from [JetBrains][JetBrains], thanks to their sponsorship. Huge thanks to them.
+The core team has access to Goland from [JetBrains][JetBrains]. Huge thanks to them for their sponsorship!
 
 You can use the IDE you prefer. Don't include anything from your IDE in the .gitignore. Please do so in your global .gitignore.
 
@@ -27,23 +27,24 @@ You can use the IDE you prefer. Don't include anything from your IDE in the .git
 
 ### Basic binaries required
 
-Your system needs at the least the following binaries installed:
+Your system needs at least the following binaries installed:
 
 - make
 - sed
 - find
 - bash (command, echo)
 - docker (for docker buildx)
-- kind
-- go (see version in go.mod)
+- go (see the required version in go.mod)
+- mise (to manage developer tools. See [mise installation instructions](https://mise.jdx.dev/installing-mise.html).)
 
 ### Fetch the additional binaries required
 
-Please run `make bootstrap-tools` once on a fresh repository clone to download several needed tools, e.g. GoReleaser.
+Please run `make install-tools` once on a fresh repository clone to download necessary developer tools.
+Installed tools are listed in [.mise directory](.mise/config.toml).
 
 ### Configure your git for the "Certificate of Origin"
 
-By contributing to this project you agree to the Developer Certificate of
+By contributing to this project, you agree to the Developer Certificate of
 Origin (DCO). This document was created by the Linux Kernel community and is a
 simple statement that you, as a contributor, have the legal right to make the
 contribution.
@@ -64,17 +65,17 @@ you can sign your commit automatically with `git commit -s`.
 All Kured repositories are kept under <https://github.com/kubereboot>. To find the code and work on the individual pieces that make Kured, here is our overview:
 
 | Repositories                            | Contents                  |
-| --------------------------------------- | ------------------------- |
+|-----------------------------------------|---------------------------|
 | <https://github.com/kubereboot/kured>   | Kured operator itself     |
 | <https://github.com/kubereboot/charts>  | Helm chart                |
 | <https://github.com/kubereboot/website> | website and documentation |
 
-We use github actions in all our repositories.
+We use GitHub Actions in all our repositories.
 
 ### Charts repo structure highlights
 
-- we use github actions to do the chart testing. Only linting/installation happens, no e2e test is done.
-- charts/kured is the place to contribute changes to the chart. Please bump Chart.yaml at each change according to semver.
+- We use GitHub Actions to do the chart testing. Only linting/installation happens, no e2e test is done.
+- [charts/kured](https://github.com/kubereboot/charts/tree/main/charts/kured) is the place to contribute changes to the chart. Please bump [Chart.yaml](https://github.com/kubereboot/charts/blob/main/charts/kured/Chart.yaml) at each change according to semver.
 
 ### Kured repo structure highlights
 
@@ -91,7 +92,7 @@ We also have other tests:
 - golangci-lint , shellcheck
 - a security check against our base image (alpine)
 
-All these test run on every PR/tagged release. See .github/workflows for more details.
+All these tests are run on every PR/tagged release. See [.github/workflows](.github/workflows) for more details.
 
 We use [GoReleaser to build](.goreleaser.yml).
 
@@ -104,7 +105,7 @@ At each new major release of kubernetes, we update our dependencies.
 Beware that whenever we want to update e.g. the `kubectl` or `client-go` dependencies, some other impactful changes might be necessary too.
 (RBAC, drain behaviour changes, ...)
 
-As examples, this is what it took to support:
+A few examples of what it took to support:
 
 - Kubernetes 1.10 <https://github.com/kubereboot/kured/commit/b3f9ddf> + <https://github.com/kubereboot/kured/commit/bc3f28d> + <https://github.com/kubereboot/kured/commit/908998a> + <https://github.com/kubereboot/kured/commit/efbb0c3> + <https://github.com/kubereboot/kured/commit/5731b98>
 - Kubernetes 1.14 <https://github.com/kubereboot/kured/pull/75>
@@ -112,7 +113,7 @@ As examples, this is what it took to support:
 
 Search the git log for inspiration for your cases.
 
-In general the following activities have to happen:
+In general, the following activities have to happen:
 
 - Bump kind and its images (see below)
 - `go get k8s.io/kubectl@v0.{version}`
@@ -130,31 +131,31 @@ This will make the full test matrix updated (the CI and the test code).
 Once your code passes all tests, update the support matrix in
 the [installation docs](https://kured.dev/docs/installation/).
 
-Beware that sometimes you also need to update kind version. grep in the .github/workflows for the kind version.
+Beware that sometimes you also need to update the Kind version. grep in the [.github/workflows](.github/workflows) for the kind version.
 
 ### Updating other dependencies
 
 Dependabot proposes changes in our `go.mod`/`go.sum`.
-Some of those changes are covered by CI testing, some are not.
+CI testing covers some of those changes, but not all.
 
 Please make sure to test those not covered by CI (mostly the integration
 with other tools) manually before merging.
 
 In all cases, review dependabot changes: Imagine all changes as a possible supply chain
-attack vector. You then need to review the proposed changes by dependabot, and evaluate the trust/risks.
+attack vector. You then need to review the proposed changes by dependabot and evaluate the trust/risks.
 
 ### Review periodic jobs
 
 We run periodic jobs (see also Automated testing section of this documentation).
 Those should be monitored for failures.
 
-If a failure happen in periodics, something terribly wrong must have happened
+If a failure happens in periodic testing, something terribly wrong must have happened
 (or GitHub is failing at the creation of a kind cluster). Please monitor those
 failures carefully.
 
 ## Testing kured
 
-If you have developped anything (or just want to take kured for a spin!), run the following tests.
+If you have developed anything (or just want to take kured for a spin!), run the following tests.
 As they will run in CI, we will quickly catch if you did not test before submitting your PR.
 
 ### Linting
@@ -187,7 +188,7 @@ Then login to a node and run:
 sudo touch /var/run/reboot-required
 ```
 
-Then tell us about everything that went well or went wrong in slack.
+Then tell us about everything that went well or went wrong in Slack.
 
 #### Testing with `minikube`
 
@@ -216,7 +217,7 @@ minikube logs -f
 
 Now check for the 'Commanding reboot' message and minikube going down.
 
-Unfortunately as of today, you are going to run into
+Unfortunately, as of today, you are going to run into
 <https://github.com/kubernetes/minikube/issues/2874>. This means that
 minikube won't come back easily. You will need to start minikube again.
 Then you can check for the lock release.
@@ -246,8 +247,8 @@ You can automate the test with `kind` by using the same code as the CI.
 make e2e-test
 ```
 
-You can alter test behaviour by passing arguments to this command.
-A few examples below:
+You can alter the test behaviour by passing arguments to this command.
+A few examples are given below:
 
 ```shell
 # Run only TestE2EWithSignal test for the kubernetes version named "current" (see kind file)
@@ -278,26 +279,26 @@ In the charts PR, you can directly bump the `appVersion` to the next minor versi
 For example, if current `appVersion` is `1.6.x`, make sure you update your `appVersion`
 to `1.7.0`). It allows us to have an easy view of what we land each release.
 
-Do not hesitate to increase the test coverage for your feature, whether it's unit
-testing to full functional testing (even using helm charts).
+Do not hesitate to increase the test coverage for your feature, whether it's unit testing 
+to full functional testing (even using helm charts).
 
 The team of kured is small, so we will most likely refuse any feature adding maintenance burden.
 
 ## Introducing changes in the helm chart
 
-When you change the helm chart, do not forget to bump its version according to semver.
+When you change the helm chart, remember to bump its version according to semver.
 Changes to defaults are frowned upon unless absolutely necessary.
 
-## Introducing new tests / increase test coverage
+## Introducing new tests / increasing test coverage
 
-At the opposite of features, we welcome ALL features increasing our stability and test coverage.
+On the opposite of features, we welcome ALL features increasing our stability and test coverage.
 See also our GitHub issues with the label [`testing`](https://github.com/kubereboot/kured/labels/testing).
 
 ## Publishing a new kured release
 
-### Double check the latest kubernetes patch version
+### Double-check the latest kubernetes patch version
 
-Ensure you have used the latest patch version in tree. 
+Ensure you have used the latest patch version in the tree. 
 Check the documentation "Updating k8s support" if the minor version was not yet applied.
 
 ### Update the manifests with the new version
@@ -323,7 +324,7 @@ cat kured-ds.yaml >> "$MANIFEST"
 ### Create the new version tag on the repo (optional, can also be done directly in GH web interface)
 
 Tag the previously created commit with the future release version.
-The Github Actions workflow will push the new image to the registry.
+The GitHub Actions workflow will push the new image to the registry.
 
 ### Publish new version release artifacts
 

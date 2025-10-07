@@ -35,6 +35,10 @@ jobs:
           go-version-file: 'go.mod'
           check-latest: true
 
+      - uses: jdx/mise-action@e3d7b8d67a7958d1207f6ed871e83b1ea780e7b0 # v3.3.1
+        with:
+          version: 2025.10.5
+
       - name: Login to ghcr.io
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
         with:
@@ -58,9 +62,6 @@ jobs:
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         id: tags
 
-      - name: Setup GoReleaser
-        run: make bootstrap-tools
-
       - name: Build binaries
         run: make kured-release-snapshot
         env:
@@ -78,11 +79,11 @@ jobs:
 
       - name: Generate SBOM
         run: |
-          hack/bin/syft ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.sha_short }} -o spdx > kured.sbom
+          syft ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.sha_short }} -o spdx > kured.sbom
 
       - name: Sign and attest artifacts
         run: |
-          hack/bin/cosign sign -y -r ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.sha_short }}
-          hack/bin/cosign sign-blob -y --output-signature kured.sbom.sig --output-certificate kured.sbom.pem kured.sbom
-          hack/bin/cosign attest -y --type spdx --predicate kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.sha_short }}
-          hack/bin/cosign attach sbom --type spdx --sbom kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.sha_short }}
+          cosign sign -y -r ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.sha_short }}
+          cosign sign-blob -y --output-signature kured.sbom.sig --output-certificate kured.sbom.pem kured.sbom
+          cosign attest -y --type spdx --predicate kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.sha_short }}
+          cosign attach sbom --type spdx --sbom kured.sbom ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.sha_short }}
