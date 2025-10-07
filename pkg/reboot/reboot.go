@@ -24,7 +24,7 @@ func NewRebooter(rebootMethod string, rebootCommand string, rebootSignal int, re
 	switch rebootMethod {
 	case "command":
 		slog.Info("Will reboot using command", "cmd", rebootCommand)
-		return NewCommandRebooter(rebootCommand, rebootDelay, true, 1)
+		return NewCommandRebooter(rebootCommand, rebootDelay, privileged, pid)
 	case "signal":
 		slog.Info("Will reboot using signal", "signal", rebootSignal)
 		return NewSignalRebooter(rebootSignal, rebootDelay)
@@ -33,10 +33,13 @@ func NewRebooter(rebootMethod string, rebootCommand string, rebootSignal int, re
 	}
 }
 
+// GenericRebooter intent was to implement standard features for reboots
+// It currently only implements the tools for delaying reboots.
 type GenericRebooter struct {
 	RebootDelay time.Duration
 }
 
+// DelayReboot will delay the reboot for the configured time
 func (g GenericRebooter) DelayReboot() {
 	if g.RebootDelay > 0 {
 		slog.Debug(fmt.Sprintf("Delayed reboot for %s", g.RebootDelay))
