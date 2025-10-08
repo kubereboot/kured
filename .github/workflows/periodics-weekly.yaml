@@ -14,10 +14,13 @@ jobs:
         with:
           egress-policy: audit
 
+
       - name: checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
       - name: run tests
         run: make test
+
       - name: Annotate tests
         if: always()
         uses: guyarb/golang-test-annoations@2941118d7ef622b1b3771d1ff6eae9e90659eb26 # v0.8.0
@@ -55,6 +58,7 @@ jobs:
         egress-policy: audit
 
     - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
     - name: Link Checker
       uses: lycheeverse/lychee-action@885c65f3dc543b57c898c8099f4e08c8afd178a2
       env:
@@ -73,20 +77,27 @@ jobs:
           egress-policy: audit
 
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
       - name: Ensure go version
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version-file: 'go.mod'
           check-latest: true
+
+      - uses: jdx/mise-action@e3d7b8d67a7958d1207f6ed871e83b1ea780e7b0 # v3.3.1
+        with:
+          version: 2025.10.5
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
-      - name: Setup GoReleaser
-        run: make bootstrap-tools
+
       - name: Find current tag version
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         id: tags
+
       - name: Build artifacts
         run: VERSION="${{ steps.tags.outputs.sha_short }}" DH_ORG="${{ github.repository_owner }}" make image
       - name: Run Trivy vulnerability scanner
