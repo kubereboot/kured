@@ -3,4 +3,3 @@ vendor
 build
 dist
 test.json
-tests/kind/testfiles/*.yaml
