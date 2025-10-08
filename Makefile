@@ -33,19 +33,8 @@ image: kured
 dev-image: kured
 	$(SUDO) docker buildx build --no-cache --load -t ghcr.io/kubereboot/kured:dev .
 
-dev-manifest:
-	# basic e2e scenario
-	sed -e "s#image: ghcr.io/.*kured.*#image: ghcr.io/kubereboot/kured:dev#g" -e 's/#\(.*\)--period=1h/\1--period=20s/g' kured-ds.yaml > tests/kind/testfiles/kured-ds.yaml
-	# signal e2e scenario
-	sed -e "s#image: ghcr.io/.*kured.*#image: ghcr.io/kubereboot/kured:dev#g" -e 's/#\(.*\)--period=1h/\1--period=20s/g' kured-ds-signal.yaml > tests/kind/testfiles/kured-ds-signal.yaml
-	# concurrency e2e command scenario
-	sed -e "s#image: ghcr.io/.*kured.*#image: ghcr.io/kubereboot/kured:dev#g" -e 's/#\(.*\)--period=1h/\1--period=20s/g' -e 's/#\(.*\)--concurrency=1/\1--concurrency=2/g' kured-ds.yaml > tests/kind/testfiles/kured-ds-concurrent-command.yaml
-	# concurrency e2e signal scenario
-	sed -e "s#image: ghcr.io/.*kured.*#image: ghcr.io/kubereboot/kured:dev#g" -e 's/#\(.*\)--period=1h/\1--period=20s/g' -e 's/#\(.*\)--concurrency=1/\1--concurrency=2/g' kured-ds-signal.yaml > tests/kind/testfiles/kured-ds-concurrent-signal.yaml
-	# pod blocker e2e signal scenario
-	sed -e "s#image: ghcr.io/.*kured.*#image: ghcr.io/kubereboot/kured:dev#g" -e 's/#\(.*\)--period=1h/\1--period=20s/g' -e 's/#\(.*\)--blocking-pod-selector=name=temperamental/\1--blocking-pod-selector=app=blocker/g' kured-ds-signal.yaml > tests/kind/testfiles/kured-ds-podblocker.yaml
 
-e2e-test: dev-manifest dev-image
+e2e-test: dev-image
 	echo "Running ALL go tests"
 	go test -count=1 -v --parallel 4 ./... $(ARGS)
 
