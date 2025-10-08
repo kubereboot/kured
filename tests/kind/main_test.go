@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	kuredDevImage string = "kured:dev"
+	kuredDevImage string = "ghcr.io/kubereboot/kured:dev"
 )
 
 // KindTest cluster deployed by each TestMain function, prepared to run a given test scenario.
