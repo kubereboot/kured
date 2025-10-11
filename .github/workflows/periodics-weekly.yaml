@@ -18,6 +18,10 @@ jobs:
       - name: checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
+      - uses: jdx/mise-action@e3d7b8d67a7958d1207f6ed871e83b1ea780e7b0 # v3.3.1
+        with:
+          version: 2025.10.5
+
       - name: run tests
         run: make test
 
@@ -31,7 +35,7 @@ jobs:
     name: Mark stale issues and PRs
     runs-on: ubuntu-latest
     steps:
-    # Stale by default waits for 60 days before marking PR/issues as stale, and closes them after 21 days.
+    # Stale, by default, waits for 60 days before marking PR/issues as stale and closes them after 21 days.
     # Do not expire the first issues that would allow the community to grow.
     - name: Harden Runner
       uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
