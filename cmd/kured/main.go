@@ -12,10 +12,10 @@ import (
 	"os"
 	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/kubereboot/kured/internal/cli"
 	"github.com/kubereboot/kured/internal/daemonsetlock"
 	"github.com/kubereboot/kured/internal/k8soperations"
 	"github.com/kubereboot/kured/internal/notifications"
@@ -37,7 +37,7 @@ var (
 	version = "unreleased"
 
 	// Command line flags (sorted alphabetically)
-	alertFilter                     regexpValue
+	alertFilter                     cli.RegexpValue
 	alertFilterMatchOnly            bool
 	alertFiringOnly                 bool
 	annotateNodeProgress            bool
@@ -98,8 +98,6 @@ const (
 	KuredRebootInProgressAnnotation string = "kured.dev/kured-reboot-in-progress"
 	// KuredMostRecentRebootNeededAnnotation is the canonical string value for the kured most-recent-reboot-needed annotation
 	KuredMostRecentRebootNeededAnnotation string = "kured.dev/kured-most-recent-reboot-needed"
-	// EnvPrefix The environment variable prefix of all environment variables bound to our command line flags.
-	EnvPrefix = "KURED"
 	// TODO: Replace this with runtime evaluation
 	sigRTMinPlus5 = 34 + 5
 )
@@ -155,7 +153,7 @@ func main() {
 	flag.Parse()
 
 	// Load flags from environment variables
-	LoadFromEnv()
+	cli.LoadFromEnv()
 
 	var logger *slog.Logger
 	switch logFormat {
@@ -273,77 +271,6 @@ func validateNodeLabels(preRebootNodeLabels []string, postRebootNodeLabels []str
 	}
 
 	return nil
-}
-
-// LoadFromEnv attempts to load environment variables corresponding to flags.
-// It looks for an environment variable with the uppercase version of the flag name (prefixed by EnvPrefix).
-func LoadFromEnv() {
-	flag.VisitAll(func(f *flag.Flag) {
-		envVarName := fmt.Sprintf("%s_%s", EnvPrefix, strings.ToUpper(strings.ReplaceAll(f.Name, "-", "_")))
-
-		if envValue, exists := os.LookupEnv(envVarName); exists {
-			switch f.Value.Type() {
-			case "int":
-				if parsedVal, err := strconv.Atoi(envValue); err == nil {
-					err := flag.Set(f.Name, strconv.Itoa(parsedVal))
-					if err != nil {
-						fmt.Printf("cannot set flag %s from env var named %s", f.Name, envVarName)
-						os.Exit(1)
-					} // Set int flag
-				} else {
-					fmt.Printf("Invalid value for env var named %s", envVarName)
-					os.Exit(1)
-				}
-			case "string":
-				err := flag.Set(f.Name, envValue)
-				if err != nil {
-					fmt.Printf("cannot set flag %s from env{%s}: %s\n", f.Name, envVarName, envValue)
-					os.Exit(1)
-				} // Set string flag
-			case "bool":
-				if parsedVal, err := strconv.ParseBool(envValue); err == nil {
-					err := flag.Set(f.Name, strconv.FormatBool(parsedVal))
-					if err != nil {
-						fmt.Printf("cannot set flag %s from env{%s}: %s\n", f.Name, envVarName, envValue)
-						os.Exit(1)
-					} // Set boolean flag
-				} else {
-					fmt.Printf("Invalid value for %s: %s\n", envVarName, envValue)
-					os.Exit(1)
-				}
-			case "duration":
-				// Set duration from the environment variable (e.g., "1h30m")
-				if _, err := time.ParseDuration(envValue); err == nil {
-					err = flag.Set(f.Name, envValue)
-					if err != nil {
-						fmt.Printf("cannot set flag %s from env{%s}: %s\n", f.Name, envVarName, envValue)
-						os.Exit(1)
-					}
-				} else {
-					fmt.Printf("Invalid duration for %s: %s\n", envVarName, envValue)
-					os.Exit(1)
-				}
-			case "regexp":
-				// For regexp, set it from the environment variable
-				err := flag.Set(f.Name, envValue)
-				if err != nil {
-					fmt.Printf("cannot set flag %s from env{%s}: %s\n", f.Name, envVarName, envValue)
-					os.Exit(1)
-				}
-			case "stringSlice":
-				// For stringSlice, split the environment variable by commas and set it
-				err := flag.Set(f.Name, envValue)
-				if err != nil {
-					fmt.Printf("cannot set flag %s from env{%s}: %s\n", f.Name, envVarName, envValue)
-					os.Exit(1)
-				}
-			default:
-				// String arrays are not supported from CLI
-				fmt.Printf("Unsupported flag type for %s\n", f.Name)
-			}
-		}
-	})
-
 }
 
 func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.Checker, blockCheckers []blockers.RebootBlocker, window *timewindow.TimeWindow, lock daemonsetlock.Lock, client *kubernetes.Clientset, period time.Duration, notifier notifications.Notifier) {
