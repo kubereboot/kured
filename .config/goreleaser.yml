@@ -1,3 +1,4 @@
+version: 2
 project_name: kured
 before:
   hooks:
@@ -23,10 +24,10 @@ builds:
       - -trimpath
 
 snapshot:
-  name_template: "{{ .ShortCommit }}"
+  version_template: "{{ .ShortCommit }}"
 
 release:
   disable: true
 
 changelog:
-  skip: true
+  disable: true
