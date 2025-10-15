@@ -183,10 +183,10 @@ func TestCanAcquireMultiple(t *testing.T) {
 			lockPossible: true,
 		},
 	}
-	nm := NodeMeta{Unschedulable: false}
+
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			lockPossible, actual := testCase.daemonSetLock.canAcquireMultiple(testCase.current, nm, time.Minute, testCase.maxOwners)
+			lockPossible, actual := testCase.daemonSetLock.canAcquireMultiple(testCase.current, time.Minute, testCase.maxOwners)
 			if lockPossible != testCase.lockPossible {
 				t.Fatalf(
 					"unexpected result for lock possible (got %t expected %t new annotation %v",

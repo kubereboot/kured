@@ -89,7 +89,7 @@ jobs:
   #     (compared to helm charts, manifests cannot easily template changes based on versions)
   # Helm charts are _trailing_ releases, while manifests are done during development.
   # This test uses the "command" reboot-method.
-  e2e-manifests:
+  e2e-base:
     name: End-to-End test with kured with code and manifests from HEAD
     runs-on: ubuntu-latest
     strategy:
@@ -98,8 +98,6 @@ jobs:
         testname:
           - "TestE2EWithCommand"
           - "TestE2EWithSignal"
-          - "TestE2EConcurrentWithCommand"
-          - "TestE2EConcurrentWithSignal"
         kubernetes_version:
           - "previous"
           - "current"
@@ -136,16 +134,16 @@ jobs:
         run: make e2e-test ARGS="-run ^${{ matrix.testname }}/${{ matrix.kubernetes_version }}"
 
 
-  e2e-tests-singleversion:
-    name: End-to-End test targetting a single version of kubernetes
+  e2e-features:
+    name: End-to-End specific scenarios targeting latest version of kubernetes # If we don't break for future versions, it will work for the current version, reducing the test matrix
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         testname:
-          - "TestCordonningIsKept/concurrency1"
-          - "TestCordonningIsKept/concurrency2"
-          - "TestE2EBlocker/podblocker"
+          - "TestE2ECordoning"
+          - "TestE2EConcurrency"
+          - "TestE2PodBlocker"
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
