@@ -20,6 +20,9 @@ RUN set -ex \
   && cp /dist/kured_${TARGETOS}_${TARGETARCH}${SUFFIX}/kured /dist/kured;
 
 FROM alpine:3.22.2@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412
-RUN apk update --no-cache && apk upgrade --no-cache && apk add --no-cache ca-certificates tzdata
+RUN apk update && \
+    apk upgrade && \
+    apk add ca-certificates tzdata && \
+    rm -rf /var/cache/apk/*
 COPY --from=bin /dist/kured /usr/bin/kured
 ENTRYPOINT ["/usr/bin/kured"]
