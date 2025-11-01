@@ -70,3 +70,7 @@ lint:
 lint-docs:
 	@echo "Running lychee"
 	mise x lychee@latest -- lychee --verbose --no-progress '*.md' '*.yaml' '*/*/*.go' --exclude-link-local
+
+lint-goreleaser:
+	@echo "Checking goreleaser"
+	goreleaser check
