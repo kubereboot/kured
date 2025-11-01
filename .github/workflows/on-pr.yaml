@@ -22,7 +22,7 @@ jobs:
           go-version-file: 'go.mod'
           check-latest: true
 
-      - uses: jdx/mise-action@e3d7b8d67a7958d1207f6ed871e83b1ea780e7b0 # v3.3.1
+      - uses: jdx/mise-action@be3be2260bc02bc3fbf94c5e2fed8b7964baf074 # v3.4.0
         with:
           version: 2025.10.5
 
@@ -55,7 +55,7 @@ jobs:
           go-version-file: 'go.mod'
           check-latest: true
 
-      - uses: jdx/mise-action@e3d7b8d67a7958d1207f6ed871e83b1ea780e7b0 # v3.3.1
+      - uses: jdx/mise-action@be3be2260bc02bc3fbf94c5e2fed8b7964baf074 # v3.4.0
         with:
           version: 2025.10.5
 
@@ -118,7 +118,7 @@ jobs:
           go-version-file: 'go.mod'
           check-latest: true
 
-      - uses: jdx/mise-action@e3d7b8d67a7958d1207f6ed871e83b1ea780e7b0 # v3.3.1
+      - uses: jdx/mise-action@be3be2260bc02bc3fbf94c5e2fed8b7964baf074 # v3.4.0
         with:
           version: 2025.10.5
 
@@ -160,7 +160,7 @@ jobs:
           go-version-file: 'go.mod'
           check-latest: true
 
-      - uses: jdx/mise-action@e3d7b8d67a7958d1207f6ed871e83b1ea780e7b0 # v3.3.1
+      - uses: jdx/mise-action@be3be2260bc02bc3fbf94c5e2fed8b7964baf074 # v3.4.0
         with:
           version: 2025.10.5
 
