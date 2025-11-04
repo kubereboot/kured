@@ -1,21 +1,42 @@
 version: 2
 updates:
+  # main branch updates
   # Maintain dependencies for GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "daily"
-  # Maintain dependencies for gomod
+  # Maintain dependencies for Go packages
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
       interval: "daily"
     ignore:
-      - dependency-name: "k8s.io/api"
-      - dependency-name: "k8s.io/apimachinery"
-      - dependency-name: "k8s.io/client-go"
-      - dependency-name: "k8s.io/kubectl"
+      - dependency-name: "k8s.io/*"
+  # Maintain dependencies for Docker
   - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "daily"
+
+  # v1 branch updates
+  # Maintain dependencies for GitHub Actions
+  - package-ecosystem: "github-actions"
+    target-branch: "v1"
+    directory: "/"
+    schedule:
+      interval: "daily"
+  # Maintain dependencies for Go packages
+  - package-ecosystem: "gomod"
+    target-branch: "v1"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    ignore:
+      - dependency-name: "k8s.io/*"
+  # Maintain dependencies for Docker
+  - package-ecosystem: "docker"
+    target-branch: "v1"
     directory: "/"
     schedule:
       interval: "daily"
