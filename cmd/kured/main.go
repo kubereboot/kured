@@ -61,6 +61,7 @@ var (
 	lockReleaseDelay                time.Duration
 	prometheusURL                   string
 	preferNoScheduleTaintName       string
+	preferNoScheduleTaintImmediate  bool
 	alertFilter                     regexpValue
 	alertFilterMatchOnly            bool
 	alertFiringOnly                 bool
@@ -161,6 +162,8 @@ func main() {
 		"path to file whose existence triggers the reboot command")
 	flag.StringVar(&preferNoScheduleTaintName, "prefer-no-schedule-taint", "",
 		"Taint name applied during pending node reboot (to prevent receiving additional pods from other rebooting nodes). Disabled by default. Set e.g. to \"weave.works/kured-node-reboot\" to enable tainting.")
+	flag.BoolVar(&preferNoScheduleTaintImmediate, "prefer-no-schedule-taint-immediate", false,
+		"When tainting enabled, Taint nodes once a reboot is required to prevent additional pods scheduling.")
 	flag.StringVar(&rebootSentinelCommand, "reboot-sentinel-command", "",
 		"command for which a zero return code will trigger a reboot command")
 	flag.StringVar(&rebootCommand, "reboot-command", "/bin/systemctl reboot",
@@ -618,9 +621,13 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 
 	preferNoScheduleTaint := taints.New(client, nodeID, preferNoScheduleTaintName, v1.TaintEffectPreferNoSchedule)
 
-	// Remove taint immediately during startup to quickly allow scheduling again.
 	if !checker.RebootRequired() {
+		// Remove taint immediately during startup to quickly allow scheduling again.
 		preferNoScheduleTaint.Disable()
+	} else if preferNoScheduleTaintImmediate {
+		// Taint node immediately if a reboot is needed, lessening the chance of adding
+		// additional pods to drain
+		preferNoScheduleTaint.Enable()
 	}
 
 	source = rand.NewSource(time.Now().UnixNano())
@@ -636,6 +643,10 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 			log.Infof("Reboot not required")
 			preferNoScheduleTaint.Disable()
 			continue
+		} else if preferNoScheduleTaintImmediate {
+			// Taint node immediately if a reboot is needed, lessening the chance of adding
+			// additional pods to drain
+			preferNoScheduleTaint.Enable()
 		}
 
 		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
