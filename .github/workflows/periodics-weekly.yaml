@@ -50,6 +50,7 @@ jobs:
         stale-issue-label: 'no-issue-activity'
         stale-pr-label: 'no-pr-activity'
         exempt-issue-labels: 'good first issue,keep'
+        exempt-pr-labels: 'keep'
         days-before-close: 21
 
   check-docs-links:
