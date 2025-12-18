@@ -1,4 +1,4 @@
-FROM alpine:3.22.2@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412 AS bin
+FROM alpine:3.23.2@sha256:865b95f46d98cf867a156fe4a135ad3fe50d2056aa3f25ed31662dff6da4eb62 AS bin
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -19,7 +19,7 @@ RUN set -ex \
     esac \
   && cp /dist/kured_${TARGETOS}_${TARGETARCH}${SUFFIX}/kured /dist/kured;
 
-FROM alpine:3.22.2@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412
+FROM alpine:3.23.2@sha256:865b95f46d98cf867a156fe4a135ad3fe50d2056aa3f25ed31662dff6da4eb62
 RUN apk update --no-cache && apk upgrade --no-cache && apk add --no-cache ca-certificates tzdata
 COPY --from=bin /dist/kured /usr/bin/kured
 ENTRYPOINT ["/usr/bin/kured"]
