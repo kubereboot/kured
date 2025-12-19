@@ -8,10 +8,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
+	"log/slog"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 
 	v1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -28,9 +26,8 @@ const (
 // Lock defines the interface for acquiring, releasing, and checking
 // the status of a reboot coordination lock.
 type Lock interface {
-	Acquire(NodeMeta) (bool, string, error)
+	Acquire() (bool, error)
 	Release() error
-	Holding() (bool, LockAnnotationValue, error)
 }
 
 // GenericLock holds the configuration for lock TTL and the delay before releasing it.
@@ -71,9 +68,7 @@ type DaemonSetMultiLock struct {
 }
 
 // LockAnnotationValue contains the lock data,
-// which allows persistence across reboots, particularily recording if the
-// node was already unschedulable before kured reboot.
-// To be modified when using another type of lock storage.
+// Metadata is there for migrations reasons. Ignore this as much as possible
 type LockAnnotationValue struct {
 	NodeID   string        `json:"nodeID"`
 	Metadata NodeMeta      `json:"metadata,omitempty"`
@@ -136,22 +131,22 @@ func (dsl *DaemonSetLock) GetDaemonSet(sleep, timeout time.Duration) (*v1.Daemon
 }
 
 // Acquire attempts to annotate the kured daemonset with lock info from instantiated DaemonSetLock using client-go
-func (dsl *DaemonSetSingleLock) Acquire(nodeMetadata NodeMeta) (bool, string, error) {
+func (dsl *DaemonSetSingleLock) Acquire() (bool, error) {
 	for {
 		ds, err := dsl.GetDaemonSet(k8sAPICallRetrySleep, k8sAPICallRetryTimeout)
 		if err != nil {
-			return false, "", fmt.Errorf("timed out trying to get daemonset %s in namespace %s: %w", dsl.name, dsl.namespace, err)
+			return false, fmt.Errorf("timed out trying to get daemonset %s in namespace %s: %w", dsl.name, dsl.namespace, err)
 		}
 
 		valueString, exists := ds.Annotations[dsl.annotation]
 		if exists {
 			value := LockAnnotationValue{}
 			if err := json.Unmarshal([]byte(valueString), &value); err != nil {
-				return false, "", err
+				return false, err
 			}
 
 			if !ttlExpired(value.Created, value.TTL) {
-				return value.NodeID == dsl.nodeID, value.NodeID, nil
+				return value.NodeID == dsl.nodeID, nil
 			}
 		}
 
@@ -161,14 +156,11 @@ func (dsl *DaemonSetSingleLock) Acquire(nodeMetadata NodeMeta) (bool, string, er
 
 		value := LockAnnotationValue{
 			NodeID:   dsl.nodeID,
-			Metadata: nodeMetadata,
-			Created:  time.Now().UTC(),
-			TTL:      dsl.TTL,
+			Created: time.Now().UTC(), TTL: dsl.TTL,
 		}
-
 		valueBytes, err := json.Marshal(&value)
 		if err != nil {
-			return false, "", err
+			return false, err
 		}
 		ds.Annotations[dsl.annotation] = string(valueBytes)
 
@@ -179,40 +171,41 @@ func (dsl *DaemonSetSingleLock) Acquire(nodeMetadata NodeMeta) (bool, string, er
 				time.Sleep(time.Second)
 				continue
 			}
-			return false, "", err
+			return false, err
 		}
 
-		return true, dsl.nodeID, nil
+		return true, nil
 	}
 }
 
-// Holding checks if the current node still holds the lock based on the DaemonSet annotation.
-func (dsl *DaemonSetSingleLock) Holding() (bool, LockAnnotationValue, error) {
-	var lockData LockAnnotationValue
-	ds, err := dsl.GetDaemonSet(k8sAPICallRetrySleep, k8sAPICallRetryTimeout)
-	if err != nil {
-		return false, lockData, fmt.Errorf("timed out trying to get daemonset %s in namespace %s: %w", dsl.name, dsl.namespace, err)
-	}
-
-	valueString, exists := ds.Annotations[dsl.annotation]
-	if exists {
-		value := LockAnnotationValue{}
-		if err := json.Unmarshal([]byte(valueString), &value); err != nil {
-			return false, lockData, err
-		}
-
-		if !ttlExpired(value.Created, value.TTL) {
-			return value.NodeID == dsl.nodeID, value, nil
-		}
-	}
-
-	return false, lockData, nil
-}
+//
+//// Test attempts to check the kured daemonset lock status (existence, expiry) from instantiated DaemonSetLock using client-go
+//func (dsl *DaemonSetSingleLock) Holding() (bool, LockAnnotationValue, error) {
+//	var lockData LockAnnotationValue
+//	ds, err := dsl.GetDaemonSet(k8sAPICallRetrySleep, k8sAPICallRetryTimeout)
+//	if err != nil {
+//		return false, lockData, fmt.Errorf("timed out trying to get daemonset %s in namespace %s: %w", dsl.name, dsl.namespace, err)
+//	}
+//
+//	valueString, exists := ds.ObjectMeta.Annotations[dsl.annotation]
+//	if exists {
+//		value := LockAnnotationValue{}
+//		if err := json.Unmarshal([]byte(valueString), &value); err != nil {
+//			return false, lockData, err
+//		}
+//
+//		if !ttlExpired(value.Created, value.TTL) {
+//			return value.NodeID == dsl.nodeID, value, nil
+//		}
+//	}
+//
+//	return false, lockData, nil
+//}
 
 // Release attempts to remove the lock data from the kured ds annotations using client-go
 func (dsl *DaemonSetSingleLock) Release() error {
 	if dsl.releaseDelay > 0 {
-		log.Infof("Waiting %v before releasing lock", dsl.releaseDelay)
+		slog.Info(fmt.Sprintf("Waiting %v before releasing lock", dsl.releaseDelay))
 		time.Sleep(dsl.releaseDelay)
 	}
 	for {
@@ -222,17 +215,18 @@ func (dsl *DaemonSetSingleLock) Release() error {
 		}
 
 		valueString, exists := ds.Annotations[dsl.annotation]
-		if exists {
-			value := LockAnnotationValue{}
-			if err := json.Unmarshal([]byte(valueString), &value); err != nil {
-				return err
-			}
 
-			if value.NodeID != dsl.nodeID {
-				return fmt.Errorf("not lock holder: %v", value.NodeID)
-			}
-		} else {
-			return fmt.Errorf("lock not held")
+		if !exists {
+			return nil
+		}
+
+		value := LockAnnotationValue{}
+		if err := json.Unmarshal([]byte(valueString), &value); err != nil {
+			return err
+		}
+
+		if value.NodeID != dsl.nodeID {
+			return fmt.Errorf("not lock holder: %v", value.NodeID)
 		}
 
 		delete(ds.Annotations, dsl.annotation)
@@ -257,15 +251,15 @@ func ttlExpired(created time.Time, ttl time.Duration) bool {
 	return false
 }
 
-func nodeIDsFromMultiLock(annotation multiLockAnnotationValue) []string {
-	nodeIDs := make([]string, 0, len(annotation.LockAnnotations))
-	for _, nodeLock := range annotation.LockAnnotations {
-		nodeIDs = append(nodeIDs, nodeLock.NodeID)
-	}
-	return nodeIDs
-}
+//func nodeIDsFromMultiLock(annotation multiLockAnnotationValue) []string {
+//	nodeIDs := make([]string, 0, len(annotation.LockAnnotations))
+//	for _, nodeLock := range annotation.LockAnnotations {
+//		nodeIDs = append(nodeIDs, nodeLock.NodeID)
+//	}
+//	return nodeIDs
+//}
 
-func (dsl *DaemonSetLock) canAcquireMultiple(annotation multiLockAnnotationValue, metadata NodeMeta, TTL time.Duration, maxOwners int) (bool, multiLockAnnotationValue) {
+func (dsl *DaemonSetLock) canAcquireMultiple(annotation multiLockAnnotationValue, TTL time.Duration, maxOwners int) (bool, multiLockAnnotationValue) {
 	newAnnotation := multiLockAnnotationValue{MaxOwners: maxOwners}
 	freeSpace := false
 	if annotation.LockAnnotations == nil || len(annotation.LockAnnotations) < maxOwners {
@@ -288,10 +282,9 @@ func (dsl *DaemonSetLock) canAcquireMultiple(annotation multiLockAnnotationValue
 		newAnnotation.LockAnnotations = append(
 			newAnnotation.LockAnnotations,
 			LockAnnotationValue{
-				NodeID:   dsl.nodeID,
-				Metadata: metadata,
-				Created:  time.Now().UTC(),
-				TTL:      TTL,
+				NodeID:  dsl.nodeID,
+				Created: time.Now().UTC(),
+				TTL:     TTL,
 			},
 		)
 		return true, newAnnotation
@@ -301,24 +294,24 @@ func (dsl *DaemonSetLock) canAcquireMultiple(annotation multiLockAnnotationValue
 }
 
 // Acquire creates and annotates the daemonset with a multiple owner lock
-func (dsl *DaemonSetMultiLock) Acquire(nodeMetaData NodeMeta) (bool, string, error) {
+func (dsl *DaemonSetMultiLock) Acquire() (bool, error) {
 	for {
 		ds, err := dsl.GetDaemonSet(k8sAPICallRetrySleep, k8sAPICallRetryTimeout)
 		if err != nil {
-			return false, "", fmt.Errorf("timed out trying to get daemonset %s in namespace %s: %w", dsl.name, dsl.namespace, err)
+			return false, fmt.Errorf("timed out trying to get daemonset %s in namespace %s: %w", dsl.name, dsl.namespace, err)
 		}
 
 		annotation := multiLockAnnotationValue{}
 		valueString, exists := ds.Annotations[dsl.annotation]
 		if exists {
 			if err := json.Unmarshal([]byte(valueString), &annotation); err != nil {
-				return false, "", fmt.Errorf("error getting multi lock: %w", err)
+				return false, fmt.Errorf("error getting multi lock: %w", err)
 			}
 		}
 
-		lockPossible, newAnnotation := dsl.canAcquireMultiple(annotation, nodeMetaData, dsl.TTL, dsl.maxOwners)
+		lockPossible, newAnnotation := dsl.canAcquireMultiple(annotation, dsl.TTL, dsl.maxOwners)
 		if !lockPossible {
-			return false, strings.Join(nodeIDsFromMultiLock(newAnnotation), ","), nil
+			return false, nil
 		}
 
 		if ds.Annotations == nil {
@@ -326,7 +319,7 @@ func (dsl *DaemonSetMultiLock) Acquire(nodeMetaData NodeMeta) (bool, string, err
 		}
 		newAnnotationBytes, err := json.Marshal(&newAnnotation)
 		if err != nil {
-			return false, "", fmt.Errorf("error marshalling new annotation lock: %w", err)
+			return false, fmt.Errorf("error marshalling new annotation lock: %w", err)
 		}
 		ds.Annotations[dsl.annotation] = string(newAnnotationBytes)
 
@@ -336,42 +329,42 @@ func (dsl *DaemonSetMultiLock) Acquire(nodeMetaData NodeMeta) (bool, string, err
 				time.Sleep(time.Second)
 				continue
 			}
-			return false, "", fmt.Errorf("error updating daemonset with multi lock: %w", err)
-
+			return false, fmt.Errorf("error updating daemonset with multi lock: %w", err)
 		}
-		return true, strings.Join(nodeIDsFromMultiLock(newAnnotation), ","), nil
+		return true, nil
 	}
 }
 
-// Holding checks whether the current node is holding a valid lock for the DaemonSetMultiLock.
-func (dsl *DaemonSetMultiLock) Holding() (bool, LockAnnotationValue, error) {
-	var lockdata LockAnnotationValue
-	ds, err := dsl.GetDaemonSet(k8sAPICallRetrySleep, k8sAPICallRetryTimeout)
-	if err != nil {
-		return false, lockdata, fmt.Errorf("timed out trying to get daemonset %s in namespace %s: %w", dsl.name, dsl.namespace, err)
-	}
-
-	valueString, exists := ds.Annotations[dsl.annotation]
-	if exists {
-		value := multiLockAnnotationValue{}
-		if err := json.Unmarshal([]byte(valueString), &value); err != nil {
-			return false, lockdata, err
-		}
-
-		for _, nodeLock := range value.LockAnnotations {
-			if nodeLock.NodeID == dsl.nodeID && !ttlExpired(nodeLock.Created, nodeLock.TTL) {
-				return true, nodeLock, nil
-			}
-		}
-	}
-
-	return false, lockdata, nil
-}
+//
+//// TestMultiple attempts to check the kured daemonset lock status for multi locks
+//func (dsl *DaemonSetMultiLock) Holding() (bool, LockAnnotationValue, error) {
+//	var lockdata LockAnnotationValue
+//	ds, err := dsl.GetDaemonSet(k8sAPICallRetrySleep, k8sAPICallRetryTimeout)
+//	if err != nil {
+//		return false, lockdata, fmt.Errorf("timed out trying to get daemonset %s in namespace %s: %w", dsl.name, dsl.namespace, err)
+//	}
+//
+//	valueString, exists := ds.Annotations[dsl.annotation]
+//	if exists {
+//		value := multiLockAnnotationValue{}
+//		if err := json.Unmarshal([]byte(valueString), &value); err != nil {
+//			return false, lockdata, err
+//		}
+//
+//		for _, nodeLock := range value.LockAnnotations {
+//			if nodeLock.NodeID == dsl.nodeID && !ttlExpired(nodeLock.Created, nodeLock.TTL) {
+//				return true, nodeLock, nil
+//			}
+//		}
+//	}
+//
+//	return false, lockdata, nil
+//}
 
 // Release attempts to remove the lock data for a single node from the multi node annotation
 func (dsl *DaemonSetMultiLock) Release() error {
 	if dsl.releaseDelay > 0 {
-		log.Infof("Waiting %v before releasing lock", dsl.releaseDelay)
+		slog.Info(fmt.Sprintf("Waiting %v before releasing lock", dsl.releaseDelay))
 		time.Sleep(dsl.releaseDelay)
 	}
 	for {
@@ -396,9 +389,11 @@ func (dsl *DaemonSetMultiLock) Release() error {
 				}
 			}
 		}
-
-		if !exists || !modified {
-			return fmt.Errorf("Lock not held")
+		if !exists {
+			return nil
+		}
+		if !modified {
+			return fmt.Errorf("lock not held")
 		}
 
 		newAnnotationBytes, err := json.Marshal(value)

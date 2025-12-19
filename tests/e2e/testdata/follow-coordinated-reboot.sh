@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-
-REBOOTCOUNT=${REBOOTCOUNT:-2} # By default we only create two sentinels in create-reboot-sentinels.
 DEBUG="${DEBUG:-false}"
 CONTAINER_NAME_FORMAT=${CONTAINER_NAME_FORMAT:-"chart-testing-*"}
 
 kubectl_flags=( )
 [[ "$1" != "" ]] && kubectl_flags=("${kubectl_flags[@]}" --context "$1")
+REBOOTCOUNT=${2:-1} # Number of nodes expected to reboot, defaulting to 1.
 
 tmp_dir=$(mktemp -d -t kured-XXXX)
 

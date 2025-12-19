@@ -120,13 +120,8 @@ In general, the following activities have to happen:
 
 ### bump kind images support
 
-Go to `.github/workflows` and update the new k8s images. For that:
-
-- `cp .github/kind-cluster-current.yaml .github/kind-cluster-previous.yaml`
-- `cp .github/kind-cluster-next.yaml .github/kind-cluster-current.yaml`
-- Then edit `.github/kind-cluster-next.yaml` to point to the new version.
-
-This will make the full test matrix updated (the CI and the test code).
+Go to `.github/workflows` and update the new k8s images. For that, edit
+`tests/kind_test.go` and update the `var KindVersionImages`
 
 Once your code passes all tests, update the support matrix in
 the [installation docs](https://kured.dev/docs/installation/).
@@ -227,15 +222,14 @@ Then you can check for the lock release.
 A test-run with `kind` could look like this:
 
 ```cli
-# create kind cluster
-kind create cluster --config .github/kind-cluster-<k8s-version>.yaml
+# create your kind cluster
+kind create cluster
 
 # create reboot required files on pre-defined kind nodes
-./tests/kind/create-reboot-sentinels.sh
+./tests/e2e/create-reboot-sentinels.sh
 
 # check if reboot is working fine
-./tests/kind/follow-coordinated-reboot.sh
-
+./tests/e2e/follow-coordinated-reboot.sh
 ```
 
 ### Testing with `kind` "The easy way"
