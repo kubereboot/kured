@@ -40,7 +40,7 @@ Your system needs at least the following binaries installed:
 ### Fetch the additional binaries required
 
 Please run `make install-tools` once on a fresh repository clone to download necessary developer tools.
-Installed tools are listed in [.mise directory](.mise/config.toml).
+Installed tools are listed in [.mise directory](.config/mise.toml).
 
 ### Configure your git for the "Certificate of Origin"
 
@@ -94,7 +94,7 @@ We also have other tests:
 
 All these tests are run on every PR/tagged release. See [.github/workflows](.github/workflows) for more details.
 
-We use [GoReleaser to build](.goreleaser.yml).
+We use [GoReleaser to build](.config/goreleaser.yaml).
 
 ## Regular development activities / maintenance
 
