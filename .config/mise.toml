@@ -1,7 +1,7 @@
 [tools]
 cosign = "2.2.3"
 golangci-lint = "2.1.6"
-goreleaser = "1.24.0"
+goreleaser = "2.13.1"
 kind = "0.30.0"
 kubectl = "1.31.0"
 shellcheck = "0.11.0"

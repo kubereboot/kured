@@ -4,20 +4,21 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
 
+RUN apk update --no-cache && apk add --no-cache jq
+
 COPY dist/ /dist
+
+# Fetch binary directory from artifacts.json
 RUN set -ex \
   && case "${TARGETARCH}" in \
-      amd64) \
-          SUFFIX="_v1" \
-          ;; \
       arm) \
-          SUFFIX="_${TARGETVARIANT:1}" \
+          BINARY_PATH=$(jq -r 'first(.[] | select(.goos == "linux" and .type == "Binary" and .goarch == "arm" and .goarm == env.TARGETVARIANT[1:] ) | .path)' /dist/artifacts.json) \
           ;; \
       *) \
-          SUFFIX="" \
+          BINARY_PATH=$(jq -r 'first(.[] | select(.goos == "linux" and .type == "Binary" and .goarch == env.TARGETARCH) | .path)' /dist/artifacts.json) \
           ;; \
     esac \
-  && cp /dist/kured_${TARGETOS}_${TARGETARCH}${SUFFIX}/kured /dist/kured;
+  && cp /${BINARY_PATH} /dist/kured;
 
 FROM alpine:3.22.2@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412
 RUN apk update --no-cache && apk upgrade --no-cache && apk add --no-cache ca-certificates tzdata
