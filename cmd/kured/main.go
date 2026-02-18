@@ -534,6 +534,25 @@ func deleteNodeAnnotation(client *kubernetes.Clientset, nodeID, key string) erro
 	return nil
 }
 
+// nodeHasPreRebootLabels checks if the node has all the pre-reboot labels set.
+// This is used to detect if kured cordoned this node before losing the lock.
+func nodeHasPreRebootLabels(node *v1.Node, labels []string) bool {
+	if labels == nil {
+		return false
+	}
+	for _, label := range labels {
+		parts := strings.SplitN(label, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		k, v := parts[0], parts[1]
+		if nodeValue, ok := node.Labels[k]; !ok || nodeValue != v {
+			return false
+		}
+	}
+	return true
+}
+
 func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []string) {
 	labelsMap := make(map[string]string)
 	for _, label := range labels {
@@ -611,6 +630,43 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 			if err != nil {
 				log.Errorf("Error releasing lock, will retry: %v", err)
 				continue
+			}
+		} else {
+			// We're not holding the lock, but we may have cordoned this node before
+			// losing the lock (e.g., lock TTL expired during reboot).
+			// Detect this by checking for:
+			// - kured reboot-in-progress annotation (if annotateNodes is enabled), OR
+			// - pre-reboot labels on the node (if preRebootNodeLabels is configured)
+			node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeID, metav1.GetOptions{})
+			if err != nil {
+				log.Errorf("Error retrieving node object via k8s API: %v", err)
+				continue
+			}
+
+			hasKuredAnnotation := annotateNodes && node.Annotations[KuredRebootInProgressAnnotation] != ""
+			hasPreRebootLabels := nodeHasPreRebootLabels(node, preRebootNodeLabels)
+
+			if (hasKuredAnnotation || hasPreRebootLabels) && node.Spec.Unschedulable {
+				log.Infof("Lock lost but node %s is still cordoned with kured markers, uncordoning", nodeID)
+				err = uncordon(client, node)
+				if err != nil {
+					log.Errorf("Unable to uncordon %s: %v, will retry", node.GetName(), err)
+					continue
+				}
+
+				if notifyURL != "" {
+					if err := shoutrrr.Send(notifyURL, fmt.Sprintf(messageTemplateUncordon, nodeID)); err != nil {
+						log.Warnf("Error notifying: %v", err)
+					}
+				}
+			}
+
+			// Clean up the annotation since we've handled the post-reboot state
+			if hasKuredAnnotation && !checker.RebootRequired() {
+				err := deleteNodeAnnotation(client, nodeID, KuredRebootInProgressAnnotation)
+				if err != nil {
+					continue
+				}
 			}
 		}
 		break
