@@ -3,8 +3,8 @@ package blockers
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
-	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -44,7 +44,7 @@ func (kb KubernetesBlockingChecker) IsBlocked() bool {
 			FieldSelector: fieldSelector,
 			Limit:         10})
 		if err != nil {
-			log.Warnf("Reboot blocked: pod query error: %v", err)
+			slog.Info("Reboot blocked: pod query error", "error", err)
 			return true
 		}
 
@@ -56,9 +56,15 @@ func (kb KubernetesBlockingChecker) IsBlocked() bool {
 			if len(podList.Continue) > 0 {
 				podNames = append(podNames, "...")
 			}
-			log.Warnf("Reboot blocked: matching pods: %v", podNames)
+			slog.Info(fmt.Sprintf("Reboot blocked due pods matching the patterns: %v", podNames))
 			return true
 		}
 	}
 	return false
+}
+
+// MetricLabel is used to give a fancier name
+// than the type to the label for rebootBlockedCounter
+func (kb KubernetesBlockingChecker) MetricLabel() string {
+	return "blocker_pod"
 }
