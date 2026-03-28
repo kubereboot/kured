@@ -157,7 +157,7 @@ func main() {
 		"Only block if the alert-filter-regexp matches active alerts")
 	flag.BoolVar(&alertFiringOnly, "alert-firing-only", false,
 		"only consider firing alerts when checking for active alerts")
-	flag.StringVar(&rebootSentinelFile, "reboot-sentinel", "/var/run/reboot-required",
+	flag.StringVar(&rebootSentinelFile, "reboot-sentinel", "/run/reboot-required",
 		"path to file whose existence triggers the reboot command")
 	flag.StringVar(&preferNoScheduleTaintName, "prefer-no-schedule-taint", "",
 		"Taint name applied during pending node reboot (to prevent receiving additional pods from other rebooting nodes). Disabled by default. Set e.g. to \"weave.works/kured-node-reboot\" to enable tainting.")
