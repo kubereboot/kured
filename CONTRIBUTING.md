@@ -40,7 +40,7 @@ Your system needs at least the following binaries installed:
 ### Fetch the additional binaries required
 
 Please run `make install-tools` once on a fresh repository clone to download necessary developer tools.
-Installed tools are listed in [.mise directory](.mise/config.toml).
+Installed tools are listed in mise.toml in our .config directory (`.config/mise.toml`).
 
 ### Configure your git for the "Certificate of Origin"
 
