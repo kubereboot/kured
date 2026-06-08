@@ -15,6 +15,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const addOrRemoveJSONOp = "add"
+
 // Taint allows to set soft and hard limitations for scheduling and executing pods on nodes.
 type Taint struct {
 	client    *kubernetes.Clientset
@@ -107,7 +109,6 @@ func preferNoSchedule(client *kubernetes.Clientset, nodeID, taintName string, ef
 	}
 
 	var patches []patchTaints
-
 	if len(updatedNode.Spec.Taints) == 0 {
 		// add first taint and ensure to keep current taints
 		patches = []patchTaints{
@@ -117,12 +118,12 @@ func preferNoSchedule(client *kubernetes.Clientset, nodeID, taintName string, ef
 				Value: updatedNode.Spec,
 			},
 			{
-				Op:    "add",
+				Op:    addOrRemoveJSONOp,
 				Path:  "/spec/taints",
 				Value: []v1.Taint{},
 			},
 			{
-				Op:    "add",
+				Op:    addOrRemoveJSONOp,
 				Path:  "/spec/taints/-",
 				Value: taint,
 			},
@@ -144,7 +145,7 @@ func preferNoSchedule(client *kubernetes.Clientset, nodeID, taintName string, ef
 		// add missing taint to exsting list
 		patches = []patchTaints{
 			{
-				Op:    "add",
+				Op:    addOrRemoveJSONOp,
 				Path:  "/spec/taints/-",
 				Value: taint,
 			},
