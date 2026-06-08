@@ -1,11 +1,12 @@
-name: PR
+name: Branch push and PR
 on:
   pull_request:
   push:
-    branches-ignore:
-      - main
-    tags-ignore:
-      - "*"
+    branches:
+      - "**"
+
+permissions:
+  contents: read
 
 jobs:
   pr-short-tests:
@@ -54,12 +55,8 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
 
-      - name: Find current tag version
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-        id: tags
-
       - name: Build image
-        run: VERSION="${{ steps.tags.outputs.sha_short }}" IMAGE_NAME="${{ github.repository }}" make dev-image
+        run: make dev-image
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
