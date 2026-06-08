@@ -1,5 +1,5 @@
 .DEFAULT: all
-.PHONY: all clean install-tools build dev-image release dev-manifest e2e-test minikube-publish test lint lint-docs
+.PHONY: all clean install-tools dev-image release dev-manifest e2e-test minikube-publish test lint lint-docs
 
 DH_ORG ?= kubereboot
 IMAGE_NAME ?= $(DH_ORG)/kured
@@ -11,7 +11,7 @@ SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
 
 DEV_IMAGE := kured:dev
 
-all: build
+all: test
 
 install-tools:
 	command -v  mise 2>&1 || { echo "please install mise to continue" >&2; exit 127; }
@@ -19,9 +19,6 @@ install-tools:
 
 clean:
 	rm -rf ./dist ./.tmp/goreleaser
-
-build:
-	IMAGE_NAME="$(IMAGE_NAME)" goreleaser build --clean --single-target --snapshot -f $(GORELEASER_CONFIG)
 
 release:
 	IMAGE_NAME="$(IMAGE_NAME)" goreleaser release --clean -f $(GORELEASER_CONFIG)
