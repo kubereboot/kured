@@ -1,0 +1,30 @@
+version: "2"
+#timeout : 5m we can add this if needed
+run:
+  modules-download-mode: readonly
+  tests: false
+linters:
+  enable:
+    - govet
+    - staticcheck
+    - unused
+    - contextcheck
+    - goconst
+    - gosec
+    - testifylint
+    - errcheck
+    - revive
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+    revive:
+      severity: warning
+      confidence: 0.8
+      rules:
+        - name: indent-error-flow
+        - name: var-naming
+        - name: import-shadowing
+        # https://github.com/mgechev/revive/blob/HEAD/RULES_DESCRIPTIONS.md#package-comments
+        - name: package-comments # This is not working!
+          disabled: true

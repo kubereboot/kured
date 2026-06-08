@@ -1,0 +1,99 @@
+version: 2
+
+project_name: kured
+
+before:
+  hooks:
+    - go mod tidy
+    - sh .config/goreleaser/render-manifest.sh {{ .Version }} ghcr.io/{{ .Env.IMAGE_NAME }}
+
+builds:
+  - id: kured
+    main: ./cmd/kured
+    binary: kured
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+      - arm
+      - "386"
+    goarm:
+      - "6"
+      - "7"
+    ldflags:
+      - -s -w -X main.version={{ if .IsSnapshot }}{{ .ShortCommit }}{{ else }}{{ .Version }}{{ end }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+
+snapshot:
+  version_template: "{{ .ShortCommit }}"
+
+archives:
+  - formats:
+      - binary
+
+checksum:
+  name_template: checksums.txt
+
+sboms:
+  - artifacts: binary
+    documents:
+      - "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}.sbom.json"
+
+dockers_v2:
+  - id: kured
+    ids:
+      - kured
+    images:
+      - "ghcr.io/{{ .Env.IMAGE_NAME }}"
+    tags:
+      - "{{ if and (not .IsSnapshot) (ne .Tag .ShortCommit) }}{{ .Tag }}{{ end }}"
+      - "{{ .ShortCommit }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+      - linux/arm/v7
+      - linux/arm/v6
+      - linux/386
+    sbom: true
+    labels:
+      "org.opencontainers.image.created": "{{ .Date }}"
+      "org.opencontainers.image.description": "Kubernetes Reboot Daemon"
+      "org.opencontainers.image.licenses": "Apache-2.0"
+      "org.opencontainers.image.revision": "{{ .FullCommit }}"
+      "org.opencontainers.image.source": "{{ .GitURL }}"
+      "org.opencontainers.image.title": "{{ .ProjectName }}"
+      "org.opencontainers.image.version": "{{ .Version }}"
+    annotations:
+      "org.opencontainers.image.created": "{{ .Date }}"
+      "org.opencontainers.image.description": "Kubernetes Reboot Daemon"
+      "org.opencontainers.image.licenses": "Apache-2.0"
+      "org.opencontainers.image.revision": "{{ .FullCommit }}"
+      "org.opencontainers.image.source": "{{ .GitURL }}"
+      "org.opencontainers.image.title": "{{ .ProjectName }}"
+      "org.opencontainers.image.version": "{{ .Version }}"
+    flags:
+      - "--provenance=true"
+
+docker_digest:
+  name_template: digests.txt
+
+docker_signs:
+  - artifacts: all
+    args:
+      - sign
+      - --yes
+      - "${artifact}@${digest}"
+
+release:
+  disable: '{{ if eq .Env.DISABLE_GITHUB_RELEASE "true" }}true{{ else }}false{{ end }}'
+  name_template: "Kured {{ .Version }}"
+  extra_files:
+    - glob: ".tmp/goreleaser/kured-{{ .Version }}-combined.yaml"
+
+changelog:
+  disable: true

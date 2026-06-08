@@ -30,12 +30,13 @@ type PrometheusBlockingChecker struct {
 	filterMatchOnly bool
 	// storing the promClient
 	promClient papi.Client
+	initErr    error
 }
 
 // NewPrometheusBlockingChecker creates a new PrometheusBlockingChecker using the given
 // Prometheus API config, alert filter, and filtering options.
 func NewPrometheusBlockingChecker(config papi.Config, alertFilter *regexp.Regexp, firingOnly bool, filterMatchOnly bool) PrometheusBlockingChecker {
-	promClient, _ := papi.NewClient(config)
+	promClient, err := papi.NewClient(config)
 
 	return PrometheusBlockingChecker{
 		promConfig:      config,
@@ -43,6 +44,7 @@ func NewPrometheusBlockingChecker(config papi.Config, alertFilter *regexp.Regexp
 		firingOnly:      firingOnly,
 		filterMatchOnly: filterMatchOnly,
 		promClient:      promClient,
+		initErr:         err,
 	}
 }
 
@@ -80,6 +82,10 @@ func (pb PrometheusBlockingChecker) MetricLabel() string {
 // block-list and will NOT block rebooting. query by includeLabel means,
 // if the query finds an alert, it will include it to the block-list, and it WILL block rebooting.
 func (pb PrometheusBlockingChecker) ActiveAlerts() ([]string, error) {
+	if pb.initErr != nil {
+		return nil, pb.initErr
+	}
+
 	api := v1.NewAPI(pb.promClient)
 
 	// get all alerts from prometheus
