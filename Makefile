@@ -1,5 +1,5 @@
 .DEFAULT: all
-.PHONY: all clean install-tools dev-image release dev-manifest e2e-test minikube-publish test lint lint-docs
+.PHONY: all clean install-tools dev-image release dev-manifest e2e-test minikube-publish test lint lint-go lint-sh lint-ghactions lint-docs
 
 DH_ORG ?= kubereboot
 IMAGE_NAME ?= $(DH_ORG)/kured
@@ -52,9 +52,17 @@ test: lint
 	@echo "Running short go tests"
 	go test -test.short -json ./... > test.json
 
-lint:
+lint: lint-sh lint-ghactions lint-go
+
+lint-sh:
 	@echo "Running shellcheck"
 	find . -name '*.sh' | xargs -n1 shellcheck
+
+lint-ghactions:
+	@echo "Running actionlint"
+	actionlint -verbose
+
+lint-go:
 	@echo "Running golangci-lint..."
 	golangci-lint run --config $(GOLANGCI_CONFIG) ./...
 
