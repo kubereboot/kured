@@ -24,13 +24,10 @@ builds:
       - "6"
       - "7"
     ldflags:
-      - -s -w -X main.version={{ if .IsSnapshot }}{{ .ShortCommit }}{{ else }}{{ .Version }}{{ end }}
+      - -s -w -X main.version={{ .Version }}
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
-
-snapshot:
-  version_template: "{{ .ShortCommit }}"
 
 archives:
   - formats:
@@ -51,7 +48,7 @@ dockers_v2:
     images:
       - "ghcr.io/{{ .Env.IMAGE_NAME }}"
     tags:
-      - "{{ if and (not .IsSnapshot) (ne .Tag .ShortCommit) }}{{ .Tag }}{{ end }}"
+      - "{{ if ne .Tag .ShortCommit }}{{ .Tag }}{{ end }}"
       - "{{ .ShortCommit }}"
     platforms:
       - linux/amd64
@@ -90,10 +87,9 @@ docker_signs:
       - "${artifact}@${digest}"
 
 release:
-  disable: '{{ if eq .Env.DISABLE_GITHUB_RELEASE "true" }}true{{ else }}false{{ end }}'
   name_template: "Kured {{ .Version }}"
   extra_files:
     - glob: ".tmp/goreleaser/kured-{{ .Version }}-combined.yaml"
 
 changelog:
-  disable: true
+  use: github-native
