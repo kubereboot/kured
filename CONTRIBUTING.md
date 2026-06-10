@@ -40,7 +40,7 @@ Your system needs at least the following binaries installed:
 ### Fetch the additional binaries required
 
 Please run `make install-tools` once on a fresh repository clone to download necessary developer tools.
-Installed tools are listed in [.mise directory](.mise/config.toml).
+Installed tools are listed in mise.toml in our .config directory (`.config/mise.toml`).
 
 ### Configure your git for the "Certificate of Origin"
 
@@ -94,7 +94,7 @@ We also have other tests:
 
 All these tests are run on every PR/tagged release. See [.github/workflows](.github/workflows) for more details.
 
-We use [GoReleaser to build](.goreleaser.yml).
+We use [GoReleaser to build](.config/goreleaser.yaml).
 
 ## Regular development activities / maintenance
 
@@ -199,7 +199,7 @@ A test-run with `minikube` could look like this:
 minikube start --driver=kvm2 --kubernetes-version <k8s-release>
 
 # build kured image and publish to registry accessible by minikube
-make image minikube-publish
+make dev-image minikube-publish
 
 # edit kured-ds.yaml to
 #   - point to new image
@@ -301,51 +301,19 @@ See also our GitHub issues with the label [`testing`](https://github.com/kubereb
 Ensure you have used the latest patch version in the tree. 
 Check the documentation "Updating k8s support" if the minor version was not yet applied.
 
-### Update the manifests with the new version
-
-```sh
-export VERSION=1.20.0
-make DH_ORG="kubereboot" VERSION="${VERSION}" manifest
-```
-Create a commit updating the manifest with future image [like this one](https://github.com/kubereboot/kured/commit/58091f6145771f426b4b9e012a43a9c847af2560).
-
-### Create the combined manifest for the new release
-
-Now create the `kured-<new version>-combined.yaml` for e.g. `1.20.0`:
-
-```sh
-export VERSION=1.20.0
-export MANIFEST="kured-$VERSION-combined.yaml"
-make DH_ORG="kubereboot" VERSION="${VERSION}" manifest # just to be safe
-cat kured-rbac.yaml > "$MANIFEST"
-cat kured-ds.yaml >> "$MANIFEST"
-```
-
 ### Create the new version tag on the repo (optional, can also be done directly in GH web interface)
 
 Tag the previously created commit with the future release version.
-The GitHub Actions workflow will push the new image to the registry.
+The GitHub Actions workflow will push the new image to the registry and attach the generated combined manifest to the GitHub release.
 
 ### Publish new version release artifacts
 
-Now you can head to the GitHub UI for releases, drafting a new
-release. Chose, as tag, the new version number.
-
-Click to generate the release notes.
-
-Fill, as name, "Kured <new version>".
-
-Edit the generated text.
+GoReleaser creates the GitHub release for the tag. Edit the generated release notes if needed.
 
 Please describe what's new and noteworthy in the release notes, list the PRs
 that landed and give a shout-out to everyone who contributed.
 Please also note down on which releases the upcoming `kured` release was
 tested on or what it supports. (Check old release notes if you're unsure.)
-
-Before clicking on publishing release, upload the yaml manifest
-(`kured-<new version>-combined.yaml`) file.
-
-Click on publish the release and set as the latest release.
 
 ### Prepare Helm chart
 
@@ -354,4 +322,3 @@ Create a commit to [bump the chart and kured version like this one](https://gith
 ### Prepare Documentation
 
 Ensure the [compatibility matrix](https://kured.dev/docs/installation/) is updated to the new version you want to release.
-
