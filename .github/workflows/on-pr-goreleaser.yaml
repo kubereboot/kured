@@ -2,10 +2,10 @@ name: Verify GoReleaser config
 on:
   pull_request:
     paths:
-      - '../../.config/goreleaser.yaml'
+      - '.config/goreleaser.yaml'
   push:
     paths:
-      - '../../.config/goreleaser.yaml'
+      - '.config/goreleaser.yaml'
 
 jobs:
   check-goreleaser-config:
