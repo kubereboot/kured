@@ -5,7 +5,7 @@ project_name: kured
 before:
   hooks:
     - go mod tidy
-    - sh .config/goreleaser/render-manifest.sh {{ .Version }} ghcr.io/{{ .Env.IMAGE_NAME }}
+    - sh .config/goreleaser/render-manifest.sh {{ .Version }} {{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}
 
 builds:
   - id: kured
@@ -46,7 +46,7 @@ dockers_v2:
     ids:
       - kured
     images:
-      - "ghcr.io/{{ .Env.IMAGE_NAME }}"
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}"
     tags:
       - "{{ if ne .Tag .ShortCommit }}{{ .Tag }}{{ end }}"
       - "{{ .ShortCommit }}"
