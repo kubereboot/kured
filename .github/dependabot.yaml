@@ -10,11 +10,17 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
-    ignore:
-      - dependency-name: "k8s.io/api"
-      - dependency-name: "k8s.io/apimachinery"
-      - dependency-name: "k8s.io/client-go"
-      - dependency-name: "k8s.io/kubectl"
+    groups:
+      all:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "k8s.io/*"
+          - "sigs.k8s.io/*"
+      kubernetes:
+        patterns:
+          - "k8s.io/*"
+          - "sigs.k8s.io/*"
   - package-ecosystem: "docker"
     directory: "/"
     schedule:

@@ -1,37 +1,33 @@
 .DEFAULT: all
-.PHONY: all clean image minikube-publish manifest test kured-all lint 
+.PHONY: all clean install-tools dev-image release dev-manifest e2e-test minikube-publish test lint lint-docs
 
-DH_ORG ?= kubereboot
-VERSION=$(shell git rev-parse --short HEAD)
+REGISTRY ?= ghcr.io
+IMAGE_NAME ?= kubereboot/kured
+VERSION ?= $(shell git rev-parse --short HEAD)
+GORELEASER_CONFIG ?= .config/goreleaser.yaml
+GOLANGCI_CONFIG ?= .config/golangci.yaml
+LOCAL_PLATFORM ?= linux/amd64
 SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
 
-all: image
+DEV_IMAGE := kured:dev
 
-.PHONY: install-tools
+all: test
+
 install-tools:
 	command -v  mise 2>&1 || { echo "please install mise to continue" >&2; exit 127; }
 	mise install
 
 clean:
-	rm -rf ./dist
+	rm -rf ./dist ./.tmp/goreleaser
 
-kured:
-	goreleaser build --clean --single-target --snapshot
+release:
+	REGISTRY="$(REGISTRY)" IMAGE_NAME="$(IMAGE_NAME)" goreleaser release --clean -f $(GORELEASER_CONFIG)
 
-kured-all:
-	goreleaser build --clean --snapshot
-
-kured-release-tag:
-	goreleaser release --clean
-
-kured-release-snapshot:
-	goreleaser release --clean --snapshot
-
-image: kured
-	$(SUDO) docker buildx build --no-cache --load -t ghcr.io/$(DH_ORG)/kured:$(VERSION) .
-
-dev-image: image
-	$(SUDO) docker tag ghcr.io/$(DH_ORG)/kured:$(VERSION) kured:dev
+dev-image:
+	mkdir -p dist/docker/$(LOCAL_PLATFORM)
+	CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o dist/docker/$(LOCAL_PLATFORM)/kured ./cmd/kured
+	cp Dockerfile dist/docker/Dockerfile
+	$(SUDO) docker buildx build --load --platform $(LOCAL_PLATFORM) -t $(DEV_IMAGE) dist/docker
 
 dev-manifest:
 	# basic e2e scenario
@@ -49,13 +45,8 @@ e2e-test: dev-manifest dev-image
 	echo "Running ALL go tests"
 	go test -count=1 -v --parallel 4 ./... $(ARGS)
 
-minikube-publish: image
-	$(SUDO) docker save ghcr.io/$(DH_ORG)/kured | (eval $$(minikube docker-env) && docker load)
-
-manifest:
-	sed -i "s#image: ghcr.io/.*kured.*#image: ghcr.io/$(DH_ORG)/kured:$(VERSION)#g" kured-ds.yaml
-	sed -i "s#image: ghcr.io/.*kured.*#image: ghcr.io/$(DH_ORG)/kured:$(VERSION)#g" kured-ds-signal.yaml
-	echo "Please generate combined manifest if necessary"
+minikube-publish: dev-image
+	$(SUDO) docker save $(DEV_IMAGE) | (eval $$(minikube docker-env) && docker load)
 
 test: lint
 	@echo "Running short go tests"
@@ -65,8 +56,12 @@ lint:
 	@echo "Running shellcheck"
 	find . -name '*.sh' | xargs -n1 shellcheck
 	@echo "Running golangci-lint..."
-	golangci-lint run ./...
+	golangci-lint run --config $(GOLANGCI_CONFIG) ./...
 
 lint-docs:
 	@echo "Running lychee"
 	mise x lychee@latest -- lychee --verbose --no-progress '*.md' '*.yaml' '*/*/*.go' --exclude-link-local
+
+lint-goreleaser:
+	@echo "Checking goreleaser"
+	goreleaser check

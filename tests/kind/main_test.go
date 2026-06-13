@@ -143,7 +143,6 @@ func TestE2EWithCommand(t *testing.T) {
 	var kindClusterConfigs = []string{
 		"previous",
 		"current",
-		"next",
 	}
 	// Iterate over each Kubernetes version
 	for _, version := range kindClusterConfigs {
@@ -193,7 +192,6 @@ func TestE2EWithSignal(t *testing.T) {
 	var kindClusterConfigs = []string{
 		"previous",
 		"current",
-		"next",
 	}
 	// Iterate over each Kubernetes version
 	for _, version := range kindClusterConfigs {
@@ -243,7 +241,6 @@ func TestE2EConcurrentWithCommand(t *testing.T) {
 	var kindClusterConfigs = []string{
 		"previous",
 		"current",
-		"next",
 	}
 	// Iterate over each Kubernetes version
 	for _, version := range kindClusterConfigs {
@@ -293,7 +290,6 @@ func TestE2EConcurrentWithSignal(t *testing.T) {
 	var kindClusterConfigs = []string{
 		"previous",
 		"current",
-		"next",
 	}
 	// Iterate over each Kubernetes version
 	for _, version := range kindClusterConfigs {
@@ -353,7 +349,7 @@ func TestCordonningIsKept(t *testing.T) {
 
 			randomInt := strconv.Itoa(rand.Intn(100))
 			kindClusterName := fmt.Sprintf("kured-e2e-cordon-%v-%v", variant, randomInt)
-			kindClusterConfigFile := "../../.github/kind-cluster-next.yaml"
+			kindClusterConfigFile := "../../.github/kind-cluster-current.yaml"
 			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
 
 			var manifest string
@@ -402,7 +398,7 @@ func TestE2EBlocker(t *testing.T) {
 
 			randomInt := strconv.Itoa(rand.Intn(100))
 			kindClusterName := fmt.Sprintf("kured-e2e-cordon-%v-%v", variant, randomInt)
-			kindClusterConfigFile := "../../.github/kind-cluster-next.yaml"
+			kindClusterConfigFile := "../../.github/kind-cluster-current.yaml"
 			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
 
 			k := NewKindTester(kindClusterName, kindClusterConfigFile, t, LocalImage(kuredDevImage), Deploy("../../kured-rbac.yaml"), Deploy(fmt.Sprintf("testfiles/kured-ds-%v.yaml", variant)))
