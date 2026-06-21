@@ -33,6 +33,22 @@ func Test_nsEntering(t *testing.T) {
 	}
 }
 
+func Test_NewFileRebootChecker(t *testing.T) {
+	if _, err := NewFileRebootChecker(""); err == nil {
+		t.Error("expected an error for an empty file path, got nil")
+	}
+	if _, err := NewFileRebootChecker("   "); err == nil {
+		t.Error("expected an error for a blank file path, got nil")
+	}
+	c, err := NewFileRebootChecker("/var/run/reboot-required")
+	if err != nil {
+		t.Fatalf("unexpected error for a valid file path: %v", err)
+	}
+	if c.FilePath != "/var/run/reboot-required" {
+		t.Errorf("FilePath = %q, want %q", c.FilePath, "/var/run/reboot-required")
+	}
+}
+
 func Test_rebootRequired(t *testing.T) {
 	type args struct {
 		sentinelCommand []string
