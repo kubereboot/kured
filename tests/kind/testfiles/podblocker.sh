@@ -34,7 +34,7 @@ spec:
     blocked-host: "yes"
 EOF
 
-docker exec "$worker" touch "${SENTINEL_FILE:-/var/run/reboot-required}"
+docker exec "$worker" touch "${SENTINEL_FILE:-/run/reboot-required}"
 
 set -o errexit
 max_attempts="100"
