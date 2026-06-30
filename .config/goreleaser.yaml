@@ -90,6 +90,17 @@ release:
   name_template: "Kured {{ .Version }}"
   extra_files:
     - glob: ".tmp/goreleaser/kured-{{ .Version }}-combined.yaml"
+  mode: replace
+  footer: |
+    ## Get involved
+
+    As an open source project, we are based on a community of volunteers. Help is always welcomed, at least so we don't feel alone caring about the reboot of your nodes :)
+  
+    Don't hesitate to onboard by tackling issues labeled as "good-first-issue" in our repositories (or harder ones if you like the challenge!), reviewing patches, improving the documentation, maintaining the charts, or help producing releases...
+    There are plenty of places you can contribute, and all you need to get started is your motivation to be one of us :)
+    You can contact us on slack if you want.
+  
+    Thanks a lot to everyone who contributed to kured since last release!
 
 changelog:
   use: github-native
