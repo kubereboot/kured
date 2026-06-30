@@ -123,8 +123,7 @@ In general, the following activities have to happen:
 Go to `.github/workflows` and update the new k8s images. For that:
 
 - `cp .github/kind-cluster-current.yaml .github/kind-cluster-previous.yaml`
-- `cp .github/kind-cluster-next.yaml .github/kind-cluster-current.yaml`
-- Then edit `.github/kind-cluster-next.yaml` to point to the new version.
+- Then edit `.github/kind-cluster-current.yaml` to point to the new version.
 
 This will make the full test matrix updated (the CI and the test code).
 
