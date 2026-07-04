@@ -29,6 +29,54 @@ func TestValidateNotificationURL(t *testing.T) {
 	}
 }
 
+func TestValidateNodeLabels(t *testing.T) {
+	tests := []struct {
+		name        string
+		preReboot   []string
+		postReboot  []string
+		expectError bool
+	}{
+		{
+			name:        "matching key=value labels are accepted",
+			preReboot:   []string{"maintenance=true"},
+			postReboot:  []string{"maintenance=false"},
+			expectError: false,
+		},
+		{
+			name:        "empty label value is accepted",
+			preReboot:   []string{"maintenance="},
+			postReboot:  []string{"maintenance="},
+			expectError: false,
+		},
+		{
+			name:        "label without = is rejected instead of panicking",
+			preReboot:   []string{"node.kubernetes.io/exclude-from-external-load-balancers-"},
+			postReboot:  []string{"node.kubernetes.io/exclude-from-external-load-balancers-"},
+			expectError: true,
+		},
+		{
+			name:        "label with empty key is rejected",
+			preReboot:   []string{"=true"},
+			postReboot:  []string{"=true"},
+			expectError: true,
+		},
+		{
+			name:        "mismatched keys are rejected",
+			preReboot:   []string{"maintenance=true"},
+			postReboot:  []string{"other=false"},
+			expectError: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateNodeLabels(tt.preReboot, tt.postReboot)
+			if (err != nil) != tt.expectError {
+				t.Errorf("validateNodeLabels() error = %v, expectError %v", err, tt.expectError)
+			}
+		})
+	}
+}
+
 func Test_stripQuotes(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -292,13 +292,35 @@ func main() {
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", metricsHost, metricsPort), nil)) // #nosec G114
 }
 
+// splitNodeLabel parses a "key=value" node label into its key and value. It
+// returns an error for any label that is not in key=value form so a malformed
+// entry is caught at startup instead of triggering an index-out-of-range panic
+// later when the labels are applied (see kubereboot/kured#1281). An empty value
+// (for example "some/label=") is allowed since Kubernetes permits empty label
+// values.
+func splitNodeLabel(label string) (key, value string, err error) {
+	parts := strings.SplitN(label, "=", 2)
+	if len(parts) != 2 || parts[0] == "" {
+		return "", "", fmt.Errorf("node label %q must be in key=value form", label)
+	}
+	return parts[0], parts[1], nil
+}
+
 func validateNodeLabels(preRebootNodeLabels []string, postRebootNodeLabels []string) error {
 	var preRebootNodeLabelKeys, postRebootNodeLabelKeys []string
 	for _, label := range preRebootNodeLabels {
-		preRebootNodeLabelKeys = append(preRebootNodeLabelKeys, strings.Split(label, "=")[0])
+		key, _, err := splitNodeLabel(label)
+		if err != nil {
+			return fmt.Errorf("invalid --pre-reboot-node-labels: %w", err)
+		}
+		preRebootNodeLabelKeys = append(preRebootNodeLabelKeys, key)
 	}
 	for _, label := range postRebootNodeLabels {
-		postRebootNodeLabelKeys = append(postRebootNodeLabelKeys, strings.Split(label, "=")[0])
+		key, _, err := splitNodeLabel(label)
+		if err != nil {
+			return fmt.Errorf("invalid --post-reboot-node-labels: %w", err)
+		}
+		postRebootNodeLabelKeys = append(postRebootNodeLabelKeys, key)
 	}
 	sort.Strings(preRebootNodeLabelKeys)
 	sort.Strings(postRebootNodeLabelKeys)
@@ -537,8 +559,11 @@ func deleteNodeAnnotation(client *kubernetes.Clientset, nodeID, key string) erro
 func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []string) {
 	labelsMap := make(map[string]string)
 	for _, label := range labels {
-		k := strings.Split(label, "=")[0]
-		v := strings.Split(label, "=")[1]
+		k, v, err := splitNodeLabel(label)
+		if err != nil {
+			log.Errorf("Skipping node %s label: %v", node.GetName(), err)
+			continue
+		}
 		labelsMap[k] = v
 		log.Infof("Updating node %s label: %s=%s", node.GetName(), k, v)
 	}
@@ -556,8 +581,10 @@ func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []stri
 	if err != nil {
 		var labelsErr string
 		for _, label := range labels {
-			k := strings.Split(label, "=")[0]
-			v := strings.Split(label, "=")[1]
+			k, v, splitErr := splitNodeLabel(label)
+			if splitErr != nil {
+				continue
+			}
 			labelsErr += fmt.Sprintf("%s=%s ", k, v)
 		}
 		log.Errorf("Error updating node labels %s via k8s API: %v", labelsErr, err)
