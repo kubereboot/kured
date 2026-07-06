@@ -47,6 +47,13 @@ func Test_NewFileRebootChecker(t *testing.T) {
 	if c.FilePath != "/var/run/reboot-required" {
 		t.Errorf("FilePath = %q, want %q", c.FilePath, "/var/run/reboot-required")
 	}
+	c, err = NewFileRebootChecker("  /var/run/reboot-required  ")
+	if err != nil {
+		t.Fatalf("unexpected error for a padded file path: %v", err)
+	}
+	if c.FilePath != "/var/run/reboot-required" {
+		t.Errorf("FilePath = %q, want trimmed %q", c.FilePath, "/var/run/reboot-required")
+	}
 }
 
 func Test_rebootRequired(t *testing.T) {

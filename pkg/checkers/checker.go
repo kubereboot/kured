@@ -44,7 +44,8 @@ func (rc FileRebootChecker) RebootRequired() bool {
 
 // NewFileRebootChecker is the constructor for the file based reboot checker
 func NewFileRebootChecker(filePath string) (*FileRebootChecker, error) {
-	if strings.TrimSpace(filePath) == "" {
+	filePath = strings.TrimSpace(filePath)
+	if filePath == "" {
 		return nil, fmt.Errorf("file path for FileRebootChecker must not be empty")
 	}
 	return &FileRebootChecker{
