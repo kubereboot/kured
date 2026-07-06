@@ -134,292 +134,175 @@ func (k *KindTest) Destroy() error {
 	return nil
 }
 
-func TestE2EWithCommand(t *testing.T) {
+const (
+	currentK8sClusterConfig  = "../../.github/kind-cluster-current.yaml"
+	previousK8sClusterConfig = "../../.github/kind-cluster-previous.yaml"
+	rebootSentinelsScript    = "testfiles/create-reboot-sentinels.sh"
+	coordinatedRebootScript  = "testfiles/follow-coordinated-reboot.sh"
+)
+
+type e2eScenario struct {
+	clusterNamePrefix string
+	clusterConfigFile string
+	manifest          string
+	setupScript       string
+	testScript        string
+	failureMessage    string
+}
+
+func runE2E(t *testing.T, scenario e2eScenario) {
+	t.Helper()
 	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
 
-	var kindClusterConfigs = []string{
-		"previous",
-		"current",
+	randomInt := strconv.Itoa(rand.Intn(100))
+	kindClusterName := fmt.Sprintf("%s-%s", scenario.clusterNamePrefix, randomInt)
+	kindContext := fmt.Sprintf("kind-%v", kindClusterName)
+
+	k := NewKindTester(kindClusterName, scenario.clusterConfigFile, t, LocalImage(kuredDevImage), Deploy("../../kured-rbac.yaml"), Deploy(scenario.manifest))
+	defer k.FlushLog()
+
+	err := k.Create()
+	if err != nil {
+		t.Fatalf("Error creating cluster %v", err)
 	}
-	// Iterate over each Kubernetes version
-	for _, version := range kindClusterConfigs {
-		version := version
-		// Define a subtest for each combination
-		t.Run(version, func(t *testing.T) {
-			t.Parallel() // Allow tests to run in parallel
+	defer func(k *KindTest) {
+		err := k.Destroy()
+		if err != nil {
+			t.Fatalf("Error destroying cluster %v", err)
+		}
+	}(k)
 
-			randomInt := strconv.Itoa(rand.Intn(100))
-			kindClusterName := fmt.Sprintf("kured-e2e-command-%v-%v", version, randomInt)
-			kindClusterConfigFile := fmt.Sprintf("../../.github/kind-cluster-%v.yaml", version)
-			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
+	k.Write([]byte("Now running e2e tests"))
 
-			k := NewKindTester(kindClusterName, kindClusterConfigFile, t, LocalImage(kuredDevImage), Deploy("../../kured-rbac.yaml"), Deploy("testfiles/kured-ds.yaml"))
-			defer k.FlushLog()
+	if scenario.setupScript != "" {
+		if err := k.RunCmd("bash", scenario.setupScript, kindContext); err != nil {
+			t.Fatalf("failed to run setup script %s: %v", scenario.setupScript, err)
+		}
+	}
 
-			err := k.Create()
-			if err != nil {
-				t.Fatalf("Error creating cluster %v", err)
-			}
-			defer func(k *KindTest) {
-				err := k.Destroy()
-				if err != nil {
-					t.Fatalf("Error destroying cluster %v", err)
-				}
-			}(k)
-
-			k.Write([]byte("Now running e2e tests"))
-
-			if err := k.RunCmd("bash", "testfiles/create-reboot-sentinels.sh", kindContext); err != nil {
-				t.Fatalf("failed to create sentinels: %v", err)
-			}
-
-			if err := k.RunCmd("bash", "testfiles/follow-coordinated-reboot.sh", kindContext); err != nil {
-				t.Fatalf("failed to follow reboot: %v", err)
-			}
-		})
+	if err := k.RunCmd("bash", scenario.testScript, kindContext); err != nil {
+		t.Fatalf("%s: %v", scenario.failureMessage, err)
 	}
 }
 
-func TestE2EWithSignal(t *testing.T) {
-	t.Parallel()
-	if testing.Short() {
-		t.Skip("skipping test in short mode.")
-	}
-
-	var kindClusterConfigs = []string{
-		"previous",
-		"current",
-	}
-	// Iterate over each Kubernetes version
-	for _, version := range kindClusterConfigs {
-		version := version
-		// Define a subtest for each combination
-		t.Run(version, func(t *testing.T) {
-			t.Parallel() // Allow tests to run in parallel
-
-			randomInt := strconv.Itoa(rand.Intn(100))
-			kindClusterName := fmt.Sprintf("kured-e2e-signal-%v-%v", version, randomInt)
-			kindClusterConfigFile := fmt.Sprintf("../../.github/kind-cluster-%v.yaml", version)
-			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
-
-			k := NewKindTester(kindClusterName, kindClusterConfigFile, t, LocalImage(kuredDevImage), Deploy("../../kured-rbac.yaml"), Deploy("testfiles/kured-ds-signal.yaml"))
-			defer k.FlushLog()
-
-			err := k.Create()
-			if err != nil {
-				t.Fatalf("Error creating cluster %v", err)
-			}
-			defer func(k *KindTest) {
-				err := k.Destroy()
-				if err != nil {
-					t.Fatalf("Error destroying cluster %v", err)
-				}
-			}(k)
-
-			k.Write([]byte("Now running e2e tests"))
-
-			if err := k.RunCmd("bash", "testfiles/create-reboot-sentinels.sh", kindContext); err != nil {
-				t.Fatalf("failed to create sentinels: %v", err)
-			}
-
-			if err := k.RunCmd("bash", "testfiles/follow-coordinated-reboot.sh", kindContext); err != nil {
-				t.Fatalf("failed to follow reboot: %v", err)
-			}
-		})
-	}
+func TestRebootCommandCurrentk8sRelease(t *testing.T) {
+	runE2E(t, e2eScenario{
+		clusterNamePrefix: "kured-e2e-command-current",
+		clusterConfigFile: currentK8sClusterConfig,
+		manifest:          "testfiles/kured-ds.yaml",
+		setupScript:       rebootSentinelsScript,
+		testScript:        coordinatedRebootScript,
+		failureMessage:    "failed to follow reboot",
+	})
 }
 
-func TestE2EConcurrentWithCommand(t *testing.T) {
-	t.Parallel()
-	if testing.Short() {
-		t.Skip("skipping test in short mode.")
-	}
-
-	var kindClusterConfigs = []string{
-		"previous",
-		"current",
-	}
-	// Iterate over each Kubernetes version
-	for _, version := range kindClusterConfigs {
-		version := version
-		// Define a subtest for each combination
-		t.Run(version, func(t *testing.T) {
-			t.Parallel() // Allow tests to run in parallel
-
-			randomInt := strconv.Itoa(rand.Intn(100))
-			kindClusterName := fmt.Sprintf("kured-e2e-concurrentcommand-%v-%v", version, randomInt)
-			kindClusterConfigFile := fmt.Sprintf("../../.github/kind-cluster-%v.yaml", version)
-			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
-
-			k := NewKindTester(kindClusterName, kindClusterConfigFile, t, LocalImage(kuredDevImage), Deploy("../../kured-rbac.yaml"), Deploy("testfiles/kured-ds-concurrent-command.yaml"))
-			defer k.FlushLog()
-
-			err := k.Create()
-			if err != nil {
-				t.Fatalf("Error creating cluster %v", err)
-			}
-			defer func(k *KindTest) {
-				err := k.Destroy()
-				if err != nil {
-					t.Fatalf("Error destroying cluster %v", err)
-				}
-			}(k)
-
-			k.Write([]byte("Now running e2e tests"))
-
-			if err := k.RunCmd("bash", "testfiles/create-reboot-sentinels.sh", kindContext); err != nil {
-				t.Fatalf("failed to create sentinels: %v", err)
-			}
-
-			if err := k.RunCmd("bash", "testfiles/follow-coordinated-reboot.sh", kindContext); err != nil {
-				t.Fatalf("failed to follow reboot: %v", err)
-			}
-		})
-	}
+func TestRebootCommandPreviousk8sRelease(t *testing.T) {
+	runE2E(t, e2eScenario{
+		clusterNamePrefix: "kured-e2e-command-previous",
+		clusterConfigFile: previousK8sClusterConfig,
+		manifest:          "testfiles/kured-ds.yaml",
+		setupScript:       rebootSentinelsScript,
+		testScript:        coordinatedRebootScript,
+		failureMessage:    "failed to follow reboot",
+	})
 }
 
-func TestE2EConcurrentWithSignal(t *testing.T) {
-	t.Parallel()
-	if testing.Short() {
-		t.Skip("skipping test in short mode.")
-	}
-
-	var kindClusterConfigs = []string{
-		"previous",
-		"current",
-	}
-	// Iterate over each Kubernetes version
-	for _, version := range kindClusterConfigs {
-		version := version
-		// Define a subtest for each combination
-		t.Run(version, func(t *testing.T) {
-			t.Parallel() // Allow tests to run in parallel
-
-			randomInt := strconv.Itoa(rand.Intn(100))
-			kindClusterName := fmt.Sprintf("kured-e2e-concurrentsignal-%v-%v", version, randomInt)
-			kindClusterConfigFile := fmt.Sprintf("../../.github/kind-cluster-%v.yaml", version)
-			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
-
-			k := NewKindTester(kindClusterName, kindClusterConfigFile, t, LocalImage(kuredDevImage), Deploy("../../kured-rbac.yaml"), Deploy("testfiles/kured-ds-concurrent-signal.yaml"))
-			defer k.FlushLog()
-
-			err := k.Create()
-			if err != nil {
-				t.Fatalf("Error creating cluster %v", err)
-			}
-			defer func(k *KindTest) {
-				err := k.Destroy()
-				if err != nil {
-					t.Fatalf("Error destroying cluster %v", err)
-				}
-			}(k)
-
-			k.Write([]byte("Now running e2e tests"))
-
-			if err := k.RunCmd("bash", "testfiles/create-reboot-sentinels.sh", kindContext); err != nil {
-				t.Fatalf("failed to create sentinels: %v", err)
-			}
-
-			if err := k.RunCmd("bash", "testfiles/follow-coordinated-reboot.sh", kindContext); err != nil {
-				t.Fatalf("failed to follow reboot: %v", err)
-			}
-		})
-	}
+func TestRebootSignalCurrentk8sRelease(t *testing.T) {
+	runE2E(t, e2eScenario{
+		clusterNamePrefix: "kured-e2e-signal-current",
+		clusterConfigFile: currentK8sClusterConfig,
+		manifest:          "testfiles/kured-ds-signal.yaml",
+		setupScript:       rebootSentinelsScript,
+		testScript:        coordinatedRebootScript,
+		failureMessage:    "failed to follow reboot",
+	})
 }
 
-func TestCordonningIsKept(t *testing.T) {
-	t.Parallel()
-	if testing.Short() {
-		t.Skip("skipping test in short mode.")
-	}
-
-	var kindClusterConfigs = []string{
-		"concurrency1",
-		"concurrency2",
-	}
-	// Iterate over each test variant
-	for _, variant := range kindClusterConfigs {
-		variant := variant
-		// Define a subtest for each combination
-		t.Run(variant, func(t *testing.T) {
-			t.Parallel() // Allow tests to run in parallel
-
-			randomInt := strconv.Itoa(rand.Intn(100))
-			kindClusterName := fmt.Sprintf("kured-e2e-cordon-%v-%v", variant, randomInt)
-			kindClusterConfigFile := "../../.github/kind-cluster-current.yaml"
-			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
-
-			var manifest string
-			if variant == "concurrency1" {
-				manifest = "testfiles/kured-ds-signal.yaml"
-			} else {
-				manifest = "testfiles/kured-ds-concurrent-signal.yaml"
-			}
-			k := NewKindTester(kindClusterName, kindClusterConfigFile, t, LocalImage(kuredDevImage), Deploy("../../kured-rbac.yaml"), Deploy(manifest))
-			defer k.FlushLog()
-
-			err := k.Create()
-			if err != nil {
-				t.Fatalf("Error creating cluster %v", err)
-			}
-			defer func(k *KindTest) {
-				err := k.Destroy()
-				if err != nil {
-					t.Fatalf("Error destroying cluster %v", err)
-				}
-			}(k)
-
-			k.Write([]byte("Now running e2e tests"))
-
-			if err := k.RunCmd("bash", "testfiles/node-stays-as-cordonned.sh", kindContext); err != nil {
-				t.Fatalf("node did not reboot in time: %v", err)
-			}
-		})
-	}
+func TestRebootSignalPreviousk8sRelease(t *testing.T) {
+	runE2E(t, e2eScenario{
+		clusterNamePrefix: "kured-e2e-signal-previous",
+		clusterConfigFile: previousK8sClusterConfig,
+		manifest:          "testfiles/kured-ds-signal.yaml",
+		setupScript:       rebootSentinelsScript,
+		testScript:        coordinatedRebootScript,
+		failureMessage:    "failed to follow reboot",
+	})
 }
-func TestE2EBlocker(t *testing.T) {
-	t.Parallel()
-	if testing.Short() {
-		t.Skip("skipping test in short mode.")
-	}
 
-	var kindClusterConfigs = []string{
-		"podblocker",
-	}
-	// Iterate over each variant of the test
-	for _, variant := range kindClusterConfigs {
-		variant := variant
-		// Define a subtest for each combination
-		t.Run(variant, func(t *testing.T) {
-			t.Parallel() // Allow tests to run in parallel
+func TestConcurrentRebootCommandCurrentk8sRelease(t *testing.T) {
+	runE2E(t, e2eScenario{
+		clusterNamePrefix: "kured-e2e-concurrentcommand-current",
+		clusterConfigFile: currentK8sClusterConfig,
+		manifest:          "testfiles/kured-ds-concurrent-command.yaml",
+		setupScript:       rebootSentinelsScript,
+		testScript:        coordinatedRebootScript,
+		failureMessage:    "failed to follow reboot",
+	})
+}
 
-			randomInt := strconv.Itoa(rand.Intn(100))
-			kindClusterName := fmt.Sprintf("kured-e2e-cordon-%v-%v", variant, randomInt)
-			kindClusterConfigFile := "../../.github/kind-cluster-current.yaml"
-			kindContext := fmt.Sprintf("kind-%v", kindClusterName)
+func TestConcurrentRebootCommandPreviousk8sRelease(t *testing.T) {
+	runE2E(t, e2eScenario{
+		clusterNamePrefix: "kured-e2e-concurrentcommand-previous",
+		clusterConfigFile: previousK8sClusterConfig,
+		manifest:          "testfiles/kured-ds-concurrent-command.yaml",
+		setupScript:       rebootSentinelsScript,
+		testScript:        coordinatedRebootScript,
+		failureMessage:    "failed to follow reboot",
+	})
+}
 
-			k := NewKindTester(kindClusterName, kindClusterConfigFile, t, LocalImage(kuredDevImage), Deploy("../../kured-rbac.yaml"), Deploy(fmt.Sprintf("testfiles/kured-ds-%v.yaml", variant)))
-			defer k.FlushLog()
+func TestConcurrentRebootSignalCurrentk8sRelease(t *testing.T) {
+	runE2E(t, e2eScenario{
+		clusterNamePrefix: "kured-e2e-concurrentsignal-current",
+		clusterConfigFile: currentK8sClusterConfig,
+		manifest:          "testfiles/kured-ds-concurrent-signal.yaml",
+		setupScript:       rebootSentinelsScript,
+		testScript:        coordinatedRebootScript,
+		failureMessage:    "failed to follow reboot",
+	})
+}
 
-			err := k.Create()
-			if err != nil {
-				t.Fatalf("Error creating cluster %v", err)
-			}
-			defer func(k *KindTest) {
-				err := k.Destroy()
-				if err != nil {
-					t.Fatalf("Error destroying cluster %v", err)
-				}
-			}(k)
+func TestConcurrentRebootSignalPreviousk8sRelease(t *testing.T) {
+	runE2E(t, e2eScenario{
+		clusterNamePrefix: "kured-e2e-concurrentsignal-previous",
+		clusterConfigFile: previousK8sClusterConfig,
+		manifest:          "testfiles/kured-ds-concurrent-signal.yaml",
+		setupScript:       rebootSentinelsScript,
+		testScript:        coordinatedRebootScript,
+		failureMessage:    "failed to follow reboot",
+	})
+}
 
-			k.Write([]byte("Now running e2e tests"))
+func TestCordonningIsKeptWithoutConcurrency(t *testing.T) {
+	runE2E(t, e2eScenario{
+		clusterNamePrefix: "kured-e2e-cordon-without-concurrency",
+		clusterConfigFile: currentK8sClusterConfig,
+		manifest:          "testfiles/kured-ds-signal.yaml",
+		testScript:        "testfiles/node-stays-as-cordonned.sh",
+		failureMessage:    "node did not reboot in time",
+	})
+}
 
-			if err := k.RunCmd("bash", fmt.Sprintf("testfiles/%v.sh", variant), kindContext); err != nil {
-				t.Fatalf("node blocker test did not succeed: %v", err)
-			}
-		})
-	}
+func TestCordonningIsKeptWithConcurrency(t *testing.T) {
+	runE2E(t, e2eScenario{
+		clusterNamePrefix: "kured-e2e-cordon-with-concurrency",
+		clusterConfigFile: currentK8sClusterConfig,
+		manifest:          "testfiles/kured-ds-concurrent-signal.yaml",
+		testScript:        "testfiles/node-stays-as-cordonned.sh",
+		failureMessage:    "node did not reboot in time",
+	})
+}
+
+func TestRebootBlockedPodblocker(t *testing.T) {
+	runE2E(t, e2eScenario{
+		clusterNamePrefix: "kured-e2e-cordon-podblocker",
+		clusterConfigFile: currentK8sClusterConfig,
+		manifest:          "testfiles/kured-ds-podblocker.yaml",
+		testScript:        "testfiles/podblocker.sh",
+		failureMessage:    "node blocker test did not succeed",
+	})
 }
