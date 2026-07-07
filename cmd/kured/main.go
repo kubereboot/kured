@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -222,6 +223,12 @@ func main() {
 
 	err := validateNodeLabels(preRebootNodeLabels, postRebootNodeLabels)
 	if err != nil {
+		// A malformed label (not in key=value form) would panic later during
+		// uncordon, so refuse to start. A mere key mismatch between the pre and
+		// post reboot sets is only surprising, not fatal, so keep warning.
+		if errors.Is(err, errMalformedNodeLabel) {
+			log.Fatal(err.Error())
+		}
 		log.Warn(err.Error())
 	}
 
@@ -292,16 +299,24 @@ func main() {
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", metricsHost, metricsPort), nil)) // #nosec G114
 }
 
+// Sentinel errors for node label validation so callers can tell a malformed
+// label (unsafe, panics later during uncordon) apart from a mere key mismatch
+// between the pre and post reboot sets (surprising but not fatal).
+var (
+	errMalformedNodeLabel      = errors.New("malformed node label")
+	errMismatchedNodeLabelKeys = errors.New("pre/post reboot node label keys do not match")
+)
+
 // splitNodeLabel parses a "key=value" node label into its key and value. It
-// returns an error for any label that is not in key=value form so a malformed
-// entry is caught at startup instead of triggering an index-out-of-range panic
-// later when the labels are applied (see kubereboot/kured#1281). An empty value
-// (for example "some/label=") is allowed since Kubernetes permits empty label
-// values.
+// wraps errMalformedNodeLabel for any label that is not in key=value form so a
+// malformed entry is caught at startup instead of triggering an
+// index-out-of-range panic later when the labels are applied (see
+// kubereboot/kured#1281). An empty value (for example "some/label=") is allowed
+// since Kubernetes permits empty label values.
 func splitNodeLabel(label string) (key, value string, err error) {
 	parts := strings.SplitN(label, "=", 2)
 	if len(parts) != 2 || parts[0] == "" {
-		return "", "", fmt.Errorf("node label %q must be in key=value form", label)
+		return "", "", fmt.Errorf("%w: %q must be in key=value form", errMalformedNodeLabel, label)
 	}
 	return parts[0], parts[1], nil
 }
@@ -325,7 +340,7 @@ func validateNodeLabels(preRebootNodeLabels []string, postRebootNodeLabels []str
 	sort.Strings(preRebootNodeLabelKeys)
 	sort.Strings(postRebootNodeLabelKeys)
 	if !reflect.DeepEqual(preRebootNodeLabelKeys, postRebootNodeLabelKeys) {
-		return fmt.Errorf("pre-reboot-node-labels keys and post-reboot-node-labels keys do not match, resulting in unexpected behaviour")
+		return fmt.Errorf("%w, resulting in unexpected behaviour", errMismatchedNodeLabelKeys)
 	}
 
 	return nil
