@@ -534,11 +534,17 @@ func deleteNodeAnnotation(client *kubernetes.Clientset, nodeID, key string) erro
 	return nil
 }
 
-func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []string) {
+func updateNodeLabels(client kubernetes.Interface, node *v1.Node, labels []string) {
 	labelsMap := make(map[string]string)
 	for _, label := range labels {
-		k := strings.Split(label, "=")[0]
-		v := strings.Split(label, "=")[1]
+		parts := strings.SplitN(label, "=", 2)
+		if len(parts) != 2 {
+			// Labels are added as key=value; skip malformed entries
+			// (e.g. a trailing "-" removal marker) instead of panicking.
+			log.Warnf("Skipping node label %q: expected key=value format", label)
+			continue
+		}
+		k, v := parts[0], parts[1]
 		labelsMap[k] = v
 		log.Infof("Updating node %s label: %s=%s", node.GetName(), k, v)
 	}
@@ -556,9 +562,11 @@ func updateNodeLabels(client *kubernetes.Clientset, node *v1.Node, labels []stri
 	if err != nil {
 		var labelsErr string
 		for _, label := range labels {
-			k := strings.Split(label, "=")[0]
-			v := strings.Split(label, "=")[1]
-			labelsErr += fmt.Sprintf("%s=%s ", k, v)
+			parts := strings.SplitN(label, "=", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			labelsErr += fmt.Sprintf("%s=%s ", parts[0], parts[1])
 		}
 		log.Errorf("Error updating node labels %s via k8s API: %v", labelsErr, err)
 	}
