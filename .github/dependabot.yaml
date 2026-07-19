@@ -10,6 +10,17 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    groups:
+      all:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "k8s.io/*"
+          - "sigs.k8s.io/*"
+      kubernetes:
+        patterns:
+          - "k8s.io/*"
+          - "sigs.k8s.io/*"
   - package-ecosystem: "docker"
     directory: "/"
     schedule:

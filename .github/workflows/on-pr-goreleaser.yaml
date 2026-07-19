@@ -1,0 +1,28 @@
+name: Verify GoReleaser config
+on:
+  pull_request:
+    paths:
+      - '.config/goreleaser.yaml'
+  push:
+    paths:
+      - '.config/goreleaser.yaml'
+
+jobs:
+  check-goreleaser-config:
+    name: Check GoReleaser config
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Check GoReleaser config
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 #v7.2.3
+        with:
+          version: '~> v2'
+          args: check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

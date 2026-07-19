@@ -1,0 +1,106 @@
+version: 2
+
+project_name: kured
+
+before:
+  hooks:
+    - go mod tidy
+    - sh .config/goreleaser/render-manifest.sh {{ .Version }} {{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}
+
+builds:
+  - id: kured
+    main: ./cmd/kured
+    binary: kured
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+      - arm
+      - "386"
+    goarm:
+      - "6"
+      - "7"
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+
+archives:
+  - formats:
+      - binary
+
+checksum:
+  name_template: checksums.txt
+
+sboms:
+  - artifacts: binary
+    documents:
+      - "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}.sbom.json"
+
+dockers_v2:
+  - id: kured
+    ids:
+      - kured
+    images:
+      - "{{ .Env.REGISTRY }}/{{ .Env.IMAGE_NAME }}"
+    tags:
+      - "{{ if ne .Tag .ShortCommit }}{{ .Tag }}{{ end }}"
+      - "{{ .ShortCommit }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+      - linux/arm/v7
+      - linux/arm/v6
+      - linux/386
+    sbom: true
+    labels:
+      "org.opencontainers.image.created": "{{ .Date }}"
+      "org.opencontainers.image.description": "Kubernetes Reboot Daemon"
+      "org.opencontainers.image.licenses": "Apache-2.0"
+      "org.opencontainers.image.revision": "{{ .FullCommit }}"
+      "org.opencontainers.image.source": "{{ .GitURL }}"
+      "org.opencontainers.image.title": "{{ .ProjectName }}"
+      "org.opencontainers.image.version": "{{ .Version }}"
+    annotations:
+      "org.opencontainers.image.created": "{{ .Date }}"
+      "org.opencontainers.image.description": "Kubernetes Reboot Daemon"
+      "org.opencontainers.image.licenses": "Apache-2.0"
+      "org.opencontainers.image.revision": "{{ .FullCommit }}"
+      "org.opencontainers.image.source": "{{ .GitURL }}"
+      "org.opencontainers.image.title": "{{ .ProjectName }}"
+      "org.opencontainers.image.version": "{{ .Version }}"
+    flags:
+      - "--provenance=true"
+
+docker_digest:
+  name_template: digests.txt
+
+docker_signs:
+  - artifacts: all
+    args:
+      - sign
+      - --yes
+      - "${artifact}@${digest}"
+
+release:
+  name_template: "Kured {{ .Version }}"
+  extra_files:
+    - glob: ".tmp/goreleaser/kured-{{ .Version }}-combined.yaml"
+  mode: replace
+  footer: |
+    ## Get involved
+
+    As an open source project, we are based on a community of volunteers. Help is always welcomed, at least so we don't feel alone caring about the reboot of your nodes :)
+  
+    Don't hesitate to onboard by tackling issues labeled as "good-first-issue" in our repositories (or harder ones if you like the challenge!), reviewing patches, improving the documentation, maintaining the charts, or help producing releases...
+    There are plenty of places you can contribute, and all you need to get started is your motivation to be one of us :)
+    You can contact us on slack if you want.
+  
+    Thanks a lot to everyone who contributed to kured since last release!
+
+changelog:
+  use: github-native

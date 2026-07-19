@@ -2,5 +2,7 @@ cmd/kured/kured
 vendor
 build
 dist
+.tmp/goreleaser
 test.json
 tests/kind/testfiles/*.yaml
+/.cache/
