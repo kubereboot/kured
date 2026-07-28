@@ -1,7 +1,7 @@
 [tools]
 actionlint = "latest"
 cosign = "3.0.6"
-go = "1.26.4"
+go = "1.26.5"
 golangci-lint = "2.12.2"
 goreleaser = "2.16.0"
 kind = "0.32.0"
