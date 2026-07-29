@@ -1,5 +1,5 @@
 .DEFAULT: all
-.PHONY: all clean install-tools dev-image release dev-manifest e2e-test minikube-publish test lint lint-go lint-sh lint-ghactions lint-docs
+.PHONY: all clean install-tools dev-image release dev-manifest e2e-test minikube-publish test lint lint-go lint-sh lint-ghactions lint-docs check-go-version
 
 REGISTRY ?= ghcr.io
 IMAGE_NAME ?= kubereboot/kured
@@ -54,6 +54,15 @@ test: lint
 
 lint: lint-sh lint-ghactions lint-go
 
+check-go-version:
+	@echo "Checking Go version consistency"
+	@go_version="$$(sed -nE 's/^go[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+)[[:space:]]*$$/\1/p' go.mod)"; \
+	mise_version="$$(sed -nE 's/^go[[:space:]]*=[[:space:]]*"([0-9]+\.[0-9]+\.[0-9]+)"[[:space:]]*$$/\1/p' .config/mise.toml)"; \
+	if [ -z "$$go_version" ] || [ -z "$$mise_version" ] || [ "$$go_version" != "$$mise_version" ]; then \
+		echo "Go version mismatch or invalid format: go.mod=$${go_version:-invalid}, .config/mise.toml=$${mise_version:-invalid}" >&2; \
+		exit 1; \
+	fi
+
 lint-sh:
 	@echo "Running shellcheck"
 	find . -name '*.sh' | xargs -n1 shellcheck
@@ -73,3 +82,4 @@ lint-docs:
 lint-goreleaser:
 	@echo "Checking goreleaser"
 	goreleaser check
+
