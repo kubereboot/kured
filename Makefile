@@ -6,7 +6,7 @@ IMAGE_NAME ?= kubereboot/kured
 VERSION ?= $(shell git rev-parse --short HEAD)
 GORELEASER_CONFIG ?= .config/goreleaser.yaml
 GOLANGCI_CONFIG ?= .config/golangci.yaml
-LOCAL_PLATFORM ?= linux/amd64
+DOCKER_LOCAL_PLATFORM ?= linux/$(shell go env GOARCH)
 SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
 
 DEV_IMAGE := kured:dev
@@ -24,10 +24,10 @@ release:
 	REGISTRY="$(REGISTRY)" IMAGE_NAME="$(IMAGE_NAME)" goreleaser release --clean -f $(GORELEASER_CONFIG)
 
 dev-image:
-	mkdir -p dist/docker/$(LOCAL_PLATFORM)
-	CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o dist/docker/$(LOCAL_PLATFORM)/kured ./cmd/kured
+	mkdir -p dist/docker
+	CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o dist/docker/kured ./cmd/kured
 	cp Dockerfile dist/docker/Dockerfile
-	$(SUDO) docker buildx build --load --platform $(LOCAL_PLATFORM) -t $(DEV_IMAGE) dist/docker
+	$(SUDO) docker buildx build --load --platform $(DOCKER_LOCAL_PLATFORM) -t $(DEV_IMAGE) dist/docker
 
 dev-manifest:
 	# basic e2e scenario
