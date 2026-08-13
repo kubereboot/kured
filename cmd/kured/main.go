@@ -89,10 +89,35 @@ var (
 	annotateNodes bool
 
 	// Metrics
+	lockAnnotationGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Subsystem: "kured",
+		Name:      "lock_annotation",
+		Help:      "Kured lock annotation metadata.",
+	}, []string{"node", "kured_node_id", "kured_node_unschedulable"})
+	lockHeldGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Subsystem: "kured",
+		Name:      "lock_held",
+		Help:      "Kured holds a lock allowing a node to reboot.",
+	}, []string{"node"})
+	nodeDrainingGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Subsystem: "kured",
+		Name:      "node_draining",
+		Help:      "Kured is in the process of draining a node prior to reboot.",
+	}, []string{"node"})
+	rebootBlockedGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Subsystem: "kured",
+		Name:      "reboot_blocked",
+		Help:      "OS requires reboot but the reboot is blocked by a condition.",
+	}, []string{"node"})
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Subsystem: "kured",
 		Name:      "reboot_required",
 		Help:      "OS requires reboot due to software updates.",
+	}, []string{"node"})
+	rebootWindowGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Subsystem: "kured",
+		Name:      "reboot_window_active",
+		Help:      "Kured is in an active window allowing reboots to occur.",
 	}, []string{"node"})
 )
 
@@ -286,7 +311,7 @@ func main() {
 	lock := daemonsetlock.New(client, nodeID, dsNamespace, dsName, lockAnnotation, lockTTL, concurrency, lockReleaseDelay)
 
 	go rebootAsRequired(nodeID, rebooter, rebootChecker, blockCheckers, window, lock, client)
-	go maintainRebootRequiredMetric(nodeID, rebootChecker)
+	go maintainMetrics(nodeID, rebootChecker, lock, blockCheckers, window)
 
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", metricsHost, metricsPort), nil)) // #nosec G114
@@ -428,6 +453,8 @@ func drain(client *kubernetes.Clientset, node *v1.Node) error {
 	}
 
 	log.Infof("Draining node %s", nodename)
+	nodeDrainingGauge.WithLabelValues(nodeID).Set(1)
+	defer nodeDrainingGauge.WithLabelValues(nodeID).Set(0)
 
 	if notifyURL != "" {
 		if err := shoutrrr.Send(notifyURL, fmt.Sprintf(messageTemplateDrain, nodename)); err != nil {
@@ -479,14 +506,35 @@ func uncordon(client *kubernetes.Clientset, node *v1.Node) error {
 	return nil
 }
 
-func maintainRebootRequiredMetric(nodeID string, checker checkers.Checker) {
+func maintainMetrics(nodeID string, checker checkers.Checker, lock daemonsetlock.Lock, blockCheckers []blockers.RebootBlocker, window *timewindow.TimeWindow) {
 	for {
 		if checker.RebootRequired() {
 			rebootRequiredGauge.WithLabelValues(nodeID).Set(1)
 		} else {
 			rebootRequiredGauge.WithLabelValues(nodeID).Set(0)
 		}
-		time.Sleep(time.Minute)
+
+		held, annotation, _ := lock.Holding()
+		lockAnnotationGauge.WithLabelValues(nodeID, annotation.NodeID, strconv.FormatBool(annotation.Metadata.Unschedulable)).Set(1)
+		if held {
+			lockHeldGauge.WithLabelValues(nodeID).Set(1)
+		} else {
+			lockHeldGauge.WithLabelValues(nodeID).Set(0)
+		}
+
+		if blockers.RebootBlocked(blockCheckers...) {
+			rebootBlockedGauge.WithLabelValues(nodeID).Set(1)
+		} else {
+			rebootBlockedGauge.WithLabelValues(nodeID).Set(0)
+		}
+
+		if window.Contains(time.Now()) {
+			rebootWindowGauge.WithLabelValues(nodeID).Set(1)
+		} else {
+			rebootWindowGauge.WithLabelValues(nodeID).Set(0)
+		}
+
+		time.Sleep(15 * time.Second)
 	}
 }
 
