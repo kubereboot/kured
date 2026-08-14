@@ -479,6 +479,19 @@ func uncordon(client *kubernetes.Clientset, node *v1.Node) error {
 	return nil
 }
 
+// uncordonThenRelease performs a best-effort uncordon before releasing the lock, so that a
+// failed drain does not leave the node cordoned for the duration of any configured lock
+// release delay.
+func uncordonThenRelease(nodeName string, lock daemonsetlock.Lock, uncordonFn func() error) {
+	log.Infof("Performing a best-effort uncordon after failed cordon and drain")
+	if err := uncordonFn(); err != nil {
+		log.Errorf("Failed to uncordon %s: %v", nodeName, err)
+	}
+	if err := lock.Release(); err != nil {
+		log.Errorf("Error releasing lock: %v", err)
+	}
+}
+
 func maintainRebootRequiredMetric(nodeID string, checker checkers.Checker) {
 	for {
 		if checker.RebootRequired() {
@@ -690,15 +703,7 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 		if err != nil {
 			if !forceReboot {
 				log.Errorf("Unable to cordon or drain %s: %v, will release lock and retry cordon and drain before rebooting when lock is next acquired", node.GetName(), err)
-				err = lock.Release()
-				if err != nil {
-					log.Errorf("Error releasing lock: %v", err)
-				}
-				log.Infof("Performing a best-effort uncordon after failed cordon and drain")
-				err := uncordon(client, node)
-				if err != nil {
-					log.Errorf("Failed to uncordon %s: %v", node.GetName(), err)
-				}
+				uncordonThenRelease(node.GetName(), lock, func() error { return uncordon(client, node) })
 				continue
 			}
 		}
