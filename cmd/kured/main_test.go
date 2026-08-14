@@ -1,9 +1,56 @@
 package main
 
 import (
+	"errors"
 	"reflect"
 	"testing"
+
+	"github.com/kubereboot/kured/pkg/daemonsetlock"
 )
+
+// fakeLock is a minimal daemonsetlock.Lock used to observe call ordering in tests.
+type fakeLock struct {
+	onRelease func()
+}
+
+func (f *fakeLock) Acquire(daemonsetlock.NodeMeta) (bool, string, error) { return true, "", nil }
+func (f *fakeLock) Holding() (bool, daemonsetlock.LockAnnotationValue, error) {
+	return true, daemonsetlock.LockAnnotationValue{}, nil
+}
+func (f *fakeLock) Release() error {
+	if f.onRelease != nil {
+		f.onRelease()
+	}
+	return nil
+}
+
+func TestUncordonThenReleaseUncordonsBeforeReleasingLock(t *testing.T) {
+	var order []string
+
+	lock := &fakeLock{onRelease: func() { order = append(order, "release") }}
+	uncordonFn := func() error {
+		order = append(order, "uncordon")
+		return nil
+	}
+
+	uncordonThenRelease("test-node", lock, uncordonFn)
+
+	if want := []string{"uncordon", "release"}; !reflect.DeepEqual(order, want) {
+		t.Errorf("uncordonThenRelease() call order = %v, want %v", order, want)
+	}
+}
+
+func TestUncordonThenReleaseReleasesLockEvenIfUncordonFails(t *testing.T) {
+	released := false
+	lock := &fakeLock{onRelease: func() { released = true }}
+	uncordonFn := func() error { return errors.New("boom") }
+
+	uncordonThenRelease("test-node", lock, uncordonFn)
+
+	if !released {
+		t.Errorf("uncordonThenRelease() did not release the lock after a failed uncordon")
+	}
+}
 
 func TestValidateNotificationURL(t *testing.T) {
 
