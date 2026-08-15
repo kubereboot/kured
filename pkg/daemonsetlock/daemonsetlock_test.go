@@ -29,6 +29,27 @@ func TestTtlExpired(t *testing.T) {
 	}
 }
 
+func TestEffectiveTTL(t *testing.T) {
+	tests := []struct {
+		name       string
+		stored     time.Duration
+		configured time.Duration
+		want       time.Duration
+	}{
+		{"lock recorded its own ttl, configured ignored", time.Hour, time.Minute, time.Hour},
+		{"lock recorded none, falls back to configured", 0, 30 * time.Minute, 30 * time.Minute},
+		{"neither set, stays disabled", 0, 0, 0},
+	}
+
+	for _, tst := range tests {
+		t.Run(tst.name, func(t *testing.T) {
+			if got := effectiveTTL(tst.stored, tst.configured); got != tst.want {
+				t.Errorf("effectiveTTL(%v, %v) = %v, want %v", tst.stored, tst.configured, got, tst.want)
+			}
+		})
+	}
+}
+
 func multiLockAnnotationsAreEqualByNodes(src, dst multiLockAnnotationValue) bool {
 	srcNodes := []string{}
 	for _, srcLock := range src.LockAnnotations {
@@ -178,6 +199,40 @@ func TestCanAcquireMultiple(t *testing.T) {
 				MaxOwners: 2,
 				LockAnnotations: []LockAnnotationValue{
 					{NodeID: node1Name},
+				},
+			},
+			lockPossible: true,
+		},
+		{
+			// A lock taken while --lock-ttl was still at its default of 0
+			// records a zero TTL. Without a fallback to the configured TTL
+			// that lock never expires, so a node that went away without
+			// releasing blocks every later reboot.
+			name: "full_with_lock_taken_before_ttl_was_configured",
+			daemonSetLock: DaemonSetLock{
+				nodeID: node1Name,
+			},
+			maxOwners: 2,
+			current: multiLockAnnotationValue{
+				MaxOwners: 2,
+				LockAnnotations: []LockAnnotationValue{
+					{
+						NodeID:  node2Name,
+						Created: time.Now().UTC().Add(-1 * time.Hour),
+						TTL:     0,
+					},
+					{
+						NodeID:  node3Name,
+						Created: time.Now().UTC().Add(-1 * time.Minute),
+						TTL:     time.Hour,
+					},
+				},
+			},
+			desired: multiLockAnnotationValue{
+				MaxOwners: 2,
+				LockAnnotations: []LockAnnotationValue{
+					{NodeID: node1Name},
+					{NodeID: node3Name},
 				},
 			},
 			lockPossible: true,
