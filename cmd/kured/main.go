@@ -74,6 +74,7 @@ var (
 	messageTemplateReboot           string
 	messageTemplateUncordon         string
 	podSelectors                    []string
+	nodeLabels                      []string
 	rebootCommand                   string
 	rebootSignal                    int
 	logFormat                       string
@@ -185,6 +186,8 @@ func main() {
 		"message template used to notify about a node being rebooted")
 	flag.StringArrayVar(&podSelectors, "blocking-pod-selector", nil,
 		"label selector identifying pods whose presence should prevent reboots")
+	flag.StringArrayVar(&nodeLabels, "blocking-node-label", nil,
+		"node label selectors that should prevent reboots")
 	flag.StringSliceVar(&rebootDays, "reboot-days", timewindow.EveryDay,
 		"schedule reboot on these days")
 	flag.StringVar(&rebootStart, "start-time", "0:00",
@@ -229,6 +232,7 @@ func main() {
 
 	// This should be printed from blocker list instead of only blocking pod selectors
 	log.Infof("Blocking Pod Selectors: %v", podSelectors)
+	log.Infof("Blocking Node Labels: %v", nodeLabels)
 
 	log.Infof("Reboot period %v", period)
 	log.Infof("Concurrency: %v", concurrency)
@@ -269,8 +273,11 @@ func main() {
 	if prometheusURL != "" {
 		blockCheckers = append(blockCheckers, blockers.NewPrometheusBlockingChecker(papi.Config{Address: prometheusURL}, alertFilter.Regexp, alertFiringOnly, alertFilterMatchOnly))
 	}
-	if podSelectors != nil {
+	if len(podSelectors) > 0 {
 		blockCheckers = append(blockCheckers, blockers.NewKubernetesBlockingChecker(client, nodeID, podSelectors))
+	}
+	if len(nodeLabels) > 0 {
+		blockCheckers = append(blockCheckers, blockers.NewKubernetesNodeBlockingChecker(client, nodeID, nodeLabels))
 	}
 	log.Infof("Lock Annotation: %s/%s:%s", dsNamespace, dsName, lockAnnotation)
 	if lockTTL > 0 {
