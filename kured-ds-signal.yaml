@@ -90,6 +90,7 @@ spec:
 #            - --blocking-pod-selector=runtime=long,cost=expensive
 #            - --blocking-pod-selector=name=temperamental
 #            - --blocking-pod-selector=...
+#            - --blocking-node-label=kubernetes.io/arch:arm64
 #            - --reboot-days=sun,mon,tue,wed,thu,fri,sat
 #            - --reboot-delay=90s
 #            - --start-time=0:00
