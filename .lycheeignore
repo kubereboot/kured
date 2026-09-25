@@ -1,6 +1,7 @@
 app.fossa.com
 cluster.local
 hooks.slack.com
+cloud-native.slack.com
 localhost
 slack://
 teams://
