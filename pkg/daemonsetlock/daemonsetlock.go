@@ -150,7 +150,7 @@ func (dsl *DaemonSetSingleLock) Acquire(nodeMetadata NodeMeta) (bool, string, er
 				return false, "", err
 			}
 
-			if !ttlExpired(value.Created, value.TTL) {
+			if !ttlExpired(value.Created, effectiveTTL(value.TTL, dsl.TTL)) {
 				return value.NodeID == dsl.nodeID, value.NodeID, nil
 			}
 		}
@@ -201,7 +201,7 @@ func (dsl *DaemonSetSingleLock) Holding() (bool, LockAnnotationValue, error) {
 			return false, lockData, err
 		}
 
-		if !ttlExpired(value.Created, value.TTL) {
+		if !ttlExpired(value.Created, effectiveTTL(value.TTL, dsl.TTL)) {
 			return value.NodeID == dsl.nodeID, value, nil
 		}
 	}
@@ -257,6 +257,25 @@ func ttlExpired(created time.Time, ttl time.Duration) bool {
 	return false
 }
 
+// effectiveTTL decides which TTL an existing lock is judged by.
+//
+// A lock records the TTL that was configured when it was taken. Since
+// --lock-ttl defaults to 0 and ttlExpired never expires a zero TTL, a lock
+// taken before the flag was set can outlive the node that took it: the node
+// is gone and cannot release, and no later value of --lock-ttl reaches the
+// TTL already written into the annotation. Reboots then block until an
+// operator deletes the annotation by hand.
+//
+// Falling back to the configured TTL only when the lock recorded none keeps
+// locks that carry their own TTL on that TTL, so a rolling upgrade still sees
+// each lock honour the setting it was taken under.
+func effectiveTTL(stored, configured time.Duration) time.Duration {
+	if stored == 0 {
+		return configured
+	}
+	return stored
+}
+
 func nodeIDsFromMultiLock(annotation multiLockAnnotationValue) []string {
 	nodeIDs := make([]string, 0, len(annotation.LockAnnotations))
 	for _, nodeLock := range annotation.LockAnnotations {
@@ -273,7 +292,7 @@ func (dsl *DaemonSetLock) canAcquireMultiple(annotation multiLockAnnotationValue
 		newAnnotation.LockAnnotations = annotation.LockAnnotations
 	} else {
 		for _, nodeLock := range annotation.LockAnnotations {
-			if ttlExpired(nodeLock.Created, nodeLock.TTL) {
+			if ttlExpired(nodeLock.Created, effectiveTTL(nodeLock.TTL, TTL)) {
 				freeSpace = true
 				continue
 			}
@@ -359,7 +378,7 @@ func (dsl *DaemonSetMultiLock) Holding() (bool, LockAnnotationValue, error) {
 		}
 
 		for _, nodeLock := range value.LockAnnotations {
-			if nodeLock.NodeID == dsl.nodeID && !ttlExpired(nodeLock.Created, nodeLock.TTL) {
+			if nodeLock.NodeID == dsl.nodeID && !ttlExpired(nodeLock.Created, effectiveTTL(nodeLock.TTL, dsl.TTL)) {
 				return true, nodeLock, nil
 			}
 		}
