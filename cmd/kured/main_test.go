@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -24,6 +25,72 @@ func TestValidateNotificationURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := validateNotificationURL(tt.notifyURL, tt.slackHookURL); !reflect.DeepEqual(got, tt.expected) {
 				t.Errorf("validateNotificationURL() = %v, expected %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestValidateNodeLabels(t *testing.T) {
+	// wantErr is the sentinel the returned error should wrap (nil means the
+	// input is valid). A malformed label is fatal at startup, a key mismatch is
+	// only a warning, so the caller distinguishes them via errors.Is and the
+	// test pins down which sentinel each case yields.
+	tests := []struct {
+		name       string
+		preReboot  []string
+		postReboot []string
+		wantErr    error
+	}{
+		{
+			name:       "matching key=value labels are accepted",
+			preReboot:  []string{"maintenance=true"},
+			postReboot: []string{"maintenance=false"},
+			wantErr:    nil,
+		},
+		{
+			name:       "empty label value is accepted",
+			preReboot:  []string{"maintenance="},
+			postReboot: []string{"maintenance="},
+			wantErr:    nil,
+		},
+		{
+			name:       "label without = is malformed instead of panicking",
+			preReboot:  []string{"node.kubernetes.io/exclude-from-external-load-balancers-"},
+			postReboot: []string{"node.kubernetes.io/exclude-from-external-load-balancers-"},
+			wantErr:    errMalformedNodeLabel,
+		},
+		{
+			name:       "label with empty key is malformed",
+			preReboot:  []string{"=true"},
+			postReboot: []string{"=true"},
+			wantErr:    errMalformedNodeLabel,
+		},
+		{
+			name:       "mismatched keys are reported as a mismatch",
+			preReboot:  []string{"maintenance=true"},
+			postReboot: []string{"other=false"},
+			wantErr:    errMismatchedNodeLabelKeys,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateNodeLabels(tt.preReboot, tt.postReboot)
+			if tt.wantErr == nil {
+				if err != nil {
+					t.Errorf("validateNodeLabels() = %v, want nil", err)
+				}
+				return
+			}
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("validateNodeLabels() = %v, want error wrapping %v", err, tt.wantErr)
+			}
+			// A malformed label must not be mistaken for a mere mismatch (which
+			// would only warn) and vice versa.
+			if tt.wantErr == errMalformedNodeLabel && errors.Is(err, errMismatchedNodeLabelKeys) {
+				t.Errorf("validateNodeLabels() = %v, malformed label must not wrap errMismatchedNodeLabelKeys", err)
+			}
+			if tt.wantErr == errMismatchedNodeLabelKeys && errors.Is(err, errMalformedNodeLabel) {
+				t.Errorf("validateNodeLabels() = %v, key mismatch must not wrap errMalformedNodeLabel", err)
 			}
 		})
 	}
