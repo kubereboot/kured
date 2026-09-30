@@ -88,6 +88,9 @@ var (
 	timezone      string
 	annotateNodes bool
 
+	sentinelCommandTimeout time.Duration
+	rebootCommandTimeout   time.Duration
+
 	// Metrics
 	rebootRequiredGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Subsystem: "kured",
@@ -163,8 +166,12 @@ func main() {
 		"Taint name applied during pending node reboot (to prevent receiving additional pods from other rebooting nodes). Disabled by default. Set e.g. to \"weave.works/kured-node-reboot\" to enable tainting.")
 	flag.StringVar(&rebootSentinelCommand, "reboot-sentinel-command", "",
 		"command for which a zero return code will trigger a reboot command")
+	flag.DurationVar(&sentinelCommandTimeout, "sentinel-command-timeout", 60*time.Second,
+		"positive maximum duration for one reboot sentinel command (default 60s); after cancellation or process exit, waiting for inherited stdout/stderr pipes is bounded by a 1s drain grace")
 	flag.StringVar(&rebootCommand, "reboot-command", "/bin/systemctl reboot",
 		"command to run when a reboot is required")
+	flag.DurationVar(&rebootCommandTimeout, "reboot-command-timeout", 60*time.Second,
+		"positive maximum duration for one reboot command (default 60s); after cancellation or process exit, waiting for inherited stdout/stderr pipes is bounded by a 1s drain grace")
 	flag.IntVar(&concurrency, "concurrency", 1,
 		"amount of nodes to concurrently reboot. Defaults to 1")
 	flag.IntVar(&rebootSignal, "reboot-signal", sigTrminPlus5,
@@ -216,6 +223,15 @@ func main() {
 	if nodeID == "" {
 		log.Fatal("KURED_NODE_ID environment variable required")
 	}
+	// Reject non-positive deadlines before checkers, rebooters, or the cluster
+	// client are built. The in-process 60s fallback is only for unset fields,
+	// not for an explicit zero or negative flag.
+	if sentinelCommandTimeout <= 0 {
+		log.Fatalf("sentinel-command-timeout must be positive, got %v", sentinelCommandTimeout)
+	}
+	if rebootCommandTimeout <= 0 {
+		log.Fatalf("reboot-command-timeout must be positive, got %v", rebootCommandTimeout)
+	}
 	log.Infof("Node ID: %s", nodeID)
 
 	notifyURL = validateNotificationURL(notifyURL, slackHookURL)
@@ -245,12 +261,12 @@ func main() {
 	log.Infof("Reboot schedule: %v", window)
 
 	log.Infof("Reboot method: %s", rebootMethod)
-	rebooter, err := internal.NewRebooter(rebootMethod, rebootCommand, rebootSignal)
+	rebooter, err := internal.NewRebooter(rebootMethod, rebootCommand, rebootSignal, rebootCommandTimeout)
 	if err != nil {
 		log.Fatalf("Failed to build rebooter: %v", err)
 	}
 
-	rebootChecker, err := internal.NewRebootChecker(rebootSentinelCommand, rebootSentinelFile)
+	rebootChecker, err := internal.NewRebootChecker(rebootSentinelCommand, rebootSentinelFile, sentinelCommandTimeout)
 	if err != nil {
 		log.Fatalf("Failed to build reboot checker: %v", err)
 	}

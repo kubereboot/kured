@@ -77,6 +77,8 @@ spec:
 #            - --alert-firing-only=false
 #            - --prefer-no-schedule-taint=""
 #            - --reboot-sentinel-command=""
+#            - --sentinel-command-timeout=60s # positive duration; default 60s; stdout/stderr drain grace is 1s
+#            - --reboot-command-timeout=60s # positive duration; default 60s; stdout/stderr drain grace is 1s
 #            - --reboot-method=command
 #            - --reboot-signal=39
 #            - --slack-hook-url=https://hooks.slack.com/...
