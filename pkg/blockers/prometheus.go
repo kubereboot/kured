@@ -89,7 +89,7 @@ func (pb PrometheusBlockingChecker) ActiveAlerts() ([]string, error) {
 	api := v1.NewAPI(pb.promClient)
 
 	// get all alerts from prometheus
-	value, _, err := api.Query(context.Background(), "ALERTS", time.Now())
+	value, _, _, err := api.Query(context.Background(), "ALERTS", time.Now())
 	if err != nil {
 		return nil, err
 	}
