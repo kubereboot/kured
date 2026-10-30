@@ -9,11 +9,15 @@ updates:
       codeql:
         patterns:
           - "github/codeql-action/*"
+    cooldown:
+      default-days: 7
   # Maintain dependencies for gomod
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
       interval: "daily"
+    cooldown:
+      semver-minor-days: 7
     groups:
       all:
         patterns:
@@ -29,3 +33,5 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
