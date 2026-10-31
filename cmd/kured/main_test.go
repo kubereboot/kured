@@ -56,6 +56,7 @@ func TestCommandTimeoutFlagHelp(t *testing.T) {
 		"--sentinel-command-timeout",
 		"--reboot-command-timeout",
 		"before it is killed, must be positive",
+		"0 (the default) means no deadline",
 		"waits at most 1s more",
 		"still holding its stdout or stderr",
 	} {
@@ -63,21 +64,20 @@ func TestCommandTimeoutFlagHelp(t *testing.T) {
 			t.Errorf("help missing %q\n%s", fragment, out)
 		}
 	}
-	if got := strings.Count(out, "(default 1m0s)"); got != 2 {
-		t.Errorf("(default 1m0s) count = %d, want 2\n%s", got, out)
+	if got := strings.Count(out, "(default 1m0s)"); got != 1 {
+		t.Errorf("(default 1m0s) count = %d, want 1 for the sentinel timeout only\n%s", got, out)
 	}
 }
 
-func TestCommandTimeoutFlagsRejectNonPositiveBeforeClusterConfig(t *testing.T) {
+func TestCommandTimeoutFlagsRejectInvalidBeforeClusterConfig(t *testing.T) {
 	tests := []struct {
 		name string
 		args []string
 		want string
 	}{
-		{name: "sentinel zero", args: []string{"--node-id=node", "--sentinel-command-timeout=0s"}, want: "sentinel-command-timeout"},
-		{name: "sentinel negative", args: []string{"--node-id=node", "--sentinel-command-timeout=-1s"}, want: "sentinel-command-timeout"},
-		{name: "reboot zero", args: []string{"--node-id=node", "--reboot-command-timeout=0s"}, want: "reboot-command-timeout"},
-		{name: "reboot negative", args: []string{"--node-id=node", "--reboot-command-timeout=-1s"}, want: "reboot-command-timeout"},
+		{name: "sentinel zero", args: []string{"--node-id=node", "--sentinel-command-timeout=0s"}, want: "sentinel-command-timeout must be positive"},
+		{name: "sentinel negative", args: []string{"--node-id=node", "--sentinel-command-timeout=-1s"}, want: "sentinel-command-timeout must be positive"},
+		{name: "reboot negative", args: []string{"--node-id=node", "--reboot-command-timeout=-1s"}, want: "reboot-command-timeout must not be negative"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -88,17 +88,18 @@ func TestCommandTimeoutFlagsRejectNonPositiveBeforeClusterConfig(t *testing.T) {
 			if strings.Contains(out, "unable to load in-cluster configuration") {
 				t.Fatalf("validation reached Kubernetes configuration: %s", out)
 			}
-			if !strings.Contains(out, tt.want) || !strings.Contains(out, "must be positive") {
+			if !strings.Contains(out, tt.want) {
 				t.Fatalf("output = %s", out)
 			}
 		})
 	}
 }
 
-func TestPositiveCommandTimeoutsReachClusterConfig(t *testing.T) {
+func TestValidCommandTimeoutsReachClusterConfig(t *testing.T) {
 	tests := [][]string{
 		{"--node-id=node"},
 		{"--node-id=node", "--sentinel-command-timeout=30s", "--reboot-command-timeout=2m"},
+		{"--node-id=node", "--reboot-command-timeout=0s"},
 	}
 	for _, args := range tests {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
@@ -106,8 +107,8 @@ func TestPositiveCommandTimeoutsReachClusterConfig(t *testing.T) {
 			if code == 0 {
 				t.Fatalf("expected failure outside a cluster: %s", out)
 			}
-			if strings.Contains(out, "must be positive") {
-				t.Fatalf("positive timeouts were rejected: %s", out)
+			if strings.Contains(out, "must be positive") || strings.Contains(out, "must not be negative") {
+				t.Fatalf("valid timeouts were rejected: %s", out)
 			}
 			if !strings.Contains(out, "unable to load in-cluster configuration") {
 				t.Fatalf("expected cluster configuration access, got: %s", out)

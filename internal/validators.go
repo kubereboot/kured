@@ -16,8 +16,8 @@ import (
 
 // NewRebooter validates the rebootMethod, rebootCommand, and rebootSignal input,
 // then chains to the right constructor.
-// rebootCommandTimeout is passed to command rebooters and must already be
-// positive; a zero value is not rewritten here. Signal rebooting is unchanged.
+// rebootCommandTimeout is passed to command rebooters; zero means no deadline.
+// Signal rebooting is unchanged.
 func NewRebooter(rebootMethod string, rebootCommand string, rebootSignal int, rebootCommandTimeout time.Duration) (reboot.Rebooter, error) {
 	switch rebootMethod {
 	case "command":

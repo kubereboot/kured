@@ -129,7 +129,7 @@ func cleanupSleepPID(t *testing.T, pidFile string) {
 	})
 }
 
-func TestCommandRebooterZeroTimeoutFallback(t *testing.T) {
+func TestCommandRebooterZeroTimeoutHasNoDeadline(t *testing.T) {
 	constructed, err := NewCommandRebooter("echo ok", 0)
 	if err != nil {
 		t.Fatal(err)
@@ -137,20 +137,18 @@ func TestCommandRebooterZeroTimeoutFallback(t *testing.T) {
 	if constructed.Timeout != 0 {
 		t.Fatalf("constructor Timeout = %v, want zero", constructed.Timeout)
 	}
-	if got := constructed.commandTimeout(); got != defaultCommandTimeout {
-		t.Fatalf("constructor effective timeout = %v, want %v", got, defaultCommandTimeout)
-	}
 
-	literal := CommandRebooter{RebootCommand: []string{"true"}}
-	if got := literal.commandTimeout(); got != defaultCommandTimeout {
-		t.Fatalf("literal effective timeout = %v, want %v", got, defaultCommandTimeout)
+	// The descendant outlives the command and holds its pipes past the 1s
+	// drain bound used with a Timeout. With no Timeout that is not a failure.
+	hold := 2 * commandWaitDelay
+	script := fmt.Sprintf("sleep %d & exit 0", int(hold.Seconds()))
+	rebooter := CommandRebooter{RebootCommand: shell(script)}
+	start := time.Now()
+	if err := rebooter.Reboot(); err != nil {
+		t.Fatalf("zero Timeout failed: %v", err)
 	}
-	if err := literal.Reboot(); err != nil {
-		t.Fatalf("zero Timeout on direct struct failed closed: %v", err)
-	}
-	literal.Timeout = 5 * time.Second
-	if got := literal.commandTimeout(); got != 5*time.Second {
-		t.Fatalf("explicit timeout = %v", got)
+	if elapsed := time.Since(start); elapsed < hold/2+commandWaitDelay/4 {
+		t.Fatalf("Reboot returned after %v, before the output closed", elapsed)
 	}
 }
 

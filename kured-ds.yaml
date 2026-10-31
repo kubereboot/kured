@@ -78,7 +78,7 @@ spec:
 #            - --prefer-no-schedule-taint=""
 #            - --reboot-sentinel-command=""
 #            - --sentinel-command-timeout=60s # positive duration; default 60s
-#            - --reboot-command-timeout=60s # positive duration; default 60s
+#            - --reboot-command-timeout=0s # duration; default 0s, no deadline
 #            - --reboot-method=command
 #            - --reboot-signal=39
 #            - --slack-hook-url=https://hooks.slack.com/...

@@ -13,32 +13,19 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const (
-	// defaultCommandTimeout is the deadline used when Timeout is unset.
-	// It matches the --reboot-command-timeout CLI default so existing
-	// constructors and direct struct literals stay bounded.
-	defaultCommandTimeout = 60 * time.Second
-	// commandWaitDelay bounds draining of inherited stdout/stderr pipes after
-	// the process exits or its deadline fires. It does not terminate
-	// descendant processes. The CLI help text documents this 1s wait.
-	commandWaitDelay = time.Second
-)
+// commandWaitDelay bounds draining of inherited stdout/stderr pipes after the
+// process exits or its deadline fires, when a Timeout is set. It does not
+// terminate descendant processes. The CLI help text documents this 1s wait.
+const commandWaitDelay = time.Second
 
 // CommandRebooter holds context-information for a reboot with command
 type CommandRebooter struct {
 	RebootCommand []string
 	// Timeout is the deadline for a single Reboot execution.
-	// The zero value falls back to 60s. Each call creates its own context
-	// and output buffers; nothing about a previous run is retained.
+	// Zero means no deadline: Reboot is never cancelled and waits for the
+	// command and its output, however long they take. Each call creates its
+	// own context and output buffers; nothing about a previous run is retained.
 	Timeout time.Duration
-}
-
-// commandTimeout returns the deadline for one execution.
-func (c CommandRebooter) commandTimeout() time.Duration {
-	if c.Timeout == 0 {
-		return defaultCommandTimeout
-	}
-	return c.Timeout
 }
 
 // Reboot triggers the reboot command.
@@ -49,19 +36,24 @@ func (c CommandRebooter) Reboot() error {
 
 	bufStdout := new(bytes.Buffer)
 	bufStderr := new(bytes.Buffer)
-	timeout := c.commandTimeout()
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+	ctx := context.Background()
+	if c.Timeout != 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, c.Timeout)
+		defer cancel()
+	}
 	cmd := exec.CommandContext(ctx, c.RebootCommand[0], c.RebootCommand[1:]...) // #nosec G204
 	cmd.Stdout = bufStdout
 	cmd.Stderr = bufStderr
-	cmd.WaitDelay = commandWaitDelay
+	if c.Timeout != 0 {
+		cmd.WaitDelay = commandWaitDelay
+	}
 
 	if err := cmd.Run(); err != nil {
 		// Deadline expiration surfaces as an ExitError from the killed process,
 		// so it has to be detected before ordinary exit handling.
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(err, context.DeadlineExceeded) {
-			return fmt.Errorf("reboot command %s timed out after %v (stdout: %v, stderr: %v): %w", c.RebootCommand, timeout, bufStdout.String(), bufStderr.String(), err)
+			return fmt.Errorf("reboot command %s timed out after %v (stdout: %v, stderr: %v): %w", c.RebootCommand, c.Timeout, bufStdout.String(), bufStderr.String(), err)
 		}
 		if errors.Is(err, exec.ErrWaitDelay) {
 			return fmt.Errorf("reboot command %s exceeded output drain grace (stdout: %v, stderr: %v): %w", c.RebootCommand, bufStdout.String(), bufStderr.String(), err)
@@ -75,7 +67,7 @@ func (c CommandRebooter) Reboot() error {
 // NewCommandRebooter is the constructor to create a CommandRebooter from a string not
 // yet shell lexed. You can skip this constructor if you parse the data correctly first
 // when instantiating a CommandRebooter instance.
-// timeout is the deadline for one Reboot execution; zero falls back to 60s.
+// timeout is the deadline for one Reboot execution; zero means no deadline.
 func NewCommandRebooter(rebootCommand string, timeout time.Duration) (*CommandRebooter, error) {
 	if rebootCommand == "" {
 		return nil, fmt.Errorf("no reboot command specified")

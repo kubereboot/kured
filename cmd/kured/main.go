@@ -170,8 +170,8 @@ func main() {
 		"maximum time one reboot sentinel command may run before it is killed, must be positive. Once the command has ended, kured waits at most 1s more for any child process still holding its stdout or stderr")
 	flag.StringVar(&rebootCommand, "reboot-command", "/bin/systemctl reboot",
 		"command to run when a reboot is required")
-	flag.DurationVar(&rebootCommandTimeout, "reboot-command-timeout", 60*time.Second,
-		"maximum time one reboot command may run before it is killed, must be positive. Once the command has ended, kured waits at most 1s more for any child process still holding its stdout or stderr")
+	flag.DurationVar(&rebootCommandTimeout, "reboot-command-timeout", 0,
+		"maximum time one reboot command may run before it is killed. 0 (the default) means no deadline. When set, kured waits at most 1s more after the command has ended for any child process still holding its stdout or stderr")
 	flag.IntVar(&concurrency, "concurrency", 1,
 		"amount of nodes to concurrently reboot. Defaults to 1")
 	flag.IntVar(&rebootSignal, "reboot-signal", sigTrminPlus5,
@@ -223,14 +223,15 @@ func main() {
 	if nodeID == "" {
 		log.Fatal("KURED_NODE_ID environment variable required")
 	}
-	// Reject non-positive deadlines before checkers, rebooters, or the cluster
-	// client are built. The in-process 60s fallback is only for unset fields,
-	// not for an explicit zero or negative flag.
+	// Reject invalid deadlines before checkers, rebooters, or the cluster
+	// client are built. The in-process 60s sentinel fallback is only for unset
+	// fields, not for an explicit zero or negative flag. A zero reboot command
+	// timeout means no deadline, so only a negative one is invalid.
 	if sentinelCommandTimeout <= 0 {
 		log.Fatalf("sentinel-command-timeout must be positive, got %v", sentinelCommandTimeout)
 	}
-	if rebootCommandTimeout <= 0 {
-		log.Fatalf("reboot-command-timeout must be positive, got %v", rebootCommandTimeout)
+	if rebootCommandTimeout < 0 {
+		log.Fatalf("reboot-command-timeout must not be negative, got %v", rebootCommandTimeout)
 	}
 	log.Infof("Node ID: %s", nodeID)
 
