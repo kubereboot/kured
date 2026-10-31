@@ -167,7 +167,7 @@ func main() {
 	flag.StringVar(&rebootSentinelCommand, "reboot-sentinel-command", "",
 		"command for which a zero return code will trigger a reboot command")
 	flag.DurationVar(&sentinelCommandTimeout, "sentinel-command-timeout", 60*time.Second,
-		"maximum time one reboot sentinel command may run before it is killed, must be positive. Once the command has ended, kured waits at most 1s more for any child process still holding its stdout or stderr")
+		"maximum time one reboot sentinel command may run before it is killed, must be positive and, when --reboot-sentinel-command is set, shorter than --period. Once the command has ended, kured waits at most 1s more for any child process still holding its stdout or stderr")
 	flag.StringVar(&rebootCommand, "reboot-command", "/bin/systemctl reboot",
 		"command to run when a reboot is required")
 	flag.DurationVar(&rebootCommandTimeout, "reboot-command-timeout", 0,
@@ -233,11 +233,18 @@ func main() {
 	if rebootCommandTimeout < 0 {
 		log.Fatalf("reboot-command-timeout must not be negative, got %v", rebootCommandTimeout)
 	}
+	warning, err := validateSentinelTimeout(rebootSentinelCommand, sentinelCommandTimeout, period, flag.CommandLine.Changed("sentinel-command-timeout"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if warning != "" {
+		log.Warn(warning)
+	}
 	log.Infof("Node ID: %s", nodeID)
 
 	notifyURL = validateNotificationURL(notifyURL, slackHookURL)
 
-	err := validateNodeLabels(preRebootNodeLabels, postRebootNodeLabels)
+	err = validateNodeLabels(preRebootNodeLabels, postRebootNodeLabels)
 	if err != nil {
 		log.Warn(err.Error())
 	}
@@ -347,6 +354,24 @@ func validateNotificationURL(notifyURL string, slackHookURL string) string {
 		return fmt.Sprintf("slack://%s", strings.ReplaceAll(parsedURL.Path, "/services/", ""))
 	}
 	return ""
+}
+
+// validateSentinelTimeout checks the sentinel command deadline against the
+// check period. rebootAsRequired runs the sentinel inline on each period tick,
+// so a deadline of one period or more lets a stuck command take up the next
+// check. A sentinel file has no deadline, so only a sentinel command is checked.
+//
+// An explicit timeout that does not fit is an error. The 60s default is only a
+// warning: a shorter --period with a sentinel command works today, and an
+// upgrade should not stop that daemon for a value the user never set.
+func validateSentinelTimeout(sentinelCommand string, timeout, period time.Duration, explicit bool) (string, error) {
+	if sentinelCommand == "" || timeout < period {
+		return "", nil
+	}
+	if explicit {
+		return "", fmt.Errorf("sentinel-command-timeout (%v) must be shorter than period (%v)", timeout, period)
+	}
+	return fmt.Sprintf("default sentinel-command-timeout (%v) is not shorter than period (%v); set --sentinel-command-timeout below the period", timeout, period), nil
 }
 
 // LoadFromEnv attempts to load environment variables corresponding to flags.

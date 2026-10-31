@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestMain(m *testing.M) {
@@ -33,8 +34,13 @@ func kuredTestEnv() []string {
 
 func runKured(t *testing.T, args ...string) (string, int) {
 	t.Helper()
+	return runKuredWithEnv(t, nil, args...)
+}
+
+func runKuredWithEnv(t *testing.T, env []string, args ...string) (string, int) {
+	t.Helper()
 	cmd := exec.Command(os.Args[0], append([]string{"--"}, args...)...)
-	cmd.Env = kuredTestEnv()
+	cmd.Env = append(kuredTestEnv(), env...)
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		return string(out), 0
@@ -100,6 +106,11 @@ func TestValidCommandTimeoutsReachClusterConfig(t *testing.T) {
 		{"--node-id=node"},
 		{"--node-id=node", "--sentinel-command-timeout=30s", "--reboot-command-timeout=2m"},
 		{"--node-id=node", "--reboot-command-timeout=0s"},
+		{"--node-id=node", "--reboot-sentinel-command=true", "--period=2m", "--sentinel-command-timeout=1m"},
+		// No sentinel command, so the sentinel timeout is unused.
+		{"--node-id=node", "--period=30s", "--sentinel-command-timeout=1m"},
+		// The reboot command runs once and never meets the next period tick.
+		{"--node-id=node", "--period=30s", "--reboot-command-timeout=1m"},
 	}
 	for _, args := range tests {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
@@ -107,13 +118,79 @@ func TestValidCommandTimeoutsReachClusterConfig(t *testing.T) {
 			if code == 0 {
 				t.Fatalf("expected failure outside a cluster: %s", out)
 			}
-			if strings.Contains(out, "must be positive") || strings.Contains(out, "must not be negative") {
+			if strings.Contains(out, "must be positive") || strings.Contains(out, "must not be negative") || strings.Contains(out, "must be shorter") {
 				t.Fatalf("valid timeouts were rejected: %s", out)
 			}
 			if !strings.Contains(out, "unable to load in-cluster configuration") {
 				t.Fatalf("expected cluster configuration access, got: %s", out)
 			}
 		})
+	}
+}
+
+func TestValidateSentinelTimeout(t *testing.T) {
+	tests := []struct {
+		name        string
+		command     string
+		timeout     time.Duration
+		period      time.Duration
+		explicit    bool
+		wantWarning bool
+		wantErr     bool
+	}{
+		{name: "shorter than period", command: "true", timeout: time.Minute, period: time.Hour, explicit: true},
+		{name: "explicit equal to period", command: "true", timeout: time.Hour, period: time.Hour, explicit: true, wantErr: true},
+		{name: "explicit longer than period", command: "true", timeout: 2 * time.Hour, period: time.Hour, explicit: true, wantErr: true},
+		{name: "default equal to period", command: "true", timeout: time.Minute, period: time.Minute, wantWarning: true},
+		{name: "default longer than period", command: "true", timeout: time.Minute, period: 20 * time.Second, wantWarning: true},
+		{name: "sentinel file ignores explicit timeout", timeout: time.Hour, period: time.Minute, explicit: true},
+		{name: "sentinel file ignores default timeout", timeout: time.Minute, period: 20 * time.Second},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			warning, err := validateSentinelTimeout(tt.command, tt.timeout, tt.period, tt.explicit)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
+			}
+			if (warning != "") != tt.wantWarning {
+				t.Fatalf("warning = %q, wantWarning %v", warning, tt.wantWarning)
+			}
+		})
+	}
+}
+
+func TestSentinelTimeoutMustFitPeriod(t *testing.T) {
+	const want = "sentinel-command-timeout (1m0s) must be shorter than period (30s)"
+	args := []string{"--node-id=node", "--reboot-sentinel-command=true", "--period=30s"}
+
+	t.Run("flag", func(t *testing.T) {
+		out, code := runKured(t, append(args, "--sentinel-command-timeout=1m")...)
+		if code != 1 || !strings.Contains(out, want) {
+			t.Fatalf("exit %d, output = %s", code, out)
+		}
+		if strings.Contains(out, "unable to load in-cluster configuration") {
+			t.Fatalf("validation reached Kubernetes configuration: %s", out)
+		}
+	})
+
+	t.Run("environment", func(t *testing.T) {
+		out, code := runKuredWithEnv(t, []string{"KURED_SENTINEL_COMMAND_TIMEOUT=1m"}, args...)
+		if code != 1 || !strings.Contains(out, want) {
+			t.Fatalf("exit %d, output = %s", code, out)
+		}
+	})
+}
+
+func TestDefaultSentinelTimeoutOverPeriodOnlyWarns(t *testing.T) {
+	out, code := runKured(t, "--node-id=node", "--reboot-sentinel-command=true", "--period=30s")
+	if code == 0 {
+		t.Fatalf("expected failure outside a cluster: %s", out)
+	}
+	if !strings.Contains(out, "is not shorter than period (30s)") {
+		t.Fatalf("missing warning: %s", out)
+	}
+	if !strings.Contains(out, "unable to load in-cluster configuration") {
+		t.Fatalf("expected cluster configuration access, got: %s", out)
 	}
 }
 

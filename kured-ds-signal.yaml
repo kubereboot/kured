@@ -80,7 +80,7 @@ spec:
 #            - --alert-firing-only=false
 #            - --prefer-no-schedule-taint=""
 #            - --reboot-sentinel-command=""
-#            - --sentinel-command-timeout=60s # positive duration; default 60s
+#            - --sentinel-command-timeout=60s # positive duration, shorter than --period; default 60s
 #            - --slack-hook-url=https://hooks.slack.com/...
 #            - --slack-username=prod
 #            - --slack-channel=alerting
