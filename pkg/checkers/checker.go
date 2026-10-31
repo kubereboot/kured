@@ -141,8 +141,8 @@ func (rc CommandChecker) RebootRequired() bool {
 // This relies on hostPID:true and privileged:true to enter host mount space
 // For info, rancher based need different pid, which should be user given.
 // until we have a better discovery mechanism.
-// Timeout is left zero so existing callers keep the 60s execution default.
-func NewCommandChecker(sentinelCommand string, pid int, privileged bool) (*CommandChecker, error) {
+// timeout is the deadline for one RebootRequired execution; zero falls back to 60s.
+func NewCommandChecker(sentinelCommand string, pid int, privileged bool, timeout time.Duration) (*CommandChecker, error) {
 	var cmd []string
 	if privileged {
 		cmd = append(cmd, "/usr/bin/nsenter", fmt.Sprintf("-m/proc/%d/ns/mnt", pid), "--")
@@ -156,5 +156,6 @@ func NewCommandChecker(sentinelCommand string, pid int, privileged bool) (*Comma
 		CheckCommand: cmd,
 		NamespacePid: pid,
 		Privileged:   privileged,
+		Timeout:      timeout,
 	}, nil
 }

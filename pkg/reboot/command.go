@@ -75,8 +75,8 @@ func (c CommandRebooter) Reboot() error {
 // NewCommandRebooter is the constructor to create a CommandRebooter from a string not
 // yet shell lexed. You can skip this constructor if you parse the data correctly first
 // when instantiating a CommandRebooter instance.
-// Timeout is left zero so existing callers keep the 60s execution default.
-func NewCommandRebooter(rebootCommand string) (*CommandRebooter, error) {
+// timeout is the deadline for one Reboot execution; zero falls back to 60s.
+func NewCommandRebooter(rebootCommand string, timeout time.Duration) (*CommandRebooter, error) {
 	if rebootCommand == "" {
 		return nil, fmt.Errorf("no reboot command specified")
 	}
@@ -86,5 +86,5 @@ func NewCommandRebooter(rebootCommand string) (*CommandRebooter, error) {
 		return nil, fmt.Errorf("error %v when parsing reboot command %s", err, rebootCommand)
 	}
 	cmd = append(cmd, parsedCommand...)
-	return &CommandRebooter{RebootCommand: cmd}, nil
+	return &CommandRebooter{RebootCommand: cmd, Timeout: timeout}, nil
 }

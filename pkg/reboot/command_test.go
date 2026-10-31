@@ -20,6 +20,7 @@ import (
 func TestNewCommandRebooter(t *testing.T) {
 	type args struct {
 		rebootCommand string
+		timeout       time.Duration
 	}
 	tests := []struct {
 		name    string
@@ -29,20 +30,20 @@ func TestNewCommandRebooter(t *testing.T) {
 	}{
 		{
 			name:    "Ensure command is nsenter wrapped",
-			args:    args{"ls -Fal"},
-			want:    &CommandRebooter{RebootCommand: []string{"/usr/bin/nsenter", "-m/proc/1/ns/mnt", "--", "ls", "-Fal"}},
+			args:    args{"ls -Fal", 30 * time.Second},
+			want:    &CommandRebooter{RebootCommand: []string{"/usr/bin/nsenter", "-m/proc/1/ns/mnt", "--", "ls", "-Fal"}, Timeout: 30 * time.Second},
 			wantErr: false,
 		},
 		{
 			name:    "Ensure empty command is erroring",
-			args:    args{""},
+			args:    args{"", 30 * time.Second},
 			want:    nil,
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewCommandRebooter(tt.args.rebootCommand)
+			got, err := NewCommandRebooter(tt.args.rebootCommand, tt.args.timeout)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewCommandRebooter() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -129,7 +130,7 @@ func cleanupSleepPID(t *testing.T, pidFile string) {
 }
 
 func TestCommandRebooterZeroTimeoutFallback(t *testing.T) {
-	constructed, err := NewCommandRebooter("echo ok")
+	constructed, err := NewCommandRebooter("echo ok", 0)
 	if err != nil {
 		t.Fatal(err)
 	}

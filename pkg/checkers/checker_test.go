@@ -36,7 +36,7 @@ func Test_nsEntering(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cc, _ := NewCommandChecker(tt.args.command, tt.args.pid, tt.args.privileged)
+			cc, _ := NewCommandChecker(tt.args.command, tt.args.pid, tt.args.privileged, time.Second)
 			if !reflect.DeepEqual(cc.CheckCommand, tt.want) {
 				t.Errorf("command parsed as %v, want %v", cc.CheckCommand, tt.want)
 			}
@@ -227,8 +227,18 @@ func TestCommandCheckerExitCodesAndOutput(t *testing.T) {
 	}
 }
 
+func TestNewCommandCheckerStoresTimeout(t *testing.T) {
+	checker, err := NewCommandChecker("true", 1, false, 30*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checker.Timeout != 30*time.Second {
+		t.Fatalf("Timeout = %v, want 30s", checker.Timeout)
+	}
+}
+
 func TestCommandTimeoutZeroValueFallback(t *testing.T) {
-	constructed, err := NewCommandChecker("true", 1, false)
+	constructed, err := NewCommandChecker("true", 1, false, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
