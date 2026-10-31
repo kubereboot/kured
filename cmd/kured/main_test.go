@@ -55,10 +55,9 @@ func TestCommandTimeoutFlagHelp(t *testing.T) {
 	for _, fragment := range []string{
 		"--sentinel-command-timeout",
 		"--reboot-command-timeout",
-		"positive maximum duration",
-		"default 60s",
-		"inherited stdout/stderr",
-		"1s drain grace",
+		"before it is killed, must be positive",
+		"waits at most 1s more",
+		"still holding its stdout or stderr",
 	} {
 		if !strings.Contains(out, fragment) {
 			t.Errorf("help missing %q\n%s", fragment, out)

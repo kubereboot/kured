@@ -167,11 +167,11 @@ func main() {
 	flag.StringVar(&rebootSentinelCommand, "reboot-sentinel-command", "",
 		"command for which a zero return code will trigger a reboot command")
 	flag.DurationVar(&sentinelCommandTimeout, "sentinel-command-timeout", 60*time.Second,
-		"positive maximum duration for one reboot sentinel command (default 60s); after cancellation or process exit, waiting for inherited stdout/stderr pipes is bounded by a 1s drain grace")
+		"maximum time one reboot sentinel command may run before it is killed, must be positive. Once the command has ended, kured waits at most 1s more for any child process still holding its stdout or stderr")
 	flag.StringVar(&rebootCommand, "reboot-command", "/bin/systemctl reboot",
 		"command to run when a reboot is required")
 	flag.DurationVar(&rebootCommandTimeout, "reboot-command-timeout", 60*time.Second,
-		"positive maximum duration for one reboot command (default 60s); after cancellation or process exit, waiting for inherited stdout/stderr pipes is bounded by a 1s drain grace")
+		"maximum time one reboot command may run before it is killed, must be positive. Once the command has ended, kured waits at most 1s more for any child process still holding its stdout or stderr")
 	flag.IntVar(&concurrency, "concurrency", 1,
 		"amount of nodes to concurrently reboot. Defaults to 1")
 	flag.IntVar(&rebootSignal, "reboot-signal", sigTrminPlus5,

@@ -27,7 +27,7 @@ const (
 	defaultCommandTimeout = 60 * time.Second
 	// commandWaitDelay bounds draining of inherited stdout/stderr pipes after
 	// the process exits or its deadline fires. It does not terminate
-	// descendant processes. The CLI help text documents this 1s drain grace.
+	// descendant processes. The CLI help text documents this 1s wait.
 	commandWaitDelay = time.Second
 )
 
