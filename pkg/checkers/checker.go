@@ -20,16 +20,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const (
-	// defaultCommandTimeout is the deadline used when Timeout is unset.
-	// It matches the --sentinel-command-timeout CLI default so existing
-	// constructors and direct struct literals stay bounded.
-	defaultCommandTimeout = 60 * time.Second
-	// commandWaitDelay bounds draining of inherited stdout/stderr pipes after
-	// the process exits or its deadline fires. It does not terminate
-	// descendant processes. The CLI help text documents this 1s wait.
-	commandWaitDelay = time.Second
-)
+// commandWaitDelay bounds draining of inherited stdout/stderr pipes after the
+// process exits or its deadline fires, when a Timeout is set. It does not
+// terminate descendant processes. The CLI help text documents this 1s wait.
+const commandWaitDelay = time.Second
 
 // Checker is the standard interface to use to check
 // if a reboot is required. Its types must implement a
@@ -73,17 +67,11 @@ type CommandChecker struct {
 	NamespacePid int
 	Privileged   bool
 	// Timeout is the deadline for a single RebootRequired execution.
-	// The zero value falls back to 60s. Each call creates its own context
-	// and output buffers; nothing about a previous run is retained.
+	// Zero means no deadline: RebootRequired is never cancelled and waits for
+	// the command and its output, however long they take. Each call creates
+	// its own context and output buffers; nothing about a previous run is
+	// retained.
 	Timeout time.Duration
-}
-
-// commandTimeout returns the deadline for one execution.
-func (rc CommandChecker) commandTimeout() time.Duration {
-	if rc.Timeout == 0 {
-		return defaultCommandTimeout
-	}
-	return rc.Timeout
 }
 
 // RebootRequired for CommandChecker runs a command without returning
@@ -94,20 +82,25 @@ func (rc CommandChecker) commandTimeout() time.Duration {
 func (rc CommandChecker) RebootRequired() bool {
 	bufStdout := new(bytes.Buffer)
 	bufStderr := new(bytes.Buffer)
-	timeout := rc.commandTimeout()
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+	ctx := context.Background()
+	if rc.Timeout != 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, rc.Timeout)
+		defer cancel()
+	}
 	// #nosec G204 -- CheckCommand is controlled and validated internally
 	cmd := exec.CommandContext(ctx, rc.CheckCommand[0], rc.CheckCommand[1:]...)
 	cmd.Stdout = bufStdout
 	cmd.Stderr = bufStderr
-	cmd.WaitDelay = commandWaitDelay
+	if rc.Timeout != 0 {
+		cmd.WaitDelay = commandWaitDelay
+	}
 
 	if err := cmd.Run(); err != nil {
 		// Deadline expiration surfaces as an ExitError from the killed process,
 		// so it has to be detected before ordinary exit-code handling.
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(err, context.DeadlineExceeded) {
-			log.Warn(fmt.Sprintf("sentinel command timed out after %v", timeout), "cmd", strings.Join(cmd.Args, " "), "stdout", bufStdout.String(), "stderr", bufStderr.String())
+			log.Warn(fmt.Sprintf("sentinel command timed out after %v", rc.Timeout), "cmd", strings.Join(cmd.Args, " "), "stdout", bufStdout.String(), "stderr", bufStderr.String())
 			return false
 		}
 		if errors.Is(err, exec.ErrWaitDelay) {
@@ -141,7 +134,7 @@ func (rc CommandChecker) RebootRequired() bool {
 // This relies on hostPID:true and privileged:true to enter host mount space
 // For info, rancher based need different pid, which should be user given.
 // until we have a better discovery mechanism.
-// timeout is the deadline for one RebootRequired execution; zero falls back to 60s.
+// timeout is the deadline for one RebootRequired execution; zero means no deadline.
 func NewCommandChecker(sentinelCommand string, pid int, privileged bool, timeout time.Duration) (*CommandChecker, error) {
 	var cmd []string
 	if privileged {

@@ -33,8 +33,8 @@ func NewRebooter(rebootMethod string, rebootCommand string, rebootSignal int, re
 
 // NewRebootChecker validates the rebootSentinelCommand, rebootSentinelFile input,
 // then chains to the right constructor.
-// sentinelCommandTimeout is passed to command checkers and must already be
-// positive; a zero value is not rewritten here. File checking is unchanged.
+// sentinelCommandTimeout is passed to command checkers; zero means no deadline.
+// File checking is unchanged.
 func NewRebootChecker(rebootSentinelCommand string, rebootSentinelFile string, sentinelCommandTimeout time.Duration) (checkers.Checker, error) {
 	// An override of rebootSentinelCommand means a privileged command
 	if rebootSentinelCommand != "" {

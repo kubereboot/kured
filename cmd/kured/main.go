@@ -224,9 +224,9 @@ func main() {
 		log.Fatal("KURED_NODE_ID environment variable required")
 	}
 	// Reject invalid deadlines before checkers, rebooters, or the cluster
-	// client are built. The in-process 60s sentinel fallback is only for unset
-	// fields, not for an explicit zero or negative flag. A zero reboot command
-	// timeout means no deadline, so only a negative one is invalid.
+	// client are built. The sentinel flag defaults to 60s and must stay positive,
+	// even though a zero Timeout on the package type means no deadline. A zero
+	// reboot command timeout means no deadline, so only a negative one is invalid.
 	if sentinelCommandTimeout <= 0 {
 		log.Fatalf("sentinel-command-timeout must be positive, got %v", sentinelCommandTimeout)
 	}

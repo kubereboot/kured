@@ -237,7 +237,7 @@ func TestNewCommandCheckerStoresTimeout(t *testing.T) {
 	}
 }
 
-func TestCommandTimeoutZeroValueFallback(t *testing.T) {
+func TestCommandCheckerZeroTimeoutHasNoDeadline(t *testing.T) {
 	constructed, err := NewCommandChecker("true", 1, false, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -245,23 +245,26 @@ func TestCommandTimeoutZeroValueFallback(t *testing.T) {
 	if constructed.Timeout != 0 {
 		t.Fatalf("constructor Timeout = %v, want zero", constructed.Timeout)
 	}
-	if got := constructed.commandTimeout(); got != defaultCommandTimeout {
-		t.Fatalf("constructor effective timeout = %v, want %v", got, defaultCommandTimeout)
-	}
 	if !constructed.RebootRequired() {
 		t.Fatal("zero Timeout on constructor result failed closed")
 	}
 
 	literal := CommandChecker{CheckCommand: []string{"true"}}
-	if got := literal.commandTimeout(); got != defaultCommandTimeout {
-		t.Fatalf("literal effective timeout = %v, want %v", got, defaultCommandTimeout)
-	}
 	if !literal.RebootRequired() {
 		t.Fatal("zero Timeout on direct struct failed closed")
 	}
-	literal.Timeout = 5 * time.Second
-	if got := literal.commandTimeout(); got != 5*time.Second {
-		t.Fatalf("explicit timeout = %v", got)
+
+	// The descendant outlives the command and holds its pipes past the 1s
+	// drain bound used with a Timeout. With no Timeout that is not a failure.
+	hold := 2 * commandWaitDelay
+	script := fmt.Sprintf("sleep %d & exit 0", int(hold.Seconds()))
+	held := CommandChecker{CheckCommand: shell(script)}
+	start := time.Now()
+	if !held.RebootRequired() {
+		t.Fatal("zero Timeout gave up on a command that exited 0")
+	}
+	if elapsed := time.Since(start); elapsed < hold/2+commandWaitDelay/4 {
+		t.Fatalf("RebootRequired returned after %v, before the output closed", elapsed)
 	}
 }
 
