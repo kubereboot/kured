@@ -83,3 +83,11 @@ lint-goreleaser:
 	@echo "Checking goreleaser"
 	goreleaser check
 
+scan-dev-image:
+	trivy image \
+      --format table \
+      --exit-code 1 \
+      --ignore-unfixed \
+      --pkg-types os,library \
+      --severity CRITICAL,HIGH \
+      kured:dev
