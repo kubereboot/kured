@@ -40,7 +40,7 @@ jobs:
 
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
-          version: 2026.6.1
+          version: 2026.11.3
 
       - name: run tests
         run: make test
@@ -67,7 +67,7 @@ jobs:
 
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
-          version: 2026.6.1
+          version: 2026.11.3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -76,14 +76,7 @@ jobs:
         run: make dev-image
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: kured:dev
-          format: 'table'
-          exit-code: '1'
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
+        run: make scan-dev-image
 
   e2e-test-matrix:
     name: Generate e2e test matrix
@@ -100,7 +93,7 @@ jobs:
 
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
-          version: 2026.6.1
+          version: 2026.11.3
 
       - name: Generate matrix
         id: matrix
@@ -133,7 +126,7 @@ jobs:
 
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
-          version: 2026.6.1
+          version: 2026.11.3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
