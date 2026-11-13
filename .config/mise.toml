@@ -1,5 +1,5 @@
 [tools]
-actionlint = "latest"
+actionlint = "1.7.12"
 cosign = "3.0.6"
 go = "1.26.10"
 golangci-lint = "2.12.2"
@@ -8,3 +8,4 @@ kind = "0.32.0"
 kubectl = "1.36.1"
 shellcheck = "0.11.0"
 syft = "1.45.1"
+trivy = "0.76.2"
