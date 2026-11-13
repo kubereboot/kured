@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containrrr/shoutrrr"
 	"github.com/kubereboot/kured/internal"
 	"github.com/kubereboot/kured/pkg/blockers"
 	"github.com/kubereboot/kured/pkg/checkers"
@@ -26,6 +25,7 @@ import (
 	"github.com/kubereboot/kured/pkg/reboot"
 	"github.com/kubereboot/kured/pkg/taints"
 	"github.com/kubereboot/kured/pkg/timewindow"
+	"github.com/nicholas-fedor/shoutrrr"
 	papi "github.com/prometheus/client_golang/api"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
