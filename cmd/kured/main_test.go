@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -70,6 +71,32 @@ func Test_stripQuotes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := stripQuotes(tt.input); !reflect.DeepEqual(got, tt.expected) {
 				t.Errorf("stripQuotes() = %v, expected %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func Test_abortFailedDrain(t *testing.T) {
+	tests := []struct {
+		name        string
+		uncordonErr error
+		releaseErr  error
+	}{
+		{name: "uncordons before releasing the lock"},
+		{name: "still releases the lock when uncordon fails", uncordonErr: errors.New("uncordon failed")},
+		{name: "still uncordons when releasing the lock fails", releaseErr: errors.New("release failed")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var calls []string
+			abortFailedDrain("node-1",
+				func() error { calls = append(calls, "uncordon"); return tt.uncordonErr },
+				func() error { calls = append(calls, "release"); return tt.releaseErr },
+			)
+			// Releasing the lock waits for --lock-release-delay, so the node has
+			// to be uncordoned before it, not after.
+			if want := []string{"uncordon", "release"}; !reflect.DeepEqual(calls, want) {
+				t.Errorf("abortFailedDrain() calls = %v, expected %v", calls, want)
 			}
 		})
 	}

@@ -461,6 +461,20 @@ func drain(client *kubernetes.Clientset, node *v1.Node) error {
 	return nil
 }
 
+// abortFailedDrain undoes a failed cordon and drain: it uncordons the node and
+// releases the lock. The node is uncordoned first because releasing the lock
+// waits for --lock-release-delay, and the node would otherwise stay cordoned
+// (unschedulable) for the whole delay even though no reboot will happen.
+func abortFailedDrain(nodename string, uncordonNode, releaseLock func() error) {
+	log.Infof("Performing a best-effort uncordon after failed cordon and drain")
+	if err := uncordonNode(); err != nil {
+		log.Errorf("Failed to uncordon %s: %v", nodename, err)
+	}
+	if err := releaseLock(); err != nil {
+		log.Errorf("Error releasing lock: %v", err)
+	}
+}
+
 func uncordon(client *kubernetes.Clientset, node *v1.Node) error {
 	nodename := node.GetName()
 	log.Infof("Uncordoning node %s", nodename)
@@ -690,15 +704,11 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 		if err != nil {
 			if !forceReboot {
 				log.Errorf("Unable to cordon or drain %s: %v, will release lock and retry cordon and drain before rebooting when lock is next acquired", node.GetName(), err)
-				err = lock.Release()
-				if err != nil {
-					log.Errorf("Error releasing lock: %v", err)
-				}
-				log.Infof("Performing a best-effort uncordon after failed cordon and drain")
-				err := uncordon(client, node)
-				if err != nil {
-					log.Errorf("Failed to uncordon %s: %v", node.GetName(), err)
-				}
+				abortFailedDrain(
+					node.GetName(),
+					func() error { return uncordon(client, node) },
+					lock.Release,
+				)
 				continue
 			}
 		}
