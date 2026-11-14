@@ -689,15 +689,15 @@ func rebootAsRequired(nodeID string, rebooter reboot.Rebooter, checker checkers.
 		err = drain(client, node)
 		if err != nil {
 			if !forceReboot {
-				log.Errorf("Unable to cordon or drain %s: %v, will release lock and retry cordon and drain before rebooting when lock is next acquired", node.GetName(), err)
-				err = lock.Release()
-				if err != nil {
-					log.Errorf("Error releasing lock: %v", err)
-				}
+				log.Errorf("Unable to cordon or drain %s: %v, will uncordon and release lock, then retry cordon and drain before rebooting when lock is next acquired", node.GetName(), err)
 				log.Infof("Performing a best-effort uncordon after failed cordon and drain")
 				err := uncordon(client, node)
 				if err != nil {
 					log.Errorf("Failed to uncordon %s: %v", node.GetName(), err)
+				}
+				err = lock.Release()
+				if err != nil {
+					log.Errorf("Error releasing lock: %v", err)
 				}
 				continue
 			}
