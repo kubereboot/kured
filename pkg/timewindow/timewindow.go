@@ -74,7 +74,7 @@ func (tw *TimeWindow) String() string {
 
 // parseTime tries to parse a time with several formats.
 func parseTime(s string, loc *time.Location) (time.Time, error) {
-	fmts := []string{"15:04", "15:04:05", "03:04pm", "15", "03pm", "3pm"}
+	fmts := []string{"15:04", "15:04:05", "3:04pm", "15", "03pm", "3pm"}
 	for _, f := range fmts {
 		if t, err := time.ParseInLocation(f, s, loc); err == nil {
 			return t, nil
