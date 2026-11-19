@@ -18,10 +18,16 @@ var (
 	_ RebootBlocker = (*PrometheusBlockingChecker)(nil)
 )
 
+// DefaultPrometheusQuery is the PromQL query used to look for blocking alerts
+// when no custom query is given.
+const DefaultPrometheusQuery = "ALERTS"
+
 // PrometheusBlockingChecker contains info for connecting
 // to prometheus, and can give info about whether a reboot should be blocked
 type PrometheusBlockingChecker struct {
 	promConfig papi.Config
+	// PromQL query whose non-zero results block the reboot
+	query string
 	// regexp used to get alerts
 	filter *regexp.Regexp
 	// bool to indicate if only firing alerts should be considered
@@ -34,12 +40,17 @@ type PrometheusBlockingChecker struct {
 }
 
 // NewPrometheusBlockingChecker creates a new PrometheusBlockingChecker using the given
-// Prometheus API config, alert filter, and filtering options.
-func NewPrometheusBlockingChecker(config papi.Config, alertFilter *regexp.Regexp, firingOnly bool, filterMatchOnly bool) PrometheusBlockingChecker {
+// Prometheus API config, PromQL query, alert filter, and filtering options.
+// An empty query defaults to DefaultPrometheusQuery.
+func NewPrometheusBlockingChecker(config papi.Config, query string, alertFilter *regexp.Regexp, firingOnly bool, filterMatchOnly bool) PrometheusBlockingChecker {
 	promClient, err := papi.NewClient(config)
+	if query == "" {
+		query = DefaultPrometheusQuery
+	}
 
 	return PrometheusBlockingChecker{
 		promConfig:      config,
+		query:           query,
 		filter:          alertFilter,
 		firingOnly:      firingOnly,
 		filterMatchOnly: filterMatchOnly,
@@ -77,7 +88,8 @@ func (pb PrometheusBlockingChecker) MetricLabel() string {
 }
 
 // ActiveAlerts is a method of type promClient, it returns a list of names of active alerts
-// (e.g. pending or firing), filtered by the supplied regexp or by the includeLabels query.
+// (e.g. pending or firing), found by running the configured PromQL query (ALERTS by default),
+// filtered by the supplied regexp or by the includeLabels query.
 // filter by regexp means when the regexp finds the alert-name; the alert is excluded from the
 // block-list and will NOT block rebooting. query by includeLabel means,
 // if the query finds an alert, it will include it to the block-list, and it WILL block rebooting.
@@ -88,8 +100,8 @@ func (pb PrometheusBlockingChecker) ActiveAlerts() ([]string, error) {
 
 	api := v1.NewAPI(pb.promClient)
 
-	// get all alerts from prometheus
-	value, _, _, err := api.Query(context.Background(), "ALERTS", time.Now())
+	// run the query against prometheus
+	value, _, _, err := api.Query(context.Background(), pb.query, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -98,10 +110,17 @@ func (pb PrometheusBlockingChecker) ActiveAlerts() ([]string, error) {
 		if vector, ok := value.(model.Vector); ok {
 			activeAlertSet := make(map[string]bool)
 			for _, sample := range vector {
-				if alertName, isAlert := sample.Metric[model.AlertNameLabel]; isAlert && sample.Value != 0 {
-					if matchesRegex(pb.filter, string(alertName), pb.filterMatchOnly) && (!pb.firingOnly || sample.Metric["alertstate"] == "firing") {
-						activeAlertSet[string(alertName)] = true
-					}
+				if sample.Value == 0 {
+					continue
+				}
+				// Samples of a custom query do not necessarily carry an alert name:
+				// identify them by their labels instead.
+				name := sample.Metric.String()
+				if alertName, isAlert := sample.Metric[model.AlertNameLabel]; isAlert {
+					name = string(alertName)
+				}
+				if matchesRegex(pb.filter, name, pb.filterMatchOnly) && (!pb.firingOnly || sample.Metric["alertstate"] == "firing") {
+					activeAlertSet[name] = true
 				}
 			}
 

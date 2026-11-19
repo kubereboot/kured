@@ -19,7 +19,7 @@ func Test_rebootBlocked(t *testing.T) {
 	blockingChecker := BlockingChecker{blocking: true}
 
 	// Instantiate a prometheusClient with a broken_url
-	brokenPrometheusClient := NewPrometheusBlockingChecker(papi.Config{Address: "broken_url"}, nil, false, false)
+	brokenPrometheusClient := NewPrometheusBlockingChecker(papi.Config{Address: "broken_url"}, "", nil, false, false)
 
 	type args struct {
 		blockers []RebootBlocker

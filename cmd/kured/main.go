@@ -60,6 +60,7 @@ var (
 	lockTTL                         time.Duration
 	lockReleaseDelay                time.Duration
 	prometheusURL                   string
+	prometheusQuery                 string
 	preferNoScheduleTaintName       string
 	alertFilter                     regexpValue
 	alertFilterMatchOnly            bool
@@ -151,6 +152,8 @@ func main() {
 		"delay lock release for this duration (default: 0, disabled)")
 	flag.StringVar(&prometheusURL, "prometheus-url", "",
 		"Prometheus instance to probe for active alerts")
+	flag.StringVar(&prometheusQuery, "prometheus-query", blockers.DefaultPrometheusQuery,
+		"PromQL query run against the Prometheus instance: any non-zero result blocks the reboot")
 	flag.Var(&alertFilter, "alert-filter-regexp",
 		"alert names to ignore when checking for active alerts")
 	flag.BoolVar(&alertFilterMatchOnly, "alert-filter-match-only", false,
@@ -267,7 +270,7 @@ func main() {
 
 	var blockCheckers []blockers.RebootBlocker
 	if prometheusURL != "" {
-		blockCheckers = append(blockCheckers, blockers.NewPrometheusBlockingChecker(papi.Config{Address: prometheusURL}, alertFilter.Regexp, alertFiringOnly, alertFilterMatchOnly))
+		blockCheckers = append(blockCheckers, blockers.NewPrometheusBlockingChecker(papi.Config{Address: prometheusURL}, prometheusQuery, alertFilter.Regexp, alertFiringOnly, alertFilterMatchOnly))
 	}
 	if podSelectors != nil {
 		blockCheckers = append(blockCheckers, blockers.NewKubernetesBlockingChecker(client, nodeID, podSelectors))
