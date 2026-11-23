@@ -32,7 +32,7 @@ spec:
       volumes:
         - name: sentinel
           hostPath:
-            path: /var/run
+            path: /run
             type: Directory
       containers:
         - name: kured
