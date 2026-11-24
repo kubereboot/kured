@@ -95,3 +95,79 @@ func TestTimeWindows(t *testing.T) {
 		}
 	}
 }
+
+func TestParseTime(t *testing.T) {
+	tests := []struct {
+		input  string
+		hour   int
+		minute int
+	}{
+		// Formats listed in the kured documentation.
+		{"5pm", 17, 0},
+		{"5:00pm", 17, 0},
+		{"17:00", 17, 0},
+		{"17", 17, 0},
+		// Other 12-hour clock times, with and without a leading zero on the hour.
+		{"9:30am", 9, 30},
+		{"09:30am", 9, 30},
+		{"5:45pm", 17, 45},
+		{"05:45pm", 17, 45},
+		{"11:59pm", 23, 59},
+		{"12:00am", 0, 0},
+		{"12:30pm", 12, 30},
+	}
+
+	for _, tst := range tests {
+		got, err := parseTime(tst.input, time.UTC)
+		if err != nil {
+			t.Errorf("parseTime(%q) returned an error: %v", tst.input, err)
+			continue
+		}
+		if got.Hour() != tst.hour || got.Minute() != tst.minute {
+			t.Errorf("parseTime(%q) = %02d:%02d, expected %02d:%02d", tst.input, got.Hour(), got.Minute(), tst.hour, tst.minute)
+		}
+	}
+}
+
+func TestParseTimeErrors(t *testing.T) {
+	tests := []string{
+		"",
+		"noon",
+		"13pm",
+		"5:60pm",
+		"25:00",
+	}
+
+	for _, tst := range tests {
+		if _, err := parseTime(tst, time.UTC); err == nil {
+			t.Errorf("Expected an error for input %q", tst)
+		}
+	}
+}
+
+func TestTimeWindowWithTwelveHourMinutes(t *testing.T) {
+	tw, err := New([]string{"mon", "tue", "wed", "thu", "fri"}, "9:30am", "5:15pm", "UTC")
+	if err != nil {
+		t.Fatalf("Failed to create TimeWindow: %v", err)
+	}
+
+	tests := []struct {
+		time   string
+		result bool
+	}{
+		{"2019/04/04 09:29 UTC", false},
+		{"2019/04/04 09:30 UTC", true},
+		{"2019/04/04 17:15 UTC", true},
+		{"2019/04/04 17:16 UTC", false},
+	}
+
+	for _, tst := range tests {
+		tm, err := time.ParseInLocation("2006/01/02 15:04 MST", tst.time, time.UTC)
+		if err != nil {
+			t.Fatalf("Failed to parse time %q: %v", tst.time, err)
+		}
+		if got := tw.Contains(tm); got != tst.result {
+			t.Errorf("(%s) contains (%s) = %v, expected %v", tw.String(), tst.time, got, tst.result)
+		}
+	}
+}
