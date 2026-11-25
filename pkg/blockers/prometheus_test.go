@@ -145,7 +145,7 @@ func TestActiveAlerts(t *testing.T) {
 			regex, _ := regexp.Compile(tc.rFilter)
 
 			// instantiate the prometheus client with the mockserver-address
-			p := NewPrometheusBlockingChecker(api.Config{Address: mockServer.URL}, regex, tc.firingOnly, tc.filterMatchOnly)
+			p := NewPrometheusBlockingChecker(api.Config{Address: mockServer.URL}, "", regex, tc.firingOnly, tc.filterMatchOnly)
 
 			result, err := p.ActiveAlerts()
 			if err != nil {
@@ -160,4 +160,42 @@ func TestActiveAlerts(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestActiveAlertsCustomQuery(t *testing.T) {
+	var gotQuery string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Error(err)
+		}
+		gotQuery = r.Form.Get("query")
+		_, _ = w.Write([]byte(`{"status":"success","data":{"resultType":"vector","result":[` +
+			`{"metric":{"__name__":"node_load1","instance":"a"},"value":[1622472933.973,"5"]},` +
+			`{"metric":{"__name__":"node_load1","instance":"b"},"value":[1622472933.973,"0"]},` +
+			`{"metric":{"__name__":"ALERTS","alertname":"Foo","alertstate":"pending"},"value":[1622472933.973,"1"]}]}}`))
+	}))
+	defer server.Close()
+
+	t.Run("default query is ALERTS", func(t *testing.T) {
+		p := NewPrometheusBlockingChecker(api.Config{Address: server.URL}, "", nil, false, false)
+		_, err := p.ActiveAlerts()
+		assert.NoError(t, err)
+		assert.Equal(t, "ALERTS", gotQuery)
+	})
+
+	t.Run("custom query is sent and samples without alertname block", func(t *testing.T) {
+		p := NewPrometheusBlockingChecker(api.Config{Address: server.URL}, "node_load1 > 1", nil, false, false)
+		result, err := p.ActiveAlerts()
+		assert.NoError(t, err)
+		assert.Equal(t, "node_load1 > 1", gotQuery)
+		assert.Equal(t, []string{`Foo`, `node_load1{instance="a"}`}, result)
+		assert.True(t, p.IsBlocked())
+	})
+
+	t.Run("firingOnly ignores samples that are not firing alerts", func(t *testing.T) {
+		p := NewPrometheusBlockingChecker(api.Config{Address: server.URL}, "node_load1 > 1", nil, true, false)
+		result, err := p.ActiveAlerts()
+		assert.NoError(t, err)
+		assert.Empty(t, result)
+	})
 }

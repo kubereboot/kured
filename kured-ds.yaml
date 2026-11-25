@@ -72,6 +72,7 @@ spec:
 #            - --lock-annotation=weave.works/kured-node-lock
 #            - --lock-ttl=0
 #            - --prometheus-url=http://prometheus.monitoring.svc.cluster.local
+#            - --prometheus-query=ALERTS
 #            - --alert-filter-regexp=^RebootRequired$
 #            - --alert-filter-match-only=false
 #            - --alert-firing-only=false
