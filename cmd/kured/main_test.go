@@ -1,8 +1,15 @@
 package main
 
 import (
+	"context"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/api/core/v1"
 )
 
 func TestValidateNotificationURL(t *testing.T) {
@@ -73,4 +80,27 @@ func Test_stripQuotes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUpdateNodeLabelsSkipsInvalidEntries(t *testing.T) {
+	client := fake.NewSimpleClientset(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
+	})
+	node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node"}}
+
+	// A trailing "-" removal marker (no "=") previously panicked with
+	// "index out of range [1] with length 1". It must now be skipped.
+	labels := []string{
+		"node.kubernetes.io/exclude-from-external-load-balancers=foo",
+		"node.kubernetes.io/exclude-from-external-load-balancers-",
+	}
+	require.NotPanics(t, func() {
+		updateNodeLabels(client, node, labels)
+	})
+
+	updated, err := client.CoreV1().Nodes().Get(context.TODO(), "test-node", metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, "foo", updated.Labels["node.kubernetes.io/exclude-from-external-load-balancers"])
+	_, hasInvalid := updated.Labels["node.kubernetes.io/exclude-from-external-load-balancers-"]
+	assert.False(t, hasInvalid, "invalid label entry should not be applied")
 }
